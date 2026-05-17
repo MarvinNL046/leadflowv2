@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useConvexAuth, useMutation } from 'convex/react'
@@ -11,7 +11,7 @@ type Flow = 'signIn' | 'signUp'
 function LoginPage() {
   const { signIn } = useAuthActions()
   const navigate = useNavigate()
-  const { isAuthenticated } = useConvexAuth()
+  const { isAuthenticated, isLoading } = useConvexAuth()
   const ensureProfile = useMutation(api.userProfiles.getOrCreateUserProfile)
 
   const [flow, setFlow] = useState<Flow>('signIn')
@@ -19,33 +19,51 @@ function LoginPage() {
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [statusMsg, setStatusMsg] = useState<string | null>(null)
 
-  // Wanneer al ingelogd: meteen door naar home
-  if (isAuthenticated) {
-    void navigate({ to: '/' })
-  }
+  // Reageer op auth-state changes via useEffect (correct React pattern —
+  // niet inline tijdens render). Convex's auth-state komt async binnen
+  // via websocket na succesvolle signIn, dus dit triggert vanzelf zodra
+  // de session-cookie geladen is.
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      setStatusMsg('Ingelogd, profile aanmaken…')
+      ensureProfile({})
+        .then(() => {
+          setStatusMsg('Klaar, doorsturen…')
+          void navigate({ to: '/' })
+        })
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err)
+          setError(`Profile aanmaken mislukt: ${msg}`)
+          setStatusMsg(null)
+        })
+    }
+  }, [isAuthenticated, isLoading, ensureProfile, navigate])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setStatusMsg(flow === 'signIn' ? 'Inloggen…' : 'Account aanmaken…')
     setSubmitting(true)
     try {
       const formData = new FormData()
       formData.set('email', email)
       formData.set('password', password)
       formData.set('flow', flow)
-      await signIn('password', formData)
-      // First sign-in op deze user → maak userProfile aan (idempotent).
-      // Wacht hier op zodat home page meteen een profile heeft.
-      await ensureProfile({})
-      void navigate({ to: '/' })
+      const result = await signIn('password', formData)
+      console.log('[login] signIn result:', result)
+      setStatusMsg('Wacht op auth-state…')
+      // useEffect hierboven pakt verder over zodra isAuthenticated=true
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      console.error('[login] signIn error:', err)
       setError(
         flow === 'signIn'
           ? `Inloggen mislukt: ${msg}`
           : `Registratie mislukt: ${msg}`,
       )
+      setStatusMsg(null)
       setSubmitting(false)
     }
   }
@@ -104,6 +122,12 @@ function LoginPage() {
           {error && (
             <div className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">
               {error}
+            </div>
+          )}
+
+          {statusMsg && !error && (
+            <div className="rounded-md bg-violet-50 px-3 py-2 text-sm text-violet-700">
+              {statusMsg}
             </div>
           )}
 
