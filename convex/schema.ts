@@ -26,24 +26,33 @@
 
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server";
 
 export default defineSchema({
   // ════════════════════════════════════════════════════════════════════
-  // AUTH + MULTI-TENANT
+  // CONVEX AUTH — built-in tables (users, authSessions, authAccounts,
+  // authRefreshTokens, authVerificationCodes, authVerifiers,
+  // authRateLimits). authTables.users heeft email + name + image + phone
+  // + verificationTimes. Niet zelf overschrijven.
   // ════════════════════════════════════════════════════════════════════
+  ...authTables,
 
-  users: defineTable({
-    email: v.string(),
+  // ════════════════════════════════════════════════════════════════════
+  // APP-LEVEL USER PROFILE — extra velden die niet in authTables.users
+  // passen (locale-voorkeur, Staycool super-admin flag). FK naar
+  // authTables.users (v.id("users")). 1:1 relatie; rij wordt aangemaakt
+  // bij eerste sign-in via een getOrCreateUserProfile mutation.
+  // firstName/lastName ook hier: authTables.users heeft alleen `name`
+  // als single string, wij willen split fields voor i18n + sortering.
+  // ════════════════════════════════════════════════════════════════════
+  userProfiles: defineTable({
+    userId: v.id("users"),
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
-    avatarUrl: v.optional(v.string()),
-    // Stack Auth in v1 → in v2: @convex-dev/auth of Clerk integration
-    externalAuthId: v.optional(v.string()),
     locale: v.union(v.literal("en"), v.literal("nl")),
     isSuperAdmin: v.boolean(),
     lastLoginAt: v.optional(v.number()),
-  }).index("by_email", ["email"])
-    .index("by_externalAuthId", ["externalAuthId"]),
+  }).index("by_user", ["userId"]),
 
   orgs: defineTable({
     name: v.string(),
