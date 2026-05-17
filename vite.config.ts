@@ -10,6 +10,11 @@ import { nitro } from 'nitro/vite'
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
+  // Forceer dev op poort 5173 (Vite default). strictPort=true → Vite faalt
+  // expliciet als 5173 bezet is in plaats van stilzwijgend te shiften naar
+  // 3001/3002/etc. Bewust gekozen zodat SITE_URL in convex/auth altijd
+  // matched + OAuth callback-URL's later voorspelbaar zijn.
+  server: { port: 5173, strictPort: true },
   plugins: [
     devtools(),
     nitro({ rollupConfig: { external: [/^@sentry\//] } }),
