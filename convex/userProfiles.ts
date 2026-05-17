@@ -1,5 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
 /**
  * Haalt de app-level userProfile voor de huidig ingelogde gebruiker op,
@@ -14,18 +15,26 @@ import { mutation, query } from "./_generated/server";
  * Super-admin bootstrap: marvinsmit1988@gmail.com én info@staycoolairco.nl
  * krijgen automatisch isSuperAdmin=true (Marvin's persoonlijke +
  * Staycool's bedrijfs-mailbox). Voor andere users start `false` —
- * bewuste opt-in vereist (later via admin-UI of handmatige Convex
- * dashboard SQL).
+ * bewuste opt-in vereist (later via admin-UI of invite-flow).
+ *
+ * Multi-tenant bootstrap: voor super-admins zorgt deze mutation óók dat
+ * de Staycool-org + default workspace + owner-membership bestaan. Eerste
+ * super-admin maakt de tenant aan; volgende super-admins joinen als
+ * owner van dezelfde tenant. Non-super-admins krijgen géén auto-tenant
+ * (wachten op invite of admin-toewijzing later).
  *
  * BELANGRIJK: gebruik `getAuthUserId(ctx)` van @convex-dev/auth/server,
  * NIET `identity.subject`. identity.subject is composite
  * "<userId>|<sessionId>" string, niet de plain Id<"users">.
- * getAuthUserId returnt de correct-getypete Id<"users">.
  */
 const SUPER_ADMIN_EMAILS = new Set([
   "marvinsmit1988@gmail.com",
   "info@staycoolairco.nl",
 ]);
+
+const STAYCOOL_ORG_SLUG = "staycool";
+const STAYCOOL_ORG_NAME = "Staycool Airconditioning";
+const DEFAULT_WORKSPACE_NAME = "Default";
 
 export const getOrCreateUserProfile = mutation({
   args: {},
@@ -43,6 +52,11 @@ export const getOrCreateUserProfile = mutation({
     if (existing) {
       // Bump lastLoginAt op elke aanroep — goedkope analytics
       await ctx.db.patch(existing._id, { lastLoginAt: Date.now() });
+      // Bootstrap kan al gedaan zijn; ensure idempotent voor super-admins
+      // die de eerste keer inloggen ná een schema-reset.
+      if (existing.isSuperAdmin) {
+        await ensureStaycoolTenant(ctx, userId);
+      }
       return existing;
     }
 
@@ -62,9 +76,78 @@ export const getOrCreateUserProfile = mutation({
       lastLoginAt: Date.now(),
     });
 
+    // Super-admins krijgen meteen toegang tot de Staycool-tenant.
+    if (isSuperAdmin) {
+      await ensureStaycoolTenant(ctx, userId);
+    }
+
     return await ctx.db.get(profileId);
   },
 });
+
+/**
+ * Idempotent helper: zorgt dat de Staycool-org + default workspace +
+ * owner-membership voor `userId` bestaan. Wordt aangeroepen vanuit
+ * getOrCreateUserProfile voor super-admins. Veilig om vaker te
+ * draaien — checkt bestaan voor elke insert.
+ *
+ * Niet als losse mutation geëxposed om accidentele tenant-creation door
+ * non-super-admins te voorkomen.
+ */
+async function ensureStaycoolTenant(
+  ctx: MutationCtx,
+  userId: Id<"users">
+): Promise<void> {
+  // 1. Find or create Staycool org via slug
+  let org = await ctx.db
+    .query("orgs")
+    .withIndex("by_slug", (q) => q.eq("slug", STAYCOOL_ORG_SLUG))
+    .unique();
+
+  if (!org) {
+    const orgId = await ctx.db.insert("orgs", {
+      name: STAYCOOL_ORG_NAME,
+      slug: STAYCOOL_ORG_SLUG,
+      ownerId: userId,
+    });
+    org = await ctx.db.get(orgId);
+  }
+  if (!org) return;
+
+  // 2. Find or create default workspace under org
+  let workspace = await ctx.db
+    .query("workspaces")
+    .withIndex("by_org", (q) => q.eq("orgId", org!._id))
+    .filter((q) => q.eq(q.field("isDefault"), true))
+    .first();
+
+  if (!workspace) {
+    const workspaceId = await ctx.db.insert("workspaces", {
+      orgId: org._id,
+      name: DEFAULT_WORKSPACE_NAME,
+      isDefault: true,
+    });
+    workspace = await ctx.db.get(workspaceId);
+  }
+  if (!workspace) return;
+
+  // 3. Find or create owner-membership voor deze user
+  const existingMembership = await ctx.db
+    .query("memberships")
+    .withIndex("by_user_org", (q) =>
+      q.eq("userId", userId).eq("orgId", org!._id)
+    )
+    .first();
+
+  if (!existingMembership) {
+    await ctx.db.insert("memberships", {
+      userId,
+      orgId: org._id,
+      workspaceId: workspace._id,
+      role: "owner",
+    });
+  }
+}
 
 /**
  * Read-only helper voor de current user's profile. Returned null als
@@ -81,5 +164,40 @@ export const me = query({
       .query("userProfiles")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
+  },
+});
+
+/**
+ * Returnt alle orgs + workspaces waar deze user member van is. Voor de
+ * home page om "je bent member van Staycool / Default" te tonen, en
+ * voor straks: org-switcher in de header.
+ */
+export const myTenants = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const memberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) => q.eq("userId", userId))
+      .collect();
+
+    return Promise.all(
+      memberships.map(async (m) => {
+        const org = await ctx.db.get(m.orgId);
+        const workspace = m.workspaceId
+          ? await ctx.db.get(m.workspaceId)
+          : null;
+        return {
+          membershipId: m._id,
+          role: m.role,
+          org: org ? { id: org._id, name: org.name, slug: org.slug } : null,
+          workspace: workspace
+            ? { id: workspace._id, name: workspace.name }
+            : null,
+        };
+      })
+    );
   },
 });

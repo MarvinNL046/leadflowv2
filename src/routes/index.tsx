@@ -1,5 +1,6 @@
+import { useEffect } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Authenticated, Unauthenticated, useQuery } from 'convex/react'
+import { Authenticated, Unauthenticated, useQuery, useMutation } from 'convex/react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { api } from '../../convex/_generated/api'
 
@@ -30,6 +31,21 @@ function Home() {
 function AuthenticatedView() {
   const { signOut } = useAuthActions()
   const profile = useQuery(api.userProfiles.me)
+  const tenants = useQuery(api.userProfiles.myTenants)
+  const ensureProfile = useMutation(api.userProfiles.getOrCreateUserProfile)
+
+  // Idempotent bootstrap-trigger op page-load. Voor super-admins met
+  // existing profile maar zonder memberships (b.v. omdat de tenant-
+  // bootstrap pas later is toegevoegd aan getOrCreateUserProfile) zal
+  // ensureProfile binnen ensureStaycoolTenant de Staycool-org + workspace
+  // + owner-membership aanmaken. Voor alle andere users: no-op.
+  useEffect(() => {
+    if (profile?.isSuperAdmin && tenants && tenants.length === 0) {
+      ensureProfile({}).catch((err) =>
+        console.error('[index] bootstrap failed:', err),
+      )
+    }
+  }, [profile, tenants, ensureProfile])
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
@@ -77,14 +93,48 @@ function AuthenticatedView() {
         </button>
       </div>
 
+      {/* Tenant memberships — auto-bootstrap voor super-admins */}
+      <div className="mt-6">
+        <div className="text-xs uppercase tracking-wide text-zinc-500">
+          Je tenants
+        </div>
+        {tenants === undefined ? (
+          <p className="mt-1 text-sm text-zinc-500">Laden…</p>
+        ) : tenants.length === 0 ? (
+          <p className="mt-1 text-sm text-amber-600">
+            Geen memberships gevonden. Wacht op een uitnodiging van een
+            super-admin.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {tenants.map((t) => (
+              <li
+                key={t.membershipId}
+                className="flex items-center justify-between rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+              >
+                <div>
+                  <span className="font-medium">{t.org?.name ?? '(geen org)'}</span>
+                  {t.workspace && (
+                    <span className="text-zinc-500"> · {t.workspace.name}</span>
+                  )}
+                </div>
+                <span className="rounded bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                  {t.role}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <div className="mt-6 rounded-md border border-dashed border-zinc-200 p-4 text-sm text-zinc-500">
         <p className="font-medium text-zinc-700">Volgende v2-stappen:</p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>Multi-tenant: orgs + workspaces + memberships seed</li>
           <li>CRM core: contacts list + detail + create</li>
           <li>Messaging unified table queries</li>
           <li>Workflow engine (Snelle Response port)</li>
           <li>Meta webhook (via Convex HTTP action)</li>
+          <li>Invite-flow voor non-super-admin users</li>
         </ul>
       </div>
     </div>
