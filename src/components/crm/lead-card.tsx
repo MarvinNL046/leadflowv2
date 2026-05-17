@@ -17,6 +17,7 @@ import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { cn } from '#/lib/utils.ts'
+import { LeadDialog } from './lead-dialog'
 
 export interface IncomingLead {
   _id: string
@@ -42,6 +43,7 @@ interface LeadCardProps {
 
 export function LeadCard({ lead, isNew = false }: LeadCardProps) {
   const [copied, setCopied] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   const displayName =
     [lead.firstName, lead.lastName].filter(Boolean).join(' ') ||
@@ -70,11 +72,10 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
   }
 
   function handleCall() {
-    if (!lead.phone) {
-      toast.error('Geen telefoonnummer beschikbaar')
-      return
-    }
-    window.location.href = `tel:${lead.phone}`
+    // Opent modal met call-flow opties (heeft opgenomen / niet opgenomen /
+    // ongeldig nummer / buiten werkgebied). In de modal staat het tel:
+    // link bovenaan zodat operator eerst belt, dan uitkomst registreert.
+    setDialogOpen(true)
   }
 
   // Relatieve tijd, kort (b.v. "5 min geleden", "2u geleden", "3d geleden")
@@ -203,6 +204,12 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
           </Button>
         </div>
       </CardContent>
+
+      <LeadDialog
+        lead={lead}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
     </Card>
   )
 }

@@ -111,13 +111,18 @@ export const listIncomingLeads = query({
 
     const limit = Math.min(args.limit ?? 50, 200);
 
-    const contacts = await ctx.db
+    const rawContacts = await ctx.db
       .query("contacts")
       .withIndex("by_workspace_created", (q) =>
         q.eq("workspaceId", args.workspaceId),
       )
       .order("desc")
-      .take(limit);
+      .take(limit * 2);  // overshoot zodat na filter nog ~limit overblijft
+
+    // Filter: skip outside-area markeerde contacts uit het dashboard
+    const contacts = rawContacts
+      .filter((c) => !c.outsideArea)
+      .slice(0, limit);
 
     // Per contact: laad attribution + latest note in parallel
     const enriched = await Promise.all(
@@ -145,6 +150,70 @@ export const listIncomingLeads = query({
     );
 
     return enriched;
+  },
+});
+
+/**
+ * Per-contact action mutations voor call-flow vanaf het dashboard.
+ * Alle vier vereisen workspace-membership voor de contact's workspace.
+ */
+async function requireMembershipForContact(
+  ctx: any,
+  contactId: Id<"contacts">,
+): Promise<{ contact: any; userId: Id<"users"> }> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new Error("Not authenticated");
+
+  const contact = await ctx.db.get(contactId);
+  if (!contact) throw new Error("Contact not found");
+
+  const workspace = await ctx.db.get(contact.workspaceId);
+  if (!workspace) throw new Error("Workspace not found");
+
+  const membership = await ctx.db
+    .query("memberships")
+    .withIndex("by_user_org", (q: any) =>
+      q.eq("userId", userId).eq("orgId", workspace.orgId),
+    )
+    .first();
+  if (!membership) throw new Error("Not a member of this workspace");
+
+  return { contact, userId };
+}
+
+/**
+ * Markeer dat er gebeld is + uitkomst. Bumpt callCount, set lastCallAt,
+ * set lastCallResult. Gebruikt door call-flow modal op /crm dashboard.
+ */
+export const recordCall = mutation({
+  args: {
+    contactId: v.id("contacts"),
+    result: v.union(
+      v.literal("answered"),
+      v.literal("not_answered"),
+      v.literal("invalid"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const { contact } = await requireMembershipForContact(ctx, args.contactId);
+    await ctx.db.patch(args.contactId, {
+      callCount: (contact.callCount ?? 0) + 1,
+      lastCallAt: Date.now(),
+      lastCallResult: args.result,
+    });
+  },
+});
+
+/**
+ * Markeer een lead als "buiten werkgebied" (Limburg only voor Staycool).
+ * Verbergt 'm uit het Nieuwe-leads dashboard zonder te deleten — blijft
+ * vindbaar in Contacts voor audit.
+ */
+export const markOutsideArea = mutation({
+  args: { contactId: v.id("contacts") },
+  handler: async (ctx, args) => {
+    await requireMembershipForContact(ctx, args.contactId);
+    await ctx.db.patch(args.contactId, { outsideArea: true });
   },
 });
 
