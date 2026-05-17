@@ -1,165 +1,185 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { useState } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
-import { Users, Kanban, MessageSquare, Zap, ArrowRight } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card.tsx'
+import { Phone, ChevronDown } from 'lucide-react'
+import { Card, CardContent } from '#/components/ui/card.tsx'
+import { Button } from '#/components/ui/button.tsx'
+import { Badge } from '#/components/ui/badge.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
+import { LeadCard, type IncomingLead } from '../components/crm/lead-card'
 import { api } from '../../convex/_generated/api'
 
 export const Route = createFileRoute('/crm/')({ component: CrmDashboard })
+
+const LEADS_PER_PAGE = 5
+
+type Tab = 'all' | 'follow_up' | 'new'
 
 function CrmDashboard() {
   const tenants = useQuery(api.userProfiles.myTenants)
   const tenant = tenants?.find((t) => t.workspace !== null) ?? null
   const workspaceId = tenant?.workspace?.id
 
-  const contactCount = useQuery(
-    api.contacts.count,
-    workspaceId ? { workspaceId } : 'skip',
-  )
-  const recentContacts = useQuery(
-    api.contacts.list,
-    workspaceId ? { workspaceId } : 'skip',
+  const leads = useQuery(
+    api.contacts.listIncomingLeads,
+    workspaceId ? { workspaceId, limit: 50 } : 'skip',
   )
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Overzicht van je CRM-activiteit
-        </p>
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-green-500/20 to-emerald-500/20">
+          <Phone className="h-4.5 w-4.5 text-green-600" />
+        </div>
+        <div>
+          <h1 className="text-xl font-semibold text-zinc-900">Nieuwe leads</h1>
+          <p className="text-xs text-zinc-500">
+            {leads === undefined
+              ? 'Laden…'
+              : `${leads.length} ${leads.length === 1 ? 'lead' : 'leads'} om op te volgen`}
+          </p>
+        </div>
       </div>
 
-      {/* Stats cards row */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          icon={<Users className="h-4 w-4" />}
-          label="Contacts"
-          value={contactCount}
-          to="/crm/contacts"
-        />
-        <StatCard
-          icon={<Kanban className="h-4 w-4" />}
-          label="Opportunities"
-          value={0}
-          hint="Pipeline-feature wordt straks geport"
-        />
-        <StatCard
-          icon={<MessageSquare className="h-4 w-4" />}
-          label="Berichten 24u"
-          value={0}
-          hint="Messaging-feature volgt"
-        />
-        <StatCard
-          icon={<Zap className="h-4 w-4" />}
-          label="Workflows actief"
-          value={0}
-          hint="Workflow-engine volgt"
-        />
-      </div>
-
-      {/* Recent contacts */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-base">Recente contacts</CardTitle>
-            <p className="mt-1 text-xs text-zinc-500">
-              Laatste 5 toegevoegde of bewerkte contacts
-            </p>
-          </div>
-          <Link
-            to="/crm/contacts"
-            className="inline-flex items-center gap-1 text-sm font-medium text-violet-700 hover:text-violet-900"
-          >
-            Alle contacts
-            <ArrowRight className="h-3 w-3" />
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {recentContacts === undefined ? (
-            <div className="space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : recentContacts.length === 0 ? (
-            <div className="rounded-md border border-dashed border-zinc-200 p-6 text-center">
-              <p className="text-sm text-zinc-500">
-                Nog geen contacts. Voeg je eerste toe op de Contacts pagina.
-              </p>
-              <Link
-                to="/crm/contacts"
-                className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-violet-700 hover:text-violet-900"
-              >
-                Naar contacts
-                <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-          ) : (
-            <ul className="divide-y divide-zinc-100">
-              {recentContacts.slice(0, 5).map((c) => {
-                const fullName =
-                  [c.firstName, c.lastName].filter(Boolean).join(' ') ||
-                  c.email ||
-                  c.phone ||
-                  '(naamloos)'
-                return (
-                  <li
-                    key={c._id}
-                    className="flex items-center justify-between gap-4 py-2 first:pt-0 last:pb-0"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-zinc-900">
-                        {fullName}
-                      </div>
-                      <div className="mt-0.5 text-xs text-zinc-500">
-                        {[c.email, c.phone, c.city].filter(Boolean).join(' · ')}
-                      </div>
-                    </div>
-                    <div className="text-xs text-zinc-400">
-                      {new Date(c._creationTime).toLocaleDateString('nl-NL')}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {leads === undefined ? (
+        <div className="space-y-3">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      ) : leads.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <LeadsList leads={leads as IncomingLead[]} />
+      )}
     </div>
   )
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-  to,
-  hint,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: number | undefined
-  to?: string
-  hint?: string
-}) {
-  const body = (
-    <Card className={to ? 'transition-shadow hover:shadow-md' : ''}>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-zinc-500">
-          {icon}
-          <span className="text-xs uppercase tracking-wide">{label}</span>
+function LeadsList({ leads }: { leads: IncomingLead[] }) {
+  const [tab, setTab] = useState<Tab>('all')
+  const [visibleCount, setVisibleCount] = useState(LEADS_PER_PAGE)
+
+  const now = Date.now()
+
+  // Drie buckets — niet mutually exclusive (lead kan in meerdere zitten)
+  const newOnly = leads.filter((l) => l.callCount === 0)
+  const followUp = leads.filter(
+    (l) => l.callCount > 0 && l.callCount < 3, // bel-pogingen gedaan, niet uitgeput
+  )
+
+  const filtered =
+    tab === 'follow_up' ? followUp : tab === 'new' ? newOnly : leads
+
+  const visible = filtered.slice(0, visibleCount)
+  const hasMore = filtered.length > visibleCount
+
+  return (
+    <div className="space-y-3">
+      {/* Tabs */}
+      <div className="grid grid-cols-3 gap-1 rounded-lg bg-zinc-100 p-1">
+        <TabButton
+          active={tab === 'all'}
+          onClick={() => {
+            setTab('all')
+            setVisibleCount(LEADS_PER_PAGE)
+          }}
+        >
+          Alle
+          <Badge variant="secondary" className="ml-1 bg-white">
+            {leads.length}
+          </Badge>
+        </TabButton>
+        <TabButton
+          active={tab === 'follow_up'}
+          onClick={() => {
+            setTab('follow_up')
+            setVisibleCount(LEADS_PER_PAGE)
+          }}
+        >
+          Vervolg
+          <Badge variant="secondary" className="ml-1 bg-white">
+            {followUp.length}
+          </Badge>
+        </TabButton>
+        <TabButton
+          active={tab === 'new'}
+          onClick={() => {
+            setTab('new')
+            setVisibleCount(LEADS_PER_PAGE)
+          }}
+        >
+          Nieuw
+          <Badge variant="secondary" className="ml-1 bg-white">
+            {newOnly.length}
+          </Badge>
+        </TabButton>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500">
+          Geen leads in dit filter
         </div>
-        <div className="mt-2 text-2xl font-bold tabular-nums">
-          {value === undefined ? (
-            <Skeleton className="h-7 w-12" />
-          ) : (
-            value
+      ) : (
+        <>
+          {visible.map((lead) => (
+            <LeadCard key={lead._id} lead={lead} />
+          ))}
+
+          {hasMore && (
+            <Button
+              variant="outline"
+              onClick={() => setVisibleCount((n) => n + LEADS_PER_PAGE)}
+              className="h-12 w-full border-dashed"
+            >
+              <ChevronDown className="mr-2 h-4 w-4" />
+              Toon {filtered.length - visibleCount} meer
+            </Button>
           )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        active
+          ? 'flex items-center justify-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-zinc-900 shadow-sm'
+          : 'flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-200'
+      }
+    >
+      {children}
+    </button>
+  )
+}
+
+function EmptyState() {
+  return (
+    <Card className="border-dashed">
+      <CardContent className="flex flex-col items-center justify-center gap-3 py-12">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20">
+          <Phone className="h-6 w-6 text-green-500" />
         </div>
-        {hint && <p className="mt-1 text-xs text-zinc-400">{hint}</p>}
+        <h2 className="text-lg font-semibold text-zinc-700">Geen nieuwe leads</h2>
+        <p className="max-w-md text-center text-sm text-zinc-500">
+          Zodra Meta-leads, website-form inzendingen of handmatig
+          toegevoegde contacts binnenkomen verschijnen ze hier.
+          Voeg test-contact toe via Contacts in de sidebar.
+        </p>
       </CardContent>
     </Card>
   )
-  return to ? <Link to={to}>{body}</Link> : body
 }

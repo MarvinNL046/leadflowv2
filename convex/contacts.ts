@@ -90,6 +90,65 @@ export const count = query({
 });
 
 /**
+ * Incoming leads voor het dashboard. Returnt contacts die werk vergen,
+ * met source-attribution voor weergave per lead-card.
+ *
+ * v1-pattern: drie tabs (all / follow_up / new) — hier de raw data,
+ * frontend doet de tab-filtering.
+ *
+ * Verrijking per lead:
+ *  - latest leadAttribution row (source + meta_form_name)
+ *  - laatst toegevoegde note (latestNote string)
+ *  - opportunity stages (voor follow-up classificatie later)
+ */
+export const listIncomingLeads = query({
+  args: {
+    workspaceId: v.id("workspaces"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await requireWorkspaceMembership(ctx, args.workspaceId);
+
+    const limit = Math.min(args.limit ?? 50, 200);
+
+    const contacts = await ctx.db
+      .query("contacts")
+      .withIndex("by_workspace_created", (q) =>
+        q.eq("workspaceId", args.workspaceId),
+      )
+      .order("desc")
+      .take(limit);
+
+    // Per contact: laad attribution + latest note in parallel
+    const enriched = await Promise.all(
+      contacts.map(async (c) => {
+        const attribution = await ctx.db
+          .query("leadAttribution")
+          .withIndex("by_contact", (q) => q.eq("contactId", c._id))
+          .order("desc")
+          .first();
+
+        const latestNote = await ctx.db
+          .query("notes")
+          .withIndex("by_contact", (q) => q.eq("contactId", c._id))
+          .order("desc")
+          .first();
+
+        return {
+          ...c,
+          leadSource: attribution?.source ?? null,
+          metaFormId: attribution?.metaFormId ?? null,
+          latestNote: latestNote?.body ?? null,
+          leadCreatedAt: attribution?._creationTime ?? c._creationTime,
+        };
+      }),
+    );
+
+    return enriched;
+  },
+});
+
+/**
  * Maak een nieuwe contact aan. Minimaal: workspace + 1 van
  * {firstName, lastName, email, phone}. Geen volledige dedup-check (komt
  * later in v2 wanneer Meta-leads + website-leads geïmporteerd worden).
