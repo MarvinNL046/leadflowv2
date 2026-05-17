@@ -12,6 +12,8 @@ import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import PostHogProvider from '../integrations/posthog/provider'
 
+import { Toaster } from '#/components/ui/sonner.tsx'
+
 import appCss from '../styles.css?url'
 
 import type { QueryClient } from '@tanstack/react-query'
@@ -54,6 +56,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <ConvexProvider>
           <PostHogProvider>
             {children}
+            <Toaster richColors closeButton />
             <TanStackDevtools
               config={{
                 position: 'bottom-right',

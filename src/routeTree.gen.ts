@@ -12,6 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as CrmRouteImport } from './routes/crm'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CrmIndexRouteImport } from './routes/crm.index'
+import { Route as CrmWorkflowsRouteImport } from './routes/crm.workflows'
+import { Route as CrmPipelinesRouteImport } from './routes/crm.pipelines'
+import { Route as CrmMessagesRouteImport } from './routes/crm.messages'
+import { Route as CrmContactsRouteImport } from './routes/crm.contacts'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -28,34 +33,97 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CrmIndexRoute = CrmIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmWorkflowsRoute = CrmWorkflowsRouteImport.update({
+  id: '/workflows',
+  path: '/workflows',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmPipelinesRoute = CrmPipelinesRouteImport.update({
+  id: '/pipelines',
+  path: '/pipelines',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmMessagesRoute = CrmMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmContactsRoute = CrmContactsRouteImport.update({
+  id: '/contacts',
+  path: '/contacts',
+  getParentRoute: () => CrmRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/crm': typeof CrmRoute
+  '/crm': typeof CrmRouteWithChildren
   '/login': typeof LoginRoute
+  '/crm/contacts': typeof CrmContactsRoute
+  '/crm/messages': typeof CrmMessagesRoute
+  '/crm/pipelines': typeof CrmPipelinesRoute
+  '/crm/workflows': typeof CrmWorkflowsRoute
+  '/crm/': typeof CrmIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/crm': typeof CrmRoute
   '/login': typeof LoginRoute
+  '/crm/contacts': typeof CrmContactsRoute
+  '/crm/messages': typeof CrmMessagesRoute
+  '/crm/pipelines': typeof CrmPipelinesRoute
+  '/crm/workflows': typeof CrmWorkflowsRoute
+  '/crm': typeof CrmIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/crm': typeof CrmRoute
+  '/crm': typeof CrmRouteWithChildren
   '/login': typeof LoginRoute
+  '/crm/contacts': typeof CrmContactsRoute
+  '/crm/messages': typeof CrmMessagesRoute
+  '/crm/pipelines': typeof CrmPipelinesRoute
+  '/crm/workflows': typeof CrmWorkflowsRoute
+  '/crm/': typeof CrmIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/crm' | '/login'
+  fullPaths:
+    | '/'
+    | '/crm'
+    | '/login'
+    | '/crm/contacts'
+    | '/crm/messages'
+    | '/crm/pipelines'
+    | '/crm/workflows'
+    | '/crm/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/crm' | '/login'
-  id: '__root__' | '/' | '/crm' | '/login'
+  to:
+    | '/'
+    | '/login'
+    | '/crm/contacts'
+    | '/crm/messages'
+    | '/crm/pipelines'
+    | '/crm/workflows'
+    | '/crm'
+  id:
+    | '__root__'
+    | '/'
+    | '/crm'
+    | '/login'
+    | '/crm/contacts'
+    | '/crm/messages'
+    | '/crm/pipelines'
+    | '/crm/workflows'
+    | '/crm/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CrmRoute: typeof CrmRoute
+  CrmRoute: typeof CrmRouteWithChildren
   LoginRoute: typeof LoginRoute
 }
 
@@ -82,12 +150,65 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/crm/': {
+      id: '/crm/'
+      path: '/'
+      fullPath: '/crm/'
+      preLoaderRoute: typeof CrmIndexRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/workflows': {
+      id: '/crm/workflows'
+      path: '/workflows'
+      fullPath: '/crm/workflows'
+      preLoaderRoute: typeof CrmWorkflowsRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/pipelines': {
+      id: '/crm/pipelines'
+      path: '/pipelines'
+      fullPath: '/crm/pipelines'
+      preLoaderRoute: typeof CrmPipelinesRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/messages': {
+      id: '/crm/messages'
+      path: '/messages'
+      fullPath: '/crm/messages'
+      preLoaderRoute: typeof CrmMessagesRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/contacts': {
+      id: '/crm/contacts'
+      path: '/contacts'
+      fullPath: '/crm/contacts'
+      preLoaderRoute: typeof CrmContactsRouteImport
+      parentRoute: typeof CrmRoute
+    }
   }
 }
 
+interface CrmRouteChildren {
+  CrmContactsRoute: typeof CrmContactsRoute
+  CrmMessagesRoute: typeof CrmMessagesRoute
+  CrmPipelinesRoute: typeof CrmPipelinesRoute
+  CrmWorkflowsRoute: typeof CrmWorkflowsRoute
+  CrmIndexRoute: typeof CrmIndexRoute
+}
+
+const CrmRouteChildren: CrmRouteChildren = {
+  CrmContactsRoute: CrmContactsRoute,
+  CrmMessagesRoute: CrmMessagesRoute,
+  CrmPipelinesRoute: CrmPipelinesRoute,
+  CrmWorkflowsRoute: CrmWorkflowsRoute,
+  CrmIndexRoute: CrmIndexRoute,
+}
+
+const CrmRouteWithChildren = CrmRoute._addFileChildren(CrmRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CrmRoute: CrmRoute,
+  CrmRoute: CrmRouteWithChildren,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
