@@ -127,10 +127,20 @@ function AuthenticatedView() {
         )}
       </div>
 
-      <div className="mt-6 rounded-md border border-dashed border-zinc-200 p-4 text-sm text-zinc-500">
+      <div className="mt-6">
+        <Link
+          to="/crm"
+          className="block rounded-md border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-violet-900 hover:bg-violet-100"
+        >
+          → CRM openen (contacts)
+        </Link>
+      </div>
+
+      <div className="mt-4 rounded-md border border-dashed border-zinc-200 p-4 text-sm text-zinc-500">
         <p className="font-medium text-zinc-700">Volgende v2-stappen:</p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>CRM core: contacts list + detail + create</li>
+          <li>Contacts: detail-page + edit + delete</li>
+          <li>Pipeline / Kanban (opportunities)</li>
           <li>Messaging unified table queries</li>
           <li>Workflow engine (Snelle Response port)</li>
           <li>Meta webhook (via Convex HTTP action)</li>
