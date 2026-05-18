@@ -130,6 +130,10 @@ export default defineSchema({
     tags: v.optional(v.array(v.string())),
     // Source flags
     outsideArea: v.optional(v.boolean()),
+    // Onbereikbaar na 3x niet opnemen — verbergt uit nieuwe-leads
+    // dashboard. Lead blijft zichtbaar in Contacts-lijst voor handmatige
+    // heropening (reset bij stage-drag terug naar Lead).
+    unreachable: v.optional(v.boolean()),
     externalId: v.optional(v.string()),
     // Soft-delete: timestamp van verwijdering, of undefined als actief.
     // Filter in alle list-queries; child-data (notes, messages,

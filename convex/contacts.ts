@@ -152,9 +152,17 @@ export const listIncomingLeads = query({
       .order("desc")
       .take(limit * 2);  // overshoot zodat na filter nog ~limit overblijft
 
-    // Filter: skip outside-area + soft-deleted contacts uit het dashboard
+    // Filter: skip leads die niet (meer) opgevolgd moeten worden:
+    //   - outside-area (Limburg-only)
+    //   - soft-deleted
+    //   - unreachable (3x niet bereikt)
     const contacts = rawContacts
-      .filter((c) => !c.outsideArea && c.deletedAt === undefined)
+      .filter(
+        (c) =>
+          !c.outsideArea &&
+          c.deletedAt === undefined &&
+          !c.unreachable,
+      )
       .slice(0, limit);
 
     // Per contact: laad attribution + latest note in parallel
@@ -485,8 +493,10 @@ function contactDisplay(contact: Doc<"contacts">): string {
 
 /**
  * "Niet bereikt" — geen gehoor of voicemail. Bump callCount, set
- * lastCallResult + nextFollowUpAt +2 dagen. Stage blijft Lead. Note
- * voor audit.
+ * lastCallResult. Stage blijft Lead bij poging 1-2 (lead blijft in
+ * dashboard met "Xx gebeld" badge). Bij poging 3: markeer
+ * unreachable + opp naar Lost-stage (lead verdwijnt uit dashboard,
+ * blijft in Contacts-lijst voor handmatige heropening).
  */
 export const recordCallNoAnswer = mutation({
   args: { contactId: v.id("contacts") },
@@ -496,16 +506,55 @@ export const recordCallNoAnswer = mutation({
       args.contactId,
     );
     const newCount = (contact.callCount ?? 0) + 1;
-    await ctx.db.patch(args.contactId, {
+    const isFinalStrike = newCount >= 3;
+
+    const patch: Record<string, unknown> = {
       callCount: newCount,
       lastCallAt: Date.now(),
       lastCallResult: "not_answered",
-      nextFollowUpAt: Date.now() + 2 * 24 * 60 * 60 * 1000,
-    });
+    };
+    if (isFinalStrike) {
+      patch.unreachable = true;
+      patch.nextFollowUpAt = undefined;  // geen follow-up meer
+    } else {
+      patch.nextFollowUpAt = Date.now() + 2 * 24 * 60 * 60 * 1000;
+    }
+    await ctx.db.patch(args.contactId, patch);
+
+    if (isFinalStrike) {
+      // Opp naar Lost — 3-strike-rule
+      const oppId = await findOrCreateOpportunity(
+        ctx,
+        contact.workspaceId,
+        args.contactId,
+        contactDisplay(contact),
+      );
+      if (oppId) {
+        const pipelineData = await getDefaultPipelineStages(
+          ctx,
+          contact.workspaceId,
+        );
+        if (pipelineData) {
+          const lostStage = pickStageByRole(pipelineData.stages, "lost");
+          if (lostStage) {
+            await moveOppToStage(
+              ctx,
+              oppId,
+              lostStage,
+              userId,
+              "unreachable_3x",
+            );
+          }
+        }
+      }
+    }
+
     await ctx.db.insert("notes", {
       workspaceId: contact.workspaceId,
       contactId: args.contactId,
-      body: `📞 Niet bereikt (poging ${newCount}). Volgende belpoging over 2 dagen.`,
+      body: isFinalStrike
+        ? `❌ Niet bereikt (poging ${newCount} — 3-strike-rule). Lead gemarkeerd als onbereikbaar.`
+        : `📞 Niet bereikt (poging ${newCount}). Volgende belpoging over 2 dagen.`,
       createdById: userId,
     });
   },

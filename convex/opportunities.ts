@@ -190,6 +190,30 @@ export const moveToStage = mutation({
       changedById: userId,
     });
 
+    // Heropen-logic: als opp uit Lost-stage komt en naar non-closed
+    // stage gaat → reset contact.unreachable + outsideArea zodat lead
+    // weer in dashboard verschijnt. Auto-note voor audit.
+    const fromStage = await ctx.db.get(fromStageId);
+    if (
+      fromStage?.isLostStage &&
+      !targetStage.isLostStage &&
+      !targetStage.isWonStage
+    ) {
+      const contact = await ctx.db.get(opp.contactId);
+      if (contact && (contact.unreachable || contact.outsideArea)) {
+        await ctx.db.patch(opp.contactId, {
+          unreachable: false,
+          outsideArea: false,
+        });
+        await ctx.db.insert("notes", {
+          workspaceId: opp.workspaceId,
+          contactId: opp.contactId,
+          body: `↩️ Lead heropend vanuit ${fromStage.name} naar ${targetStage.name} — komt terug in dashboard.`,
+          createdById: userId,
+        });
+      }
+    }
+
     // Trigger workflow-engine bij won/lost stage-changes
     if (targetStage.isWonStage) {
       await ctx.scheduler.runAfter(
