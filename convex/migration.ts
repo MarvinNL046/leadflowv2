@@ -1,20 +1,24 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
 /**
- * ETL helpers — alleen via Convex deploy-key callable. Geen auth-check
- * binnen omdat internalMutation per definitie privé is voor het Convex
- * project; runtime-clients (UI) kunnen ze niet aanroepen.
+ * ⚠ ETL helpers — PUBLIEK tijdens migratie-fase, GEEN auth-check binnen.
  *
- * Gebruikt door scripts/migrate-contacts.ts (Node-side) om data uit
- * Neon naar Convex te porten. Idempotent via legacyContactId index:
- * rerun is veilig — bestaande rows worden gepatcht in plaats van
- * gedupliceerd.
+ * Reden: scripts/migrate-contacts.ts moet bulk-upserts doen vanaf Node
+ * zonder admin-key (Convex's deploy-key CLI is in nieuwere versie
+ * anders gestructureerd). Voor MVP eenmalige migratie acceptabel risk.
+ *
+ * REMOVAL: na succesvolle migratie + cutover MOETEN deze functies
+ * verwijderd worden (geen publiek bulk-insert endpoint in productie
+ * laten staan). Verwacht: cleanup-commit met `git rm convex/migration.ts`.
+ *
+ * Idempotent via legacyContactId index: rerun is veilig — bestaande
+ * rows worden gepatcht in plaats van gedupliceerd.
  */
 
 /** Vind het workspace-id voor Staycool (default workspace). */
-export const getStaycoolWorkspaceId = internalQuery({
+export const getStaycoolWorkspaceId = query({
   args: {},
   handler: async (ctx) => {
     const org = await ctx.db
@@ -33,7 +37,7 @@ export const getStaycoolWorkspaceId = internalQuery({
 });
 
 /** Aantal al-gemigreerde contacts (via legacyContactId aanwezigheid). */
-export const countMigratedContacts = internalQuery({
+export const countMigratedContacts = query({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
     const rows = await ctx.db
@@ -79,7 +83,7 @@ const contactDocValidator = v.object({
  * Returnt teller {inserted, updated, skipped} zodat de Node-script
  * voortgang kan loggen.
  */
-export const upsertContactsBatch = internalMutation({
+export const upsertContactsBatch = mutation({
   args: {
     workspaceId: v.id("workspaces"),
     docs: v.array(contactDocValidator),

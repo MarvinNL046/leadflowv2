@@ -24,7 +24,6 @@ config({ path: ".env.local" });
 
 const NEON_URL = process.env.NEON_DATABASE_URL;
 const CONVEX_URL = process.env.CONVEX_URL || process.env.VITE_CONVEX_URL;
-const CONVEX_DEPLOY_KEY = process.env.CONVEX_DEPLOY_KEY;
 const DRY_RUN = process.env.DRY_RUN === "1";
 const BATCH_SIZE = 100;
 
@@ -38,12 +37,10 @@ if (!CONVEX_URL) {
   console.error("❌ CONVEX_URL / VITE_CONVEX_URL niet gezet.");
   process.exit(1);
 }
-if (!DRY_RUN && !CONVEX_DEPLOY_KEY) {
-  console.error("❌ CONVEX_DEPLOY_KEY niet gezet.");
-  console.error("   Genereer via: npx convex deploy-key generate");
-  console.error("   Of voer met DRY_RUN=1 voor preview zonder writes.");
-  process.exit(1);
-}
+
+// NB: migration mutations zijn PUBLIEK (zonder auth-check) — zie
+// convex/migration.ts header comment. Geen admin-key nodig. Na cutover
+// moet convex/migration.ts verwijderd worden.
 
 const STAYCOOL_WORKSPACE_ID_V1 = 12; // Per v1 audit
 
@@ -51,7 +48,7 @@ const STAYCOOL_WORKSPACE_ID_V1 = 12; // Per v1 audit
 // te krijgen wanneer convex dev nog niet klaar was met types regen.
 async function main() {
   // @ts-expect-error - convex/_generated/api wordt door `npx convex dev` gegenereerd
-  const { internal } = await import("../convex/_generated/api.js");
+  const { api } = await import("../convex/_generated/api.js");
 
   console.log("=== V1 Neon → V2 Convex contacts ETL ===");
   console.log("DRY_RUN:", DRY_RUN);
@@ -61,12 +58,9 @@ async function main() {
 
   // ── Connect Convex ──
   const convex = new ConvexClient(CONVEX_URL);
-  if (CONVEX_DEPLOY_KEY) {
-    convex.setAdminAuth(CONVEX_DEPLOY_KEY);
-  }
 
   // ── Find Staycool workspace ──
-  const workspaceId = await convex.query(internal.migration.getStaycoolWorkspaceId, {});
+  const workspaceId = await convex.query(api.migration.getStaycoolWorkspaceId, {});
   if (!workspaceId) {
     console.error("❌ Staycool workspace niet gevonden in Convex.");
     console.error("   Log eerst in op /login als super-admin om de bootstrap te triggeren.");
@@ -74,7 +68,7 @@ async function main() {
   }
   console.log("✓ Target workspace:", workspaceId);
 
-  const alreadyMigrated = await convex.query(internal.migration.countMigratedContacts, {
+  const alreadyMigrated = await convex.query(api.migration.countMigratedContacts, {
     workspaceId,
   });
   console.log(`✓ Al gemigreerd: ${alreadyMigrated} contacts (worden gepatcht bij rerun)`);
@@ -119,7 +113,7 @@ async function main() {
     const batch = contacts.slice(i, i + BATCH_SIZE);
     const docs = batch.map(transformContact);
 
-    const result = await convex.mutation(internal.migration.upsertContactsBatch, {
+    const result = await convex.mutation(api.migration.upsertContactsBatch, {
       workspaceId,
       docs,
     });
