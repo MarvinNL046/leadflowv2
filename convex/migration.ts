@@ -36,6 +36,59 @@ export const getStaycoolWorkspaceId = query({
   },
 });
 
+/**
+ * DEBUG — pak een metaLeadRaw + bijbehorende contact + attribution op
+ * leadgenId. Voor verifiëren van live webhook-tests. Verwijder bij
+ * cleanup (samen met de rest van migration.ts).
+ */
+export const debugLookupByLeadgenId = query({
+  args: { leadgenId: v.string() },
+  handler: async (ctx, args) => {
+    const raw = await ctx.db
+      .query("metaLeadRaw")
+      .withIndex("by_leadgenId", (q) => q.eq("leadgenId", args.leadgenId))
+      .first();
+    if (!raw) return { raw: null };
+
+    const contact = raw.contactId ? await ctx.db.get(raw.contactId) : null;
+
+    const attribution = await ctx.db
+      .query("leadAttribution")
+      .withIndex("by_metaLeadgenId", (q) =>
+        q.eq("metaLeadgenId", args.leadgenId),
+      )
+      .first();
+
+    return {
+      raw: {
+        status: raw.status,
+        retryCount: raw.retryCount,
+        errorMessage: raw.errorMessage,
+        formId: raw.formId,
+        fetchedAt: raw.fetchedAt,
+        processedAt: raw.processedAt,
+      },
+      contact: contact
+        ? {
+            id: contact._id,
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+            email: contact.email,
+            phone: contact.phone,
+            city: contact.city,
+          }
+        : null,
+      attribution: attribution
+        ? {
+            source: attribution.source,
+            metaFormId: attribution.metaFormId,
+            metaAdId: attribution.metaAdId,
+          }
+        : null,
+    };
+  },
+});
+
 /** Vind het org-id voor Staycool — nodig voor metaLeadRaw (FK naar orgs). */
 export const getStaycoolOrgId = query({
   args: {},
