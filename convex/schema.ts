@@ -405,8 +405,13 @@ export default defineSchema({
     utmCampaign: v.optional(v.string()),
     utmContent: v.optional(v.string()),
     utmTerm: v.optional(v.string()),
+    // Migration breadcrumb: serial-id van bron-row in v1 Neon. Idempotency
+    // voor de Neon→Convex ETL; geen natural unique key beschikbaar
+    // (source=manual/api hebben geen metaLeadgenId).
+    legacyId: v.optional(v.number()),
   }).index("by_contact", ["contactId"])
-    .index("by_metaLeadgenId", ["metaLeadgenId"]),
+    .index("by_metaLeadgenId", ["metaLeadgenId"])
+    .index("by_legacyId", ["legacyId"]),
 
   // Lead-ingest routes — bepaalt per form-id welk workspace de lead krijgt
   leadIngestRoutes: defineTable({

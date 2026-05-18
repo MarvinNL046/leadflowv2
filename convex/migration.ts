@@ -36,6 +36,18 @@ export const getStaycoolWorkspaceId = query({
   },
 });
 
+/** Vind het org-id voor Staycool — nodig voor metaLeadRaw (FK naar orgs). */
+export const getStaycoolOrgId = query({
+  args: {},
+  handler: async (ctx) => {
+    const org = await ctx.db
+      .query("orgs")
+      .withIndex("by_slug", (q) => q.eq("slug", "staycool"))
+      .unique();
+    return org?._id ?? null;
+  },
+});
+
 /** Aantal al-gemigreerde contacts (via legacyContactId aanwezigheid). */
 export const countMigratedContacts = query({
   args: { workspaceId: v.id("workspaces") },
@@ -132,6 +144,216 @@ export const upsertContactsBatch = mutation({
         await ctx.db.insert("contacts", {
           ...doc,
           workspaceId: args.workspaceId,
+        });
+        inserted++;
+      }
+    }
+
+    return { inserted, updated, total: args.docs.length };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// LEAD ATTRIBUTION ETL
+// ──────────────────────────────────────────────────────────────────────
+
+export const countMigratedLeadAttributions = query({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("leadAttribution").collect();
+    return rows.filter((r) => r.legacyId !== undefined).length;
+  },
+});
+
+const leadAttributionDocValidator = v.object({
+  legacyId: v.number(),
+  legacyContactId: v.number(),
+  source: v.union(v.literal("meta"), v.literal("api"), v.literal("manual")),
+  metaPageId: v.optional(v.string()),
+  metaFormId: v.optional(v.string()),
+  metaLeadgenId: v.optional(v.string()),
+  metaAdId: v.optional(v.string()),
+  metaCampaignId: v.optional(v.string()),
+  metaAdsetId: v.optional(v.string()),
+  rawPayload: v.optional(v.any()),
+  costPerLead: v.optional(v.number()),
+  utmSource: v.optional(v.string()),
+  utmMedium: v.optional(v.string()),
+  utmCampaign: v.optional(v.string()),
+  utmContent: v.optional(v.string()),
+  utmTerm: v.optional(v.string()),
+});
+
+/**
+ * Batch-upsert leadAttribution rows. legacyContactId wordt naar Convex
+ * contactId geresolved via de by_legacyContactId index op contacts.
+ * Skipt rows zonder match (returnt counter) i.p.v. te crashen — handig
+ * als attribution-migratie per ongeluk vóór contacts-migratie loopt.
+ */
+export const upsertLeadAttributionBatch = mutation({
+  args: {
+    docs: v.array(leadAttributionDocValidator),
+  },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+    let skippedNoContact = 0;
+
+    for (const doc of args.docs) {
+      const contact = await ctx.db
+        .query("contacts")
+        .withIndex("by_legacyContactId", (q) =>
+          q.eq("legacyContactId", doc.legacyContactId),
+        )
+        .first();
+      if (!contact) {
+        skippedNoContact++;
+        continue;
+      }
+
+      const existing = await ctx.db
+        .query("leadAttribution")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyId))
+        .first();
+
+      const patch = {
+        contactId: contact._id,
+        source: doc.source,
+        metaPageId: doc.metaPageId,
+        metaFormId: doc.metaFormId,
+        metaLeadgenId: doc.metaLeadgenId,
+        metaAdId: doc.metaAdId,
+        metaCampaignId: doc.metaCampaignId,
+        metaAdsetId: doc.metaAdsetId,
+        rawPayload: doc.rawPayload,
+        costPerLead: doc.costPerLead,
+        utmSource: doc.utmSource,
+        utmMedium: doc.utmMedium,
+        utmCampaign: doc.utmCampaign,
+        utmContent: doc.utmContent,
+        utmTerm: doc.utmTerm,
+      };
+
+      if (existing) {
+        await ctx.db.patch(existing._id, patch);
+        updated++;
+      } else {
+        await ctx.db.insert("leadAttribution", {
+          ...patch,
+          legacyId: doc.legacyId,
+        });
+        inserted++;
+      }
+    }
+
+    return {
+      inserted,
+      updated,
+      skippedNoContact,
+      total: args.docs.length,
+    };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// META LEAD RAW ETL
+// ──────────────────────────────────────────────────────────────────────
+
+export const countMigratedMetaLeadRaws = query({
+  args: { orgId: v.id("orgs") },
+  handler: async (ctx, args) => {
+    // Klein volume (v1 = 352 rows totaal), full scan is acceptabel.
+    const rows = await ctx.db.query("metaLeadRaw").collect();
+    return rows.filter((r) => r.orgId === args.orgId).length;
+  },
+});
+
+const metaLeadStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("processing"),
+  v.literal("completed"),
+  v.literal("failed"),
+  v.literal("skipped"),
+);
+
+const metaLeadRawDocValidator = v.object({
+  leadgenId: v.string(),
+  pageId: v.string(),
+  formId: v.optional(v.string()),
+  adId: v.optional(v.string()),
+  adgroupId: v.optional(v.string()),
+  campaignId: v.optional(v.string()),
+  payload: v.any(),
+  fieldData: v.optional(v.any()),
+  status: metaLeadStatusValidator,
+  legacyContactId: v.optional(v.number()),  // resolve to contactId
+  errorMessage: v.optional(v.string()),
+  retryCount: v.number(),
+  fetchedAt: v.number(),
+  processingStartedAt: v.optional(v.number()),
+  processedAt: v.optional(v.number()),
+});
+
+/**
+ * Batch-upsert metaLeadRaw rows. Idempotency-key = leadgenId (al unique
+ * in Neon, en al via by_leadgenId index in Convex). orgId is fixed voor
+ * Staycool en als arg meegegeven.
+ *
+ * contactId/opportunityId zijn FK's naar Convex tabellen — contactId
+ * resolven we via by_legacyContactId; opportunityId skippen we (geen
+ * opportunities-migratie nog).
+ */
+export const upsertMetaLeadRawBatch = mutation({
+  args: {
+    orgId: v.id("orgs"),
+    docs: v.array(metaLeadRawDocValidator),
+  },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+
+    for (const doc of args.docs) {
+      let contactId: Id<"contacts"> | undefined;
+      if (doc.legacyContactId !== undefined) {
+        const contact = await ctx.db
+          .query("contacts")
+          .withIndex("by_legacyContactId", (q) =>
+            q.eq("legacyContactId", doc.legacyContactId),
+          )
+          .first();
+        contactId = contact?._id;
+      }
+
+      const existing = await ctx.db
+        .query("metaLeadRaw")
+        .withIndex("by_leadgenId", (q) => q.eq("leadgenId", doc.leadgenId))
+        .first();
+
+      const fields = {
+        orgId: args.orgId,
+        pageId: doc.pageId,
+        formId: doc.formId,
+        adId: doc.adId,
+        adgroupId: doc.adgroupId,
+        campaignId: doc.campaignId,
+        payload: doc.payload,
+        fieldData: doc.fieldData,
+        status: doc.status,
+        contactId,
+        errorMessage: doc.errorMessage,
+        retryCount: doc.retryCount,
+        fetchedAt: doc.fetchedAt,
+        processingStartedAt: doc.processingStartedAt,
+        processedAt: doc.processedAt,
+      };
+
+      if (existing) {
+        await ctx.db.patch(existing._id, fields);
+        updated++;
+      } else {
+        await ctx.db.insert("metaLeadRaw", {
+          ...fields,
+          leadgenId: doc.leadgenId,
         });
         inserted++;
       }
