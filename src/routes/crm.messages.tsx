@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useAction } from 'convex/react'
 import { toast } from 'sonner'
@@ -310,6 +310,16 @@ function ConversationView({
 }) {
   const detail = useQuery(api.contacts.getDetail, { contactId })
   const messages = useQuery(api.messaging.listByContact, { contactId })
+  const streamRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll naar onder bij open van conversation + bij nieuwe message
+  // (messages-array length change). Convex real-time bezorgt nieuwe inbound
+  // én de eigen verstuurde reply als update — beide triggeren deze scroll.
+  useEffect(() => {
+    if (streamRef.current) {
+      streamRef.current.scrollTop = streamRef.current.scrollHeight
+    }
+  }, [messages?.length, contactId])
 
   if (detail === undefined || messages === undefined) {
     return (
@@ -381,7 +391,10 @@ function ConversationView({
       </header>
 
       {/* Messages stream */}
-      <div className="flex-1 space-y-2 overflow-y-auto bg-zinc-50/40 p-4">
+      <div
+        ref={streamRef}
+        className="flex-1 space-y-2 overflow-y-auto bg-zinc-50/40 p-4"
+      >
         {messages.length === 0 ? (
           <p className="py-12 text-center text-sm text-zinc-400">
             Nog geen berichten met deze contact
