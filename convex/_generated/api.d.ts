@@ -19,6 +19,8 @@ import type * as notes from "../notes.js";
 import type * as opportunities from "../opportunities.js";
 import type * as pipelines from "../pipelines.js";
 import type * as userProfiles from "../userProfiles.js";
+import type * as workflowEngine from "../workflowEngine.js";
+import type * as workflows from "../workflows.js";
 
 import type {
   ApiFromModules,
@@ -38,6 +40,8 @@ declare const fullApi: ApiFromModules<{
   opportunities: typeof opportunities;
   pipelines: typeof pipelines;
   userProfiles: typeof userProfiles;
+  workflowEngine: typeof workflowEngine;
+  workflows: typeof workflows;
 }>;
 
 /**

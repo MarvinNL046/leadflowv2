@@ -291,6 +291,7 @@ export const upsertContactFromMetaLead = internalMutation({
     }
 
     let contactId: Id<"contacts">;
+    let isNewContact = false;
     if (contact) {
       // Merge: alleen lege velden invullen, niet overschrijven.
       const merged: Record<string, string | undefined> = {};
@@ -325,6 +326,7 @@ export const upsertContactFromMetaLead = internalMutation({
         country: f.country,
         callCount: 0,
       });
+      isNewContact = true;
     }
 
     // Attribution-row altijd insert (1-op-1 met deze meta-lead).
@@ -351,6 +353,16 @@ export const upsertContactFromMetaLead = internalMutation({
         contactId,
         body: noteBody,
       });
+    }
+
+    // Workflow trigger ALLEEN bij nieuw contact (merge = bestaand contact,
+    // workflows zouden niet opnieuw moeten triggeren bij dedup-hit).
+    if (isNewContact) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.workflowEngine.triggerContactCreated,
+        { workspaceId: workspace._id, contactId },
+      );
     }
 
     return { contactId };

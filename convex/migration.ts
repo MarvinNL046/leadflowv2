@@ -144,6 +144,131 @@ export const seedStaycoolPipeline = mutation({
 });
 
 /**
+ * Auth-less seed van Staycool's "Snelle Response" workflow.
+ *
+ *   contact_created ─→ delay 3min ─→ send_email ╮
+ *                                              ├ (parallel)
+ *                                  ─→ send_whatsapp ╯
+ *
+ * Idempotent: skip als workflow met deze naam al bestaat.
+ * Verwijder bij cleanup.
+ */
+export const seedSnelleResponse = mutation({
+  args: {
+    delaySeconds: v.optional(v.number()),  // override voor test (default 180)
+  },
+  handler: async (ctx, args) => {
+    const org = await ctx.db
+      .query("orgs")
+      .withIndex("by_slug", (q) => q.eq("slug", "staycool"))
+      .unique();
+    if (!org) throw new Error("Staycool org niet gevonden");
+    const workspace = await ctx.db
+      .query("workspaces")
+      .withIndex("by_org", (q) => q.eq("orgId", org._id))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    if (!workspace) throw new Error("Geen default workspace");
+
+    const existing = await ctx.db
+      .query("workflows")
+      .withIndex("by_workspace_status", (q) =>
+        q.eq("workspaceId", workspace._id),
+      )
+      .filter((q) => q.eq(q.field("name"), "Snelle Response"))
+      .first();
+    if (existing) {
+      return { workflowId: existing._id, created: false };
+    }
+
+    const workflowId = await ctx.db.insert("workflows", {
+      workspaceId: workspace._id,
+      name: "Snelle Response",
+      description:
+        "Direct na nieuwe lead: na 3 min een welkomstmail + WhatsApp",
+      status: "active",
+      triggerConfig: [{ type: "contact_created", nodeId: "trigger-1" }],
+      version: 1,
+      totalExecutions: 0,
+      successfulExecutions: 0,
+      failedExecutions: 0,
+    });
+
+    // Nodes
+    await ctx.db.insert("workflowNodes", {
+      workflowId,
+      nodeId: "trigger-1",
+      type: "trigger",
+      subType: "contact_created",
+      positionX: 0,
+      positionY: 0,
+      config: {},
+      label: "Nieuw contact",
+    });
+    await ctx.db.insert("workflowNodes", {
+      workflowId,
+      nodeId: "delay-1",
+      type: "delay",
+      positionX: 200,
+      positionY: 0,
+      config: { delaySeconds: args.delaySeconds ?? 180 },
+      label: `Wacht ${args.delaySeconds ?? 180}s`,
+    });
+    await ctx.db.insert("workflowNodes", {
+      workflowId,
+      nodeId: "email-1",
+      type: "action",
+      subType: "send_email",
+      positionX: 400,
+      positionY: -80,
+      config: {
+        subject: "Bedankt voor je aanvraag bij Staycool Airconditioning",
+        body:
+          "Hoi {{contact.firstName}},\n\n" +
+          "Bedankt voor je interesse in Staycool Airconditioning! " +
+          "We nemen binnenkort contact met je op om je vraag te bespreken.\n\n" +
+          "Met vriendelijke groet,\nStaycool Airconditioning",
+      },
+      label: "Welkomstmail",
+    });
+    await ctx.db.insert("workflowNodes", {
+      workflowId,
+      nodeId: "wa-1",
+      type: "action",
+      subType: "send_whatsapp",
+      positionX: 400,
+      positionY: 80,
+      config: {
+        body:
+          "Hoi {{contact.firstName}}! 👋\n\n" +
+          "Bedankt voor je interesse in Staycool. " +
+          "We bellen je binnenkort terug.",
+      },
+      label: "WhatsApp",
+    });
+
+    // Edges
+    await ctx.db.insert("workflowEdges", {
+      workflowId,
+      sourceNodeId: "trigger-1",
+      targetNodeId: "delay-1",
+    });
+    await ctx.db.insert("workflowEdges", {
+      workflowId,
+      sourceNodeId: "delay-1",
+      targetNodeId: "email-1",
+    });
+    await ctx.db.insert("workflowEdges", {
+      workflowId,
+      sourceNodeId: "delay-1",
+      targetNodeId: "wa-1",
+    });
+
+    return { workflowId, created: true };
+  },
+});
+
+/**
  * DEBUG — pak een metaLeadRaw + bijbehorende contact + attribution op
  * leadgenId. Voor verifiëren van live webhook-tests. Verwijder bij
  * cleanup (samen met de rest van migration.ts).

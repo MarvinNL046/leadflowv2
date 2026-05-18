@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 /**
@@ -384,6 +385,15 @@ export const create = mutation({
       city: args.city?.trim() || undefined,
       callCount: 0,
     });
+
+    // Trigger workflow-engine voor contact_created. scheduler.runAfter(0)
+    // = na deze mutation commit. Engine matched actieve workflows en
+    // start executions parallel.
+    await ctx.scheduler.runAfter(
+      0,
+      internal.workflowEngine.triggerContactCreated,
+      { workspaceId: args.workspaceId, contactId },
+    );
 
     return await ctx.db.get(contactId);
   },
