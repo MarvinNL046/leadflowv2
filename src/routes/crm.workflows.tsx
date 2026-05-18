@@ -188,27 +188,20 @@ function WorkflowCard({
         ) : (
           <ul className="divide-y divide-zinc-100">
             {workflow.recentExecutions.map((e) => (
-              <li
-                key={e._id}
-                className="flex items-center gap-3 py-2 text-sm first:pt-0 last:pb-0"
-              >
-                <ExecutionStatusIcon status={e.status} />
-                {e.entityType === 'contact' ? (
-                  <Link
-                    to="/crm/contacts/$id"
-                    params={{ id: e.entityId }}
-                    className="min-w-0 flex-1 truncate font-medium text-zinc-900 hover:text-blue-600 hover:underline"
-                  >
-                    {e.contactName}
-                  </Link>
-                ) : (
+              <li key={e._id}>
+                <Link
+                  to="/crm/workflows/$id"
+                  params={{ id: e._id }}
+                  className="flex items-center gap-3 py-2 text-sm transition-colors hover:bg-zinc-50/60 -mx-2 px-2 rounded-md first:pt-0 last:pb-0"
+                >
+                  <ExecutionStatusIcon status={e.status} />
                   <span className="min-w-0 flex-1 truncate font-medium text-zinc-900">
                     {e.contactName}
                   </span>
-                )}
-                <span className="shrink-0 text-xs text-zinc-400">
-                  {new Date(e.startedAt).toLocaleString('nl-NL')}
-                </span>
+                  <span className="shrink-0 text-xs text-zinc-400">
+                    {new Date(e.startedAt).toLocaleString('nl-NL')}
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>

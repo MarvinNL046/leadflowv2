@@ -103,6 +103,85 @@ export const listForDashboard = query({
 });
 
 /**
+ * Per-execution detail voor /crm/workflows/$id. Returnt workflow-meta,
+ * execution-state, alle nodes (voor naam-lookup), en logs in volgorde
+ * van aanmaken (oldest first = timeline-bottom-up).
+ */
+export const getExecutionDetail = query({
+  args: { executionId: v.id("workflowExecutions") },
+  handler: async (ctx, args) => {
+    const execution = await ctx.db.get(args.executionId);
+    if (!execution) return null;
+
+    const workflow = await ctx.db.get(execution.workflowId);
+    if (!workflow) return null;
+    await requireWorkspaceMembership(ctx, workflow.workspaceId);
+
+    const nodes = await ctx.db
+      .query("workflowNodes")
+      .withIndex("by_workflow", (q) => q.eq("workflowId", workflow._id))
+      .collect();
+    const nodeByNodeId = new Map(nodes.map((n) => [n.nodeId, n]));
+
+    const logs = await ctx.db
+      .query("workflowExecutionLogs")
+      .withIndex("by_execution", (q) => q.eq("executionId", args.executionId))
+      .collect();
+    // Logs in chronologische volgorde (creation-time ascending)
+    logs.sort((a, b) => a._creationTime - b._creationTime);
+
+    const enrichedLogs = logs.map((l) => {
+      const n = nodeByNodeId.get(l.nodeId);
+      return {
+        _id: l._id,
+        _creationTime: l._creationTime,
+        nodeId: l.nodeId,
+        nodeType: l.nodeType,
+        nodeLabel: n?.label ?? l.nodeId,
+        nodeSubType: n?.subType,
+        status: l.status,
+        output: l.output,
+        error: l.error,
+        durationMs: l.durationMs,
+      };
+    });
+
+    let contactName: string | null = null;
+    if (execution.entityType === "contact") {
+      const c = await ctx.db.get(execution.entityId as Id<"contacts">);
+      if (c) {
+        contactName =
+          [c.firstName, c.lastName].filter(Boolean).join(" ") ||
+          c.email ||
+          c.phone ||
+          null;
+      }
+    }
+
+    return {
+      workflow: {
+        _id: workflow._id,
+        name: workflow.name,
+        description: workflow.description,
+      },
+      execution: {
+        _id: execution._id,
+        _creationTime: execution._creationTime,
+        status: execution.status,
+        currentNodeId: execution.currentNodeId,
+        startedAt: execution.startedAt,
+        completedAt: execution.completedAt,
+        pausedUntil: execution.pausedUntil,
+        entityType: execution.entityType,
+        entityId: execution.entityId,
+        contactName,
+      },
+      logs: enrichedLogs,
+    };
+  },
+});
+
+/**
  * DEBUG — logs per execution voor verifieren wat per node lukte/faalde.
  * Public temporary; vervangen door per-execution detail-route later.
  */

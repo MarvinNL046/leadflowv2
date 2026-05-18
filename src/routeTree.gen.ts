@@ -17,6 +17,7 @@ import { Route as CrmWorkflowsRouteImport } from './routes/crm.workflows'
 import { Route as CrmPipelinesRouteImport } from './routes/crm.pipelines'
 import { Route as CrmMessagesRouteImport } from './routes/crm.messages'
 import { Route as CrmContactsRouteImport } from './routes/crm.contacts'
+import { Route as CrmWorkflowsIdRouteImport } from './routes/crm.workflows_.$id'
 import { Route as CrmContactsIdRouteImport } from './routes/crm.contacts_.$id'
 
 const LoginRoute = LoginRouteImport.update({
@@ -59,6 +60,11 @@ const CrmContactsRoute = CrmContactsRouteImport.update({
   path: '/contacts',
   getParentRoute: () => CrmRoute,
 } as any)
+const CrmWorkflowsIdRoute = CrmWorkflowsIdRouteImport.update({
+  id: '/workflows_/$id',
+  path: '/workflows/$id',
+  getParentRoute: () => CrmRoute,
+} as any)
 const CrmContactsIdRoute = CrmContactsIdRouteImport.update({
   id: '/contacts_/$id',
   path: '/contacts/$id',
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/crm/': typeof CrmIndexRoute
   '/crm/contacts/$id': typeof CrmContactsIdRoute
+  '/crm/workflows/$id': typeof CrmWorkflowsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -85,6 +92,7 @@ export interface FileRoutesByTo {
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/crm': typeof CrmIndexRoute
   '/crm/contacts/$id': typeof CrmContactsIdRoute
+  '/crm/workflows/$id': typeof CrmWorkflowsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -97,6 +105,7 @@ export interface FileRoutesById {
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/crm/': typeof CrmIndexRoute
   '/crm/contacts_/$id': typeof CrmContactsIdRoute
+  '/crm/workflows_/$id': typeof CrmWorkflowsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -110,6 +119,7 @@ export interface FileRouteTypes {
     | '/crm/workflows'
     | '/crm/'
     | '/crm/contacts/$id'
+    | '/crm/workflows/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -120,6 +130,7 @@ export interface FileRouteTypes {
     | '/crm/workflows'
     | '/crm'
     | '/crm/contacts/$id'
+    | '/crm/workflows/$id'
   id:
     | '__root__'
     | '/'
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/crm/workflows'
     | '/crm/'
     | '/crm/contacts_/$id'
+    | '/crm/workflows_/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -197,6 +209,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmContactsRouteImport
       parentRoute: typeof CrmRoute
     }
+    '/crm/workflows_/$id': {
+      id: '/crm/workflows_/$id'
+      path: '/workflows/$id'
+      fullPath: '/crm/workflows/$id'
+      preLoaderRoute: typeof CrmWorkflowsIdRouteImport
+      parentRoute: typeof CrmRoute
+    }
     '/crm/contacts_/$id': {
       id: '/crm/contacts_/$id'
       path: '/contacts/$id'
@@ -214,6 +233,7 @@ interface CrmRouteChildren {
   CrmWorkflowsRoute: typeof CrmWorkflowsRoute
   CrmIndexRoute: typeof CrmIndexRoute
   CrmContactsIdRoute: typeof CrmContactsIdRoute
+  CrmWorkflowsIdRoute: typeof CrmWorkflowsIdRoute
 }
 
 const CrmRouteChildren: CrmRouteChildren = {
@@ -223,6 +243,7 @@ const CrmRouteChildren: CrmRouteChildren = {
   CrmWorkflowsRoute: CrmWorkflowsRoute,
   CrmIndexRoute: CrmIndexRoute,
   CrmContactsIdRoute: CrmContactsIdRoute,
+  CrmWorkflowsIdRoute: CrmWorkflowsIdRoute,
 }
 
 const CrmRouteWithChildren = CrmRoute._addFileChildren(CrmRouteChildren)
