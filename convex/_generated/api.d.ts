@@ -11,6 +11,8 @@
 import type * as auth from "../auth.js";
 import type * as contacts from "../contacts.js";
 import type * as http from "../http.js";
+import type * as metaIngest from "../metaIngest.js";
+import type * as metaProcessor from "../metaProcessor.js";
 import type * as migration from "../migration.js";
 import type * as userProfiles from "../userProfiles.js";
 
@@ -24,6 +26,8 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   contacts: typeof contacts;
   http: typeof http;
+  metaIngest: typeof metaIngest;
+  metaProcessor: typeof metaProcessor;
   migration: typeof migration;
   userProfiles: typeof userProfiles;
 }>;
