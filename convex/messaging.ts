@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import {
   action,
@@ -417,6 +418,74 @@ export const listByContact = query({
       .withIndex("by_contact_sent", (q) => q.eq("contactId", args.contactId))
       .order("desc")
       .take(50);
+  },
+});
+
+/**
+ * Paginated workspace-wide messages voor de /crm/messages inbox.
+ * Optionele channel-filter; default = alle kanalen.
+ */
+export const listByWorkspace = query({
+  args: {
+    workspaceId: v.id("workspaces"),
+    paginationOpts: paginationOptsValidator,
+    channel: v.optional(
+      v.union(
+        v.literal("email"),
+        v.literal("sms"),
+        v.literal("whatsapp"),
+        v.literal("messenger"),
+      ),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const workspace = await ctx.db.get(args.workspaceId);
+    if (!workspace) throw new Error("Workspace not found");
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) =>
+        q.eq("userId", userId).eq("orgId", workspace.orgId),
+      )
+      .first();
+    if (!membership) throw new Error("Not a member of this workspace");
+
+    const baseQuery = args.channel
+      ? ctx.db
+          .query("messages")
+          .withIndex("by_workspace_channel_sent", (q) =>
+            q
+              .eq("workspaceId", args.workspaceId)
+              .eq("channel", args.channel!),
+          )
+      : ctx.db
+          .query("messages")
+          .withIndex("by_workspace_channel_sent", (q) =>
+            q.eq("workspaceId", args.workspaceId),
+          );
+
+    const page = await baseQuery.order("desc").paginate(args.paginationOpts);
+
+    // Verrijk met contact-naam per row
+    const enriched = await Promise.all(
+      page.page.map(async (m) => {
+        let contactName: string | null = null;
+        if (m.contactId) {
+          const c = await ctx.db.get(m.contactId);
+          if (c) {
+            contactName =
+              [c.firstName, c.lastName].filter(Boolean).join(" ") ||
+              c.email ||
+              c.phone ||
+              null;
+          }
+        }
+        return { ...m, contactName };
+      }),
+    );
+
+    return { ...page, page: enriched };
   },
 });
 
