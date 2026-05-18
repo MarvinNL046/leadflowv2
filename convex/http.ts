@@ -438,9 +438,11 @@ http.route({
       channel: "whatsapp",
       from,
       body,
-      externalMessageId: payload.messageId ?? payload.id,
-      mediaUrl: payload.mediaUrl,
-      mediaType: payload.mediaType,
+      externalMessageId: payload.messageId ?? payload.id ?? undefined,
+      // Skip null → undefined (Voidfix stuurt expliciet null voor
+      // text-only messages, onze validator verwacht string|undefined)
+      mediaUrl: payload.mediaUrl ?? undefined,
+      mediaType: payload.mediaType ?? undefined,
     });
     return jsonResponse({ received: true, type: "inbound" }, 200);
   }),
