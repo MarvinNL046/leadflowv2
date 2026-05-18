@@ -249,16 +249,21 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
 
         {/* Action row — 5 acties + Copy */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          {/* Bel: opens tel: + native call-app */}
+          {/* Bel: tel: link via window.location (asChild + a met
+              gradient classes drop te veel styling) */}
           <Button
             type="button"
-            asChild
-            className="flex-1 min-w-[100px] bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700"
+            onClick={() => {
+              if (lead.phone) {
+                window.location.href = `tel:${lead.phone}`
+              }
+            }}
+            disabled={!lead.phone}
+            title={lead.phone ? `Bel ${lead.phone}` : 'Geen telefoonnummer'}
+            className="flex-1 min-w-[100px] bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 disabled:opacity-50"
           >
-            <a href={lead.phone ? `tel:${lead.phone}` : undefined}>
-              <Phone className="h-4 w-4" />
-              Bel
-            </a>
+            <Phone className="h-4 w-4" />
+            Bel
           </Button>
 
           {/* Opgenomen → AnsweredDialog */}
