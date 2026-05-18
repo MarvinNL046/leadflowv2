@@ -284,6 +284,12 @@ const linearNodeValidator = v.union(
   }),
 );
 
+const triggerTypeValidator = v.union(
+  v.literal("contact_created"),
+  v.literal("opportunity_won"),
+  v.literal("opportunity_lost"),
+);
+
 /**
  * Maakt een nieuwe lineaire workflow met trigger + sequentiële nodes.
  * Voor non-lineair (parallel branches): hardcoded seed (Snelle Response)
@@ -294,7 +300,7 @@ export const createLinear = mutation({
     workspaceId: v.id("workspaces"),
     name: v.string(),
     description: v.optional(v.string()),
-    triggerType: v.literal("contact_created"),
+    triggerType: triggerTypeValidator,
     nodes: v.array(linearNodeValidator),
     activate: v.boolean(),
   },
@@ -376,6 +382,148 @@ export const createLinear = mutation({
     }
 
     return { workflowId };
+  },
+});
+
+/**
+ * Replace content van bestaande workflow: name + description +
+ * triggerType + nodes/edges. Behoud workflow-row + executions-historie
+ * + counters. CAVEAT: lopende executions pauseren op specifieke nodeId;
+ * bij replace verdwijnen die nodes → executions blijven hangen of
+ * falen bij volgende dispatch. Voor MVP accepteren we dit. Productie-
+ * fix later: versioning (workflow-rows blijven gekoppeld aan version).
+ */
+export const replaceContent = mutation({
+  args: {
+    workflowId: v.id("workflows"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    triggerType: triggerTypeValidator,
+    nodes: v.array(linearNodeValidator),
+  },
+  handler: async (ctx, args) => {
+    const wf = await ctx.db.get(args.workflowId);
+    if (!wf) throw new Error("Workflow niet gevonden");
+    await requireWorkspaceMembership(ctx, wf.workspaceId);
+
+    const name = args.name.trim();
+    if (name.length === 0) throw new Error("Naam mag niet leeg zijn");
+    if (args.nodes.length === 0) {
+      throw new Error("Voeg minstens één node toe");
+    }
+
+    // Delete bestaande nodes + edges
+    const oldNodes = await ctx.db
+      .query("workflowNodes")
+      .withIndex("by_workflow", (q) => q.eq("workflowId", args.workflowId))
+      .collect();
+    for (const n of oldNodes) {
+      await ctx.db.delete(n._id);
+    }
+    const oldEdges = await ctx.db
+      .query("workflowEdges")
+      .withIndex("by_workflow", (q) => q.eq("workflowId", args.workflowId))
+      .collect();
+    for (const e of oldEdges) {
+      await ctx.db.delete(e._id);
+    }
+
+    // Update workflow meta
+    await ctx.db.patch(args.workflowId, {
+      name,
+      description: args.description?.trim() || undefined,
+      triggerConfig: [{ type: args.triggerType, nodeId: "trigger-1" }],
+      version: wf.version + 1,
+    });
+
+    // Insert nieuwe trigger-node
+    await ctx.db.insert("workflowNodes", {
+      workflowId: args.workflowId,
+      nodeId: "trigger-1",
+      type: "trigger",
+      subType: args.triggerType,
+      positionX: 0,
+      positionY: 0,
+      config: {},
+      label:
+        args.triggerType === "contact_created"
+          ? "Nieuw contact"
+          : args.triggerType === "opportunity_won"
+            ? "Opportunity gewonnen"
+            : "Opportunity verloren",
+    });
+
+    let prevNodeId = "trigger-1";
+    for (let i = 0; i < args.nodes.length; i++) {
+      const n = args.nodes[i];
+      const nodeId = `node-${i + 1}`;
+      let label = nodeId;
+      let config: Record<string, unknown> = {};
+
+      if (n.type === "delay") {
+        label = `Wacht ${n.delaySeconds}s`;
+        config = { delaySeconds: n.delaySeconds };
+      } else if (n.subType === "send_email") {
+        label = "Email";
+        config = { subject: n.subject, body: n.body };
+      } else if (n.subType === "send_sms") {
+        label = "SMS";
+        config = { body: n.body };
+      } else if (n.subType === "send_whatsapp") {
+        label = "WhatsApp";
+        config = { body: n.body };
+      }
+
+      await ctx.db.insert("workflowNodes", {
+        workflowId: args.workflowId,
+        nodeId,
+        type: n.type,
+        subType: n.type === "action" ? n.subType : undefined,
+        positionX: 200 * (i + 1),
+        positionY: 0,
+        config,
+        label,
+      });
+
+      await ctx.db.insert("workflowEdges", {
+        workflowId: args.workflowId,
+        sourceNodeId: prevNodeId,
+        targetNodeId: nodeId,
+      });
+
+      prevNodeId = nodeId;
+    }
+
+    return { workflowId: args.workflowId };
+  },
+});
+
+/**
+ * Permanent delete (alleen voor archived workflows). Verwijdert ook
+ * alle nodes/edges, maar BEHOUDT executions+logs voor audit-trail.
+ */
+export const permanentDelete = mutation({
+  args: { workflowId: v.id("workflows") },
+  handler: async (ctx, args) => {
+    const wf = await ctx.db.get(args.workflowId);
+    if (!wf) throw new Error("Workflow niet gevonden");
+    await requireWorkspaceMembership(ctx, wf.workspaceId);
+    if (wf.status !== "archived") {
+      throw new Error(
+        "Alleen gearchiveerde workflows kunnen permanent worden verwijderd",
+      );
+    }
+    const nodes = await ctx.db
+      .query("workflowNodes")
+      .withIndex("by_workflow", (q) => q.eq("workflowId", args.workflowId))
+      .collect();
+    for (const n of nodes) await ctx.db.delete(n._id);
+    const edges = await ctx.db
+      .query("workflowEdges")
+      .withIndex("by_workflow", (q) => q.eq("workflowId", args.workflowId))
+      .collect();
+    for (const e of edges) await ctx.db.delete(e._id);
+    await ctx.db.delete(args.workflowId);
   },
 });
 

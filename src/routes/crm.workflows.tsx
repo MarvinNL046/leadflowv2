@@ -13,6 +13,9 @@ import {
   Archive,
   Play,
   Pause,
+  Pencil,
+  Trash2,
+  ChevronDown,
 } from 'lucide-react'
 import {
   Card,
@@ -57,6 +60,13 @@ function WorkflowsContent({
 }) {
   const workflows = useQuery(api.workflows.listForDashboard, { workspaceId })
   const [addOpen, setAddOpen] = useState(false)
+  const [editingId, setEditingId] = useState<Id<'workflows'> | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
+
+  const activeWorkflows =
+    workflows?.filter((w) => w.status !== 'archived') ?? []
+  const archivedWorkflows =
+    workflows?.filter((w) => w.status === 'archived') ?? []
 
   return (
     <div className="space-y-6">
@@ -80,7 +90,7 @@ function WorkflowsContent({
 
       {workflows === undefined ? (
         <Skeleton className="h-64 w-full" />
-      ) : workflows.length === 0 ? (
+      ) : activeWorkflows.length === 0 && archivedWorkflows.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center gap-3 py-12">
             <Zap className="h-10 w-10 text-zinc-300" />
@@ -88,19 +98,48 @@ function WorkflowsContent({
               Nog geen workflows
             </h2>
             <p className="max-w-md text-center text-sm text-zinc-500">
-              Run{' '}
-              <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs">
-                npx tsx scripts/seed-workflows.ts
-              </code>{' '}
-              om de Snelle Response workflow aan te maken.
+              Klik op "Nieuwe workflow" om je eerste automation te maken.
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-6">
-          {workflows.map((wf) => (
-            <WorkflowCard key={wf._id} workflow={wf} />
+          {activeWorkflows.map((wf) => (
+            <WorkflowCard
+              key={wf._id}
+              workflow={wf}
+              onEdit={() => setEditingId(wf._id)}
+            />
           ))}
+
+          {archivedWorkflows.length > 0 && (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setShowArchived((s) => !s)}
+                className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-700"
+              >
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 transition-transform',
+                    showArchived && 'rotate-180',
+                  )}
+                />
+                {archivedWorkflows.length} gearchiveerd
+              </button>
+              {showArchived && (
+                <div className="space-y-3">
+                  {archivedWorkflows.map((wf) => (
+                    <WorkflowCard
+                      key={wf._id}
+                      workflow={wf}
+                      onEdit={() => setEditingId(wf._id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -109,12 +148,94 @@ function WorkflowsContent({
         open={addOpen}
         onOpenChange={setAddOpen}
       />
+      {editingId && (
+        <EditWorkflowDialogLoader
+          workflowId={editingId}
+          workspaceId={workspaceId}
+          onClose={() => setEditingId(null)}
+        />
+      )}
     </div>
+  )
+}
+
+function EditWorkflowDialogLoader({
+  workflowId,
+  workspaceId,
+  onClose,
+}: {
+  workflowId: Id<'workflows'>
+  workspaceId: Id<'workspaces'>
+  onClose: () => void
+}) {
+  const detail = useQuery(api.workflows.getDetail, { workflowId })
+  if (detail === undefined) return null  // wait for data
+  if (detail === null) {
+    return null
+  }
+
+  const { workflow, nodes } = detail
+  // Transform DB-nodes naar BuilderNode shape (skip trigger)
+  type BuilderNode =
+    | { type: 'delay'; delaySeconds: number }
+    | { type: 'action'; subType: 'send_email'; subject: string; body: string }
+    | { type: 'action'; subType: 'send_sms'; body: string }
+    | { type: 'action'; subType: 'send_whatsapp'; body: string }
+  const builderNodes: BuilderNode[] = nodes
+    .filter((n) => n.type !== 'trigger')
+    .sort((a, b) => a.nodeId.localeCompare(b.nodeId))
+    .map((n) => {
+      const config = n.config as Record<string, unknown>
+      if (n.type === 'delay') {
+        return {
+          type: 'delay',
+          delaySeconds: Number(config?.delaySeconds ?? 180),
+        }
+      }
+      if (n.subType === 'send_email') {
+        return {
+          type: 'action',
+          subType: 'send_email',
+          subject: String(config?.subject ?? ''),
+          body: String(config?.body ?? ''),
+        }
+      }
+      if (n.subType === 'send_sms') {
+        return {
+          type: 'action',
+          subType: 'send_sms',
+          body: String(config?.body ?? ''),
+        }
+      }
+      return {
+        type: 'action',
+        subType: 'send_whatsapp',
+        body: String(config?.body ?? ''),
+      }
+    })
+
+  const triggerType = (workflow.triggerConfig[0]?.type ??
+    'contact_created') as 'contact_created' | 'opportunity_won' | 'opportunity_lost'
+
+  return (
+    <NewWorkflowDialog
+      workspaceId={workspaceId}
+      open
+      onOpenChange={(o) => !o && onClose()}
+      editing={{
+        workflowId,
+        name: workflow.name,
+        description: workflow.description,
+        triggerType,
+        nodes: builderNodes,
+      }}
+    />
   )
 }
 
 function WorkflowCard({
   workflow,
+  onEdit,
 }: {
   workflow: {
     _id: Id<'workflows'>
@@ -138,8 +259,10 @@ function WorkflowCard({
       currentNodeId?: string
     }>
   }
+  onEdit: () => void
 }) {
   const setStatus = useMutation(api.workflows.setStatus)
+  const permanentDelete = useMutation(api.workflows.permanentDelete)
   const successRate =
     workflow.totalExecutions > 0
       ? Math.round(
@@ -155,6 +278,21 @@ function WorkflowCard({
       toast.success(`Workflow ${newStatus}`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Kon niet wijzigen')
+    }
+  }
+
+  async function handlePermanentDelete() {
+    if (
+      !confirm(
+        `Workflow "${workflow.name}" permanent verwijderen? Executions-historie blijft bewaard. Niet ongedaan te maken.`,
+      )
+    )
+      return
+    try {
+      await permanentDelete({ workflowId: workflow._id })
+      toast.success('Workflow permanent verwijderd')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kon niet verwijderen')
     }
   }
 
@@ -174,6 +312,17 @@ function WorkflowCard({
             )}
           </div>
           <div className="flex shrink-0 gap-1">
+            {workflow.status !== 'archived' && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={onEdit}
+                title="Bewerken"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
             {workflow.status === 'active' && (
               <Button
                 type="button"
@@ -207,6 +356,18 @@ function WorkflowCard({
                 className="text-zinc-500 hover:text-zinc-700"
               >
                 <Archive className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {workflow.status === 'archived' && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handlePermanentDelete}
+                title="Permanent verwijderen"
+                className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>

@@ -6,6 +6,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 
 /**
@@ -188,5 +189,28 @@ export const moveToStage = mutation({
       toStageId: args.toStageId,
       changedById: userId,
     });
+
+    // Trigger workflow-engine bij won/lost stage-changes
+    if (targetStage.isWonStage) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.workflowEngine.triggerOpportunityChanged,
+        {
+          workspaceId: opp.workspaceId,
+          opportunityId: args.opportunityId,
+          eventType: "opportunity_won",
+        },
+      );
+    } else if (targetStage.isLostStage) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.workflowEngine.triggerOpportunityChanged,
+        {
+          workspaceId: opp.workspaceId,
+          opportunityId: args.opportunityId,
+          eventType: "opportunity_lost",
+        },
+      );
+    }
   },
 });

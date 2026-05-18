@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMutation } from 'convex/react'
 import { toast } from 'sonner'
 import {
@@ -20,15 +20,24 @@ import {
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
-import { Badge } from '#/components/ui/badge.tsx'
 import { cn } from '#/lib/utils.ts'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+
+type TriggerType = 'contact_created' | 'opportunity_won' | 'opportunity_lost'
 
 interface Props {
   workspaceId: Id<'workspaces'>
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Als gepaseerd: edit-mode i.p.v. create. */
+  editing?: {
+    workflowId: Id<'workflows'>
+    name: string
+    description?: string
+    triggerType: TriggerType
+    nodes: BuilderNode[]
+  }
 }
 
 type BuilderNode =
@@ -41,6 +50,24 @@ type BuilderNode =
     }
   | { type: 'action'; subType: 'send_sms'; body: string }
   | { type: 'action'; subType: 'send_whatsapp'; body: string }
+
+const TRIGGER_OPTIONS: Array<{ value: TriggerType; label: string; desc: string }> = [
+  {
+    value: 'contact_created',
+    label: 'Nieuw contact',
+    desc: 'Vuur wanneer een lead binnenkomt (Meta, website-form, handmatig)',
+  },
+  {
+    value: 'opportunity_won',
+    label: 'Opportunity gewonnen',
+    desc: 'Vuur wanneer een opp naar Gewonnen-stage wordt gesleept',
+  },
+  {
+    value: 'opportunity_lost',
+    label: 'Opportunity verloren',
+    desc: 'Vuur wanneer een opp naar Verloren-stage wordt gesleept',
+  },
+]
 
 const NODE_TEMPLATES: Record<
   string,
@@ -81,22 +108,47 @@ const NODE_TEMPLATES: Record<
   },
 }
 
-export function NewWorkflowDialog({ workspaceId, open, onOpenChange }: Props) {
+export function NewWorkflowDialog({
+  workspaceId,
+  open,
+  onOpenChange,
+  editing,
+}: Props) {
   const create = useMutation(api.workflows.createLinear)
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [nodes, setNodes] = useState<BuilderNode[]>([
-    NODE_TEMPLATES.delay.make(),
-    NODE_TEMPLATES.email.make(),
-  ])
+  const replace = useMutation(api.workflows.replaceContent)
+  const isEditing = !!editing
+  const [name, setName] = useState(editing?.name ?? '')
+  const [description, setDescription] = useState(editing?.description ?? '')
+  const [triggerType, setTriggerType] = useState<TriggerType>(
+    editing?.triggerType ?? 'contact_created',
+  )
+  const [nodes, setNodes] = useState<BuilderNode[]>(
+    editing?.nodes ?? [
+      NODE_TEMPLATES.delay.make(),
+      NODE_TEMPLATES.whatsapp.make(),
+    ],
+  )
   const [activate, setActivate] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
+  // Resync wanneer editing-prop wijzigt (b.v. ander workflow geopend)
+  useEffect(() => {
+    if (editing) {
+      setName(editing.name)
+      setDescription(editing.description ?? '')
+      setTriggerType(editing.triggerType)
+      setNodes(editing.nodes)
+    }
+  }, [editing])
+
   function reset() {
-    setName('')
-    setDescription('')
-    setNodes([NODE_TEMPLATES.delay.make(), NODE_TEMPLATES.email.make()])
-    setActivate(true)
+    if (!isEditing) {
+      setName('')
+      setDescription('')
+      setTriggerType('contact_created')
+      setNodes([NODE_TEMPLATES.delay.make(), NODE_TEMPLATES.whatsapp.make()])
+      setActivate(true)
+    }
     onOpenChange(false)
   }
 
@@ -119,18 +171,29 @@ export function NewWorkflowDialog({ workspaceId, open, onOpenChange }: Props) {
     if (submitting) return
     setSubmitting(true)
     try {
-      await create({
-        workspaceId,
-        name,
-        description: description || undefined,
-        triggerType: 'contact_created',
-        nodes,
-        activate,
-      })
-      toast.success(`Workflow "${name}" aangemaakt`)
+      if (isEditing) {
+        await replace({
+          workflowId: editing.workflowId,
+          name,
+          description: description || undefined,
+          triggerType,
+          nodes,
+        })
+        toast.success(`Workflow "${name}" bijgewerkt`)
+      } else {
+        await create({
+          workspaceId,
+          name,
+          description: description || undefined,
+          triggerType,
+          nodes,
+          activate,
+        })
+        toast.success(`Workflow "${name}" aangemaakt`)
+      }
       reset()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Kon niet aanmaken')
+      toast.error(err instanceof Error ? err.message : 'Kon niet opslaan')
     } finally {
       setSubmitting(false)
     }
@@ -142,34 +205,43 @@ export function NewWorkflowDialog({ workspaceId, open, onOpenChange }: Props) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-amber-600" />
-            Nieuwe workflow
+            {isEditing ? 'Workflow bewerken' : 'Nieuwe workflow'}
           </DialogTitle>
           <DialogDescription>
-            Lineair: trigger → nodes in volgorde. Voor parallel branches
-            (Snelle Response) is hardcoded seed nodig.
+            Lineair: trigger → nodes in volgorde. Bij edit van een lopende
+            workflow: actieve executions die pauseren kunnen falen.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="wf-name">Naam</Label>
-              <Input
-                id="wf-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Welkom Email"
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Trigger</Label>
-              <div className="flex h-9 items-center rounded-md border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-600">
-                <Badge variant="secondary" className="font-mono text-xs">
-                  contact_created
-                </Badge>
-              </div>
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="wf-name">Naam</Label>
+            <Input
+              id="wf-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Welkom Email"
+              required
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="wf-trigger">Trigger</Label>
+            <select
+              id="wf-trigger"
+              value={triggerType}
+              onChange={(e) => setTriggerType(e.target.value as TriggerType)}
+              className="block h-9 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm shadow-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+              {TRIGGER_OPTIONS.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-zinc-500">
+              {TRIGGER_OPTIONS.find((t) => t.value === triggerType)?.desc}
+            </p>
           </div>
 
           <div className="space-y-1.5">
@@ -220,16 +292,18 @@ export function NewWorkflowDialog({ workspaceId, open, onOpenChange }: Props) {
             </div>
           </div>
 
-          {/* Activate */}
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={activate}
-              onChange={(e) => setActivate(e.target.checked)}
-              className="h-4 w-4 rounded border-zinc-300 text-blue-600"
-            />
-            <span>Direct activeren (anders status=draft)</span>
-          </label>
+          {/* Activate (alleen bij create) */}
+          {!isEditing && (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={activate}
+                onChange={(e) => setActivate(e.target.checked)}
+                className="h-4 w-4 rounded border-zinc-300 text-blue-600"
+              />
+              <span>Direct activeren (anders status=draft)</span>
+            </label>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button
@@ -247,7 +321,13 @@ export function NewWorkflowDialog({ workspaceId, open, onOpenChange }: Props) {
               }
             >
               <Plus className="h-4 w-4" />
-              {submitting ? 'Aanmaken…' : 'Workflow aanmaken'}
+              {submitting
+                ? isEditing
+                  ? 'Opslaan…'
+                  : 'Aanmaken…'
+                : isEditing
+                  ? 'Wijzigingen opslaan'
+                  : 'Workflow aanmaken'}
             </Button>
           </div>
         </form>

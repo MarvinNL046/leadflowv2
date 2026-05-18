@@ -56,6 +56,53 @@ export const triggerContactCreated = internalAction({
   },
 });
 
+/**
+ * Trigger voor opportunity-state-changes (won/lost). Action-nodes
+ * resolven contact via opportunity.contactId zodat email/sms/wa
+ * gewoon werken met dezelfde send-pipeline.
+ */
+export const triggerOpportunityChanged = internalAction({
+  args: {
+    workspaceId: v.id("workspaces"),
+    opportunityId: v.id("opportunities"),
+    eventType: v.union(
+      v.literal("opportunity_won"),
+      v.literal("opportunity_lost"),
+    ),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    const opp = await ctx.runQuery(
+      internal.workflowEngine.getOpportunityContactId,
+      { opportunityId: args.opportunityId },
+    );
+    if (!opp) return;
+
+    const workflowIds: Array<Id<"workflows">> = await ctx.runQuery(
+      internal.workflowEngine.findActiveWorkflowsForTrigger,
+      { workspaceId: args.workspaceId, triggerType: args.eventType },
+    );
+
+    for (const workflowId of workflowIds) {
+      // Entity = contact (action-nodes hebben email/phone nodig).
+      // Opportunity context kan later via entityData extra context bieden.
+      await ctx.runMutation(internal.workflowEngine.startExecution, {
+        workflowId,
+        entityType: "contact",
+        entityId: opp.contactId,
+      });
+    }
+  },
+});
+
+export const getOpportunityContactId = internalQuery({
+  args: { opportunityId: v.id("opportunities") },
+  handler: async (ctx, args) => {
+    const opp = await ctx.db.get(args.opportunityId);
+    if (!opp) return null;
+    return { contactId: opp.contactId };
+  },
+});
+
 // ──────────────────────────────────────────────────────────────────────
 // HELPER QUERIES + MUTATIONS
 // ──────────────────────────────────────────────────────────────────────
