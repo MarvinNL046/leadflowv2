@@ -4,7 +4,7 @@ import {
   internalMutation,
   internalQuery,
 } from "./_generated/server";
-import { internal, api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 
 /**
@@ -264,7 +264,7 @@ export const runNode = internalAction({
               ? interpolate(String(config.subject ?? ""), contact)
               : undefined;
 
-          await ctx.runAction(api.messaging.send, {
+          await ctx.runAction(internal.messaging.sendInternal, {
             contactId: contact._id,
             channel,
             body,

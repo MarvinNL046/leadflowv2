@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import {
   action,
+  internalAction,
   internalMutation,
   internalQuery,
   query,
@@ -121,6 +122,88 @@ export const send = action({
   },
 });
 
+/**
+ * Internal variant — voor systeem-acties (workflow engine, scheduled
+ * jobs) die geen user-session hebben. Skipt auth-check; resolve contact
+ * direct via internal query. Engine moet zelf zorgen dat contact in
+ * verwachte workspace zit.
+ */
+export const sendInternal = internalAction({
+  args: {
+    contactId: v.id("contacts"),
+    channel: v.union(
+      v.literal("sms"),
+      v.literal("whatsapp"),
+      v.literal("email"),
+    ),
+    body: v.string(),
+    subject: v.optional(v.string()),
+    htmlBody: v.optional(v.string()),
+    sentById: v.optional(v.id("users")),  // optioneel; nil voor systeem
+  },
+  handler: async (ctx, args): Promise<{
+    messageId: Id<"messages">;
+    status: "sent" | "failed";
+  }> => {
+    const data = await ctx.runQuery(
+      internal.messaging.resolveForSendInternal,
+      { contactId: args.contactId, channel: args.channel },
+    );
+    if ("error" in data) {
+      throw new Error(data.error);
+    }
+    const { workspaceId, recipient } = data;
+
+    const messageId = await ctx.runMutation(
+      internal.messaging.insertPendingInternal,
+      {
+        workspaceId,
+        contactId: args.contactId,
+        channel: args.channel,
+        to: recipient,
+        body: args.body,
+        subject: args.subject,
+        htmlBody: args.htmlBody,
+        sentById: args.sentById,
+      },
+    );
+
+    try {
+      let externalId: string | undefined;
+      if (args.channel === "email") {
+        externalId = await sendViaResend({
+          to: recipient,
+          subject: args.subject ?? "(geen onderwerp)",
+          text: args.body,
+          html: args.htmlBody,
+        });
+      } else if (args.channel === "sms") {
+        externalId = await sendViaVoidfixSms({
+          to: recipient,
+          message: args.body,
+        });
+      } else {
+        externalId = await sendViaVoidfixWa({
+          to: recipient,
+          message: args.body,
+        });
+      }
+      await ctx.runMutation(internal.messaging.markSent, {
+        messageId,
+        externalId,
+      });
+      return { messageId, status: "sent" };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await ctx.runMutation(internal.messaging.markFailed, {
+        messageId,
+        errorMessage: msg,
+      });
+      throw new Error(msg);
+    }
+  },
+});
+
 // ──────────────────────────────────────────────────────────────────────
 // INTERNAL HELPERS — auth + db
 // ──────────────────────────────────────────────────────────────────────
@@ -210,6 +293,68 @@ export const insertPending = internalMutation({
       htmlBody: args.htmlBody,
       sentById: args.sentById,
     });
+  },
+});
+
+/** Internal-versie: sentById optioneel (systeem-message zonder user). */
+export const insertPendingInternal = internalMutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    contactId: v.id("contacts"),
+    channel: v.union(
+      v.literal("sms"),
+      v.literal("whatsapp"),
+      v.literal("email"),
+    ),
+    to: v.string(),
+    body: v.string(),
+    subject: v.optional(v.string()),
+    htmlBody: v.optional(v.string()),
+    sentById: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("messages", {
+      workspaceId: args.workspaceId,
+      contactId: args.contactId,
+      channel: args.channel,
+      direction: "outbound",
+      status: "pending",
+      to: args.to,
+      body: args.body,
+      subject: args.subject,
+      htmlBody: args.htmlBody,
+      sentById: args.sentById,
+    });
+  },
+});
+
+/** Auth-loze resolver voor systeem-sends. */
+export const resolveForSendInternal = internalQuery({
+  args: {
+    contactId: v.id("contacts"),
+    channel: v.union(
+      v.literal("sms"),
+      v.literal("whatsapp"),
+      v.literal("email"),
+    ),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<
+    | { error: string }
+    | { workspaceId: Id<"workspaces">; recipient: string }
+  > => {
+    const contact = await ctx.db.get(args.contactId);
+    if (!contact) return { error: "Contact not found" };
+    const recipient =
+      args.channel === "email" ? contact.email : contact.phone;
+    if (!recipient) {
+      return {
+        error: `Contact heeft geen ${args.channel === "email" ? "email" : "telefoonnummer"}`,
+      };
+    }
+    return { workspaceId: contact.workspaceId, recipient };
   },
 });
 
