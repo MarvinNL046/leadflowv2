@@ -257,6 +257,7 @@ function ContactDetailPage() {
       </div>
 
       <DetailsSection contact={contact} />
+      <ConversationSection contactId={id as Id<'contacts'>} />
       <NotesSection
         contactId={id as Id<'contacts'>}
         notes={notes ?? null}
@@ -482,6 +483,174 @@ function SmallField({
     <div className="space-y-1">
       <Label className="text-xs text-zinc-500">{label}</Label>
       <Input type={type} value={value} onChange={onChange} className="h-9" />
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Conversation — chat-bubbles inbound/outbound per kanaal
+// ────────────────────────────────────────────────────────────────────────
+
+function ConversationSection({
+  contactId,
+}: {
+  contactId: Id<'contacts'>
+}) {
+  const messages = useQuery(api.messaging.listByContact, { contactId })
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <MessageCircle className="h-4 w-4 text-sky-500" />
+          Berichten
+          {messages && (
+            <Badge variant="secondary" className="text-xs">
+              {messages.length}
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {messages === undefined ? (
+          <Skeleton className="h-32 w-full" />
+        ) : messages.length === 0 ? (
+          <p className="py-6 text-center text-sm text-zinc-400">
+            Nog geen berichten verstuurd of ontvangen
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {[...messages].reverse().map((m, idx, arr) => {
+              const prev = idx > 0 ? arr[idx - 1] : null
+              const showDate =
+                !prev ||
+                new Date(m._creationTime).toDateString() !==
+                  new Date(prev._creationTime).toDateString()
+              return (
+                <div key={m._id}>
+                  {showDate && (
+                    <div className="my-3 flex items-center justify-center">
+                      <span className="rounded-full bg-zinc-100 px-3 py-0.5 text-xs text-zinc-500">
+                        {new Date(m._creationTime).toLocaleDateString(
+                          'nl-NL',
+                          {
+                            weekday: 'long',
+                            day: 'numeric',
+                            month: 'long',
+                          },
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  <MessageBubble message={m} />
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function MessageBubble({
+  message,
+}: {
+  message: {
+    _creationTime: number
+    channel: string
+    direction: string
+    status: string
+    subject?: string
+    body: string
+    errorMessage?: string
+  }
+}) {
+  const isOutbound = message.direction === 'outbound'
+  const channelMeta: Record<
+    string,
+    { icon: typeof Mail; bg: string; label: string }
+  > = {
+    email: { icon: Mail, bg: 'bg-blue-50 border-blue-200', label: 'Email' },
+    sms: {
+      icon: MessageSquare,
+      bg: 'bg-emerald-50 border-emerald-200',
+      label: 'SMS',
+    },
+    whatsapp: {
+      icon: MessageCircle,
+      bg: 'bg-green-50 border-green-200',
+      label: 'WhatsApp',
+    },
+    messenger: {
+      icon: MessageCircle,
+      bg: 'bg-violet-50 border-violet-200',
+      label: 'Messenger',
+    },
+  }
+  const m = channelMeta[message.channel] ?? channelMeta.sms
+  const Icon = m.icon
+  const failed = message.status === 'failed' || message.status === 'bounced'
+
+  return (
+    <div
+      className={cn(
+        'flex',
+        isOutbound ? 'justify-end' : 'justify-start',
+      )}
+    >
+      <div
+        className={cn(
+          'max-w-[80%] rounded-lg border px-3 py-2 text-sm',
+          isOutbound
+            ? 'bg-zinc-900 text-white border-zinc-900'
+            : `${m.bg} text-zinc-800`,
+          failed && 'opacity-60',
+        )}
+      >
+        <div
+          className={cn(
+            'mb-1 flex items-center gap-1.5 text-xs',
+            isOutbound ? 'text-zinc-300' : 'text-zinc-500',
+          )}
+        >
+          <Icon className="h-3 w-3" />
+          <span>{m.label}</span>
+          <span>·</span>
+          <span>
+            {new Date(message._creationTime).toLocaleTimeString('nl-NL', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+          {failed && (
+            <Badge className="ml-1 border-0 bg-red-100 text-red-700 text-[10px]">
+              {message.status}
+            </Badge>
+          )}
+        </div>
+        {message.subject && message.channel === 'email' && (
+          <p
+            className={cn(
+              'mb-1 font-medium',
+              isOutbound ? 'text-white' : 'text-zinc-900',
+            )}
+          >
+            {message.subject}
+          </p>
+        )}
+        <p className="whitespace-pre-line">{message.body}</p>
+        {message.errorMessage && (
+          <p
+            className={cn(
+              'mt-1 text-xs',
+              isOutbound ? 'text-red-300' : 'text-red-600',
+            )}
+          >
+            {message.errorMessage}
+          </p>
+        )}
+      </div>
     </div>
   )
 }

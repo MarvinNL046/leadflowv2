@@ -269,6 +269,51 @@ export const seedSnelleResponse = mutation({
 });
 
 /**
+ * Backfill contactId voor inbound messages die orphan zijn (contactId
+ * undefined). Probeer phone-match met variants (met/zonder + prefix).
+ * Wegwerp — verwijderen na productie-cleanup.
+ */
+export const backfillInboundContactIds = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const inboundMessages = await ctx.db
+      .query("messages")
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("direction"), "inbound"),
+          q.eq(q.field("contactId"), undefined),
+        ),
+      )
+      .take(500);
+
+    let matched = 0;
+    for (const m of inboundMessages) {
+      if (!m.from) continue;
+      if (m.channel === "email") continue; // alleen sms/wa fix nu
+
+      const digits = m.from.replace(/[^\d+]/g, "");
+      const withPlus = digits.startsWith("+") ? digits : `+${digits}`;
+      const withoutPlus = digits.startsWith("+") ? digits.slice(1) : digits;
+
+      for (const phone of [withPlus, withoutPlus]) {
+        const c = await ctx.db
+          .query("contacts")
+          .withIndex("by_workspace_phone", (q) =>
+            q.eq("workspaceId", m.workspaceId).eq("phone", phone),
+          )
+          .first();
+        if (c) {
+          await ctx.db.patch(m._id, { contactId: c._id });
+          matched++;
+          break;
+        }
+      }
+    }
+    return { scanned: inboundMessages.length, matched };
+  },
+});
+
+/**
  * Update delay op de Snelle Response workflow. Voor test gebruiken we
  * 15s, voor productie 180s. Verwijder na cleanup van migration.ts.
  */

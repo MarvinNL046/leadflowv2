@@ -404,31 +404,39 @@ export const recordInbound = internalMutation({
 
     // Contact-lookup: phone voor sms/wa, email voor email
     let contactId: Id<"contacts"> | undefined;
-    const normalizedFrom =
-      args.channel === "email"
-        ? args.from.toLowerCase().trim()
-        : args.from.replace(/[^\d+]/g, "");
 
-    const contact =
-      args.channel === "email"
-        ? await ctx.db
-            .query("contacts")
-            .withIndex("by_workspace_email", (q) =>
-              q
-                .eq("workspaceId", args.workspaceId)
-                .eq("email", normalizedFrom),
-            )
-            .first()
-        : await ctx.db
-            .query("contacts")
-            .withIndex("by_workspace_phone", (q) =>
-              q
-                .eq("workspaceId", args.workspaceId)
-                .eq("phone", normalizedFrom),
-            )
-            .first();
+    if (args.channel === "email") {
+      const normalizedEmail = args.from.toLowerCase().trim();
+      const contact = await ctx.db
+        .query("contacts")
+        .withIndex("by_workspace_email", (q) =>
+          q
+            .eq("workspaceId", args.workspaceId)
+            .eq("email", normalizedEmail),
+        )
+        .first();
+      if (contact) contactId = contact._id;
+    } else {
+      // Voidfix kan met of zonder + prefix sturen. Probeer beide
+      // varianten zodat lookup matched ongeacht format.
+      const digits = args.from.replace(/[^\d+]/g, "");
+      const withPlus = digits.startsWith("+") ? digits : `+${digits}`;
+      const withoutPlus = digits.startsWith("+") ? digits.slice(1) : digits;
 
-    if (contact) contactId = contact._id;
+      const variants = [withPlus, withoutPlus];
+      for (const phone of variants) {
+        const contact = await ctx.db
+          .query("contacts")
+          .withIndex("by_workspace_phone", (q) =>
+            q.eq("workspaceId", args.workspaceId).eq("phone", phone),
+          )
+          .first();
+        if (contact) {
+          contactId = contact._id;
+          break;
+        }
+      }
+    }
 
     const messageId = await ctx.db.insert("messages", {
       workspaceId: args.workspaceId,
