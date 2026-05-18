@@ -24,7 +24,12 @@ import { cn } from '#/lib/utils.ts'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 
-type TriggerType = 'contact_created' | 'opportunity_won' | 'opportunity_lost'
+type TriggerType =
+  | 'contact_created'
+  | 'opportunity_won'
+  | 'opportunity_lost'
+  | 'lead_unreachable'
+  | 'follow_up_due'
 
 interface Props {
   workspaceId: Id<'workspaces'>
@@ -65,7 +70,17 @@ const TRIGGER_OPTIONS: Array<{ value: TriggerType; label: string; desc: string }
   {
     value: 'opportunity_lost',
     label: 'Opportunity verloren',
-    desc: 'Vuur wanneer een opp naar Verloren-stage wordt gesleept',
+    desc: 'Vuur wanneer een opp naar Verloren-stage wordt gesleept (incl. ongeldig nummer, buiten gebied, niet geïnteresseerd)',
+  },
+  {
+    value: 'lead_unreachable',
+    label: 'Lead onbereikbaar (3x niet bereikt)',
+    desc: 'Specifiek na 3e mislukte belpoging. Bv. excuus-WhatsApp naar klant',
+  },
+  {
+    value: 'follow_up_due',
+    label: 'Follow-up klaar (2d na niet bereikt)',
+    desc: 'Vuurt 2 dagen na "Niet bereikt"-actie ALS lead nog open is. Bv. reminder-SMS naar jezelf',
   },
 ]
 

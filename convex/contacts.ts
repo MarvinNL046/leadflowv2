@@ -547,6 +547,20 @@ export const recordCallNoAnswer = mutation({
           }
         }
       }
+      // Trigger workflow-engine voor lead_unreachable event
+      await ctx.scheduler.runAfter(
+        0,
+        internal.workflowEngine.triggerLeadUnreachable,
+        { workspaceId: contact.workspaceId, contactId: args.contactId },
+      );
+    } else {
+      // Schedule follow_up_due trigger over 2 dagen. Triggert alleen
+      // als contact dan nog steeds open is (geen unreachable/won/lost).
+      await ctx.scheduler.runAfter(
+        2 * 24 * 60 * 60 * 1000,
+        internal.workflowEngine.triggerFollowUpDue,
+        { workspaceId: contact.workspaceId, contactId: args.contactId },
+      );
     }
 
     await ctx.db.insert("notes", {

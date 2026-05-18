@@ -103,6 +103,78 @@ export const getOpportunityContactId = internalQuery({
   },
 });
 
+/**
+ * Lead unreachable trigger — vuurt bij 3-strike (3x niet bereikt).
+ * Specifieker dan opportunity_lost want bv. outside_area triggert ook
+ * opportunity_lost maar is een ander semantisch event ("klant bestaat
+ * maar buiten gebied" vs "klant bereiken we niet").
+ */
+export const triggerLeadUnreachable = internalAction({
+  args: {
+    workspaceId: v.id("workspaces"),
+    contactId: v.id("contacts"),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    const workflowIds: Array<Id<"workflows">> = await ctx.runQuery(
+      internal.workflowEngine.findActiveWorkflowsForTrigger,
+      { workspaceId: args.workspaceId, triggerType: "lead_unreachable" },
+    );
+    for (const workflowId of workflowIds) {
+      await ctx.runMutation(internal.workflowEngine.startExecution, {
+        workflowId,
+        entityType: "contact",
+        entityId: args.contactId,
+      });
+    }
+  },
+});
+
+/**
+ * Follow-up due trigger — vuurt N dagen na "Niet bereikt" actie.
+ * Skip als contact in tussentijd is bijgewerkt naar unreachable, won,
+ * lost of outsideArea (lead is "afgehandeld", reminder onnodig).
+ */
+export const triggerFollowUpDue = internalAction({
+  args: {
+    workspaceId: v.id("workspaces"),
+    contactId: v.id("contacts"),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    // Check contact-state: skip als al afgehandeld
+    const contact = await ctx.runQuery(
+      internal.workflowEngine.getContactForFollowUpCheck,
+      { contactId: args.contactId },
+    );
+    if (!contact) return;
+    if (
+      contact.unreachable ||
+      contact.outsideArea ||
+      contact.deletedAt !== undefined
+    ) {
+      return;
+    }
+
+    const workflowIds: Array<Id<"workflows">> = await ctx.runQuery(
+      internal.workflowEngine.findActiveWorkflowsForTrigger,
+      { workspaceId: args.workspaceId, triggerType: "follow_up_due" },
+    );
+    for (const workflowId of workflowIds) {
+      await ctx.runMutation(internal.workflowEngine.startExecution, {
+        workflowId,
+        entityType: "contact",
+        entityId: args.contactId,
+      });
+    }
+  },
+});
+
+export const getContactForFollowUpCheck = internalQuery({
+  args: { contactId: v.id("contacts") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.contactId);
+  },
+});
+
 // ──────────────────────────────────────────────────────────────────────
 // HELPER QUERIES + MUTATIONS
 // ──────────────────────────────────────────────────────────────────────

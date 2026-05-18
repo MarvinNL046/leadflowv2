@@ -288,6 +288,8 @@ const triggerTypeValidator = v.union(
   v.literal("contact_created"),
   v.literal("opportunity_won"),
   v.literal("opportunity_lost"),
+  v.literal("lead_unreachable"),
+  v.literal("follow_up_due"),
 );
 
 /**
