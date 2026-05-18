@@ -1,0 +1,407 @@
+import { useState } from 'react'
+import { useMutation } from 'convex/react'
+import { toast } from 'sonner'
+import {
+  Plus,
+  Trash2,
+  Mail,
+  MessageSquare,
+  MessageCircle,
+  Clock,
+  Zap,
+} from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '#/components/ui/dialog.tsx'
+import { Button } from '#/components/ui/button.tsx'
+import { Input } from '#/components/ui/input.tsx'
+import { Label } from '#/components/ui/label.tsx'
+import { Badge } from '#/components/ui/badge.tsx'
+import { cn } from '#/lib/utils.ts'
+import { api } from '../../../convex/_generated/api'
+import type { Id } from '../../../convex/_generated/dataModel'
+
+interface Props {
+  workspaceId: Id<'workspaces'>
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+type BuilderNode =
+  | { type: 'delay'; delaySeconds: number }
+  | {
+      type: 'action'
+      subType: 'send_email'
+      subject: string
+      body: string
+    }
+  | { type: 'action'; subType: 'send_sms'; body: string }
+  | { type: 'action'; subType: 'send_whatsapp'; body: string }
+
+const NODE_TEMPLATES: Record<
+  string,
+  { label: string; icon: typeof Mail; make: () => BuilderNode }
+> = {
+  delay: {
+    label: 'Wacht',
+    icon: Clock,
+    make: () => ({ type: 'delay', delaySeconds: 180 }),
+  },
+  email: {
+    label: 'Email',
+    icon: Mail,
+    make: () => ({
+      type: 'action',
+      subType: 'send_email',
+      subject: 'Bedankt voor je aanvraag',
+      body: 'Hoi {{contact.firstName}},\n\n',
+    }),
+  },
+  sms: {
+    label: 'SMS',
+    icon: MessageSquare,
+    make: () => ({
+      type: 'action',
+      subType: 'send_sms',
+      body: 'Hoi {{contact.firstName}}, bedankt voor je aanvraag.',
+    }),
+  },
+  whatsapp: {
+    label: 'WhatsApp',
+    icon: MessageCircle,
+    make: () => ({
+      type: 'action',
+      subType: 'send_whatsapp',
+      body: 'Hoi {{contact.firstName}}! 👋',
+    }),
+  },
+}
+
+export function NewWorkflowDialog({ workspaceId, open, onOpenChange }: Props) {
+  const create = useMutation(api.workflows.createLinear)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [nodes, setNodes] = useState<BuilderNode[]>([
+    NODE_TEMPLATES.delay.make(),
+    NODE_TEMPLATES.email.make(),
+  ])
+  const [activate, setActivate] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+
+  function reset() {
+    setName('')
+    setDescription('')
+    setNodes([NODE_TEMPLATES.delay.make(), NODE_TEMPLATES.email.make()])
+    setActivate(true)
+    onOpenChange(false)
+  }
+
+  function addNode(templateKey: keyof typeof NODE_TEMPLATES) {
+    setNodes((prev) => [...prev, NODE_TEMPLATES[templateKey].make()])
+  }
+
+  function removeNode(idx: number) {
+    setNodes((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  function updateNode(idx: number, patch: Partial<BuilderNode>) {
+    setNodes((prev) =>
+      prev.map((n, i) => (i === idx ? ({ ...n, ...patch } as BuilderNode) : n)),
+    )
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (submitting) return
+    setSubmitting(true)
+    try {
+      await create({
+        workspaceId,
+        name,
+        description: description || undefined,
+        triggerType: 'contact_created',
+        nodes,
+        activate,
+      })
+      toast.success(`Workflow "${name}" aangemaakt`)
+      reset()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kon niet aanmaken')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : reset())}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-amber-600" />
+            Nieuwe workflow
+          </DialogTitle>
+          <DialogDescription>
+            Lineair: trigger → nodes in volgorde. Voor parallel branches
+            (Snelle Response) is hardcoded seed nodig.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="wf-name">Naam</Label>
+              <Input
+                id="wf-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Welkom Email"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Trigger</Label>
+              <div className="flex h-9 items-center rounded-md border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-600">
+                <Badge variant="secondary" className="font-mono text-xs">
+                  contact_created
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="wf-desc">Beschrijving (optioneel)</Label>
+            <Input
+              id="wf-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Wat doet deze workflow?"
+            />
+          </div>
+
+          {/* Nodes */}
+          <div className="space-y-2">
+            <Label>Nodes (sequentieel)</Label>
+            <ul className="space-y-2">
+              {nodes.map((node, idx) => (
+                <NodeRow
+                  key={idx}
+                  index={idx}
+                  node={node}
+                  onChange={(patch) => updateNode(idx, patch)}
+                  onRemove={() => removeNode(idx)}
+                />
+              ))}
+            </ul>
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              {(Object.keys(NODE_TEMPLATES) as Array<
+                keyof typeof NODE_TEMPLATES
+              >).map((key) => {
+                const t = NODE_TEMPLATES[key]
+                const Icon = t.icon
+                return (
+                  <Button
+                    key={key}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addNode(key)}
+                  >
+                    <Plus className="h-3 w-3" />
+                    <Icon className="h-3 w-3" />
+                    {t.label}
+                  </Button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Activate */}
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={activate}
+              onChange={(e) => setActivate(e.target.checked)}
+              className="h-4 w-4 rounded border-zinc-300 text-blue-600"
+            />
+            <span>Direct activeren (anders status=draft)</span>
+          </label>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={reset}
+              disabled={submitting}
+            >
+              Annuleer
+            </Button>
+            <Button
+              type="submit"
+              disabled={
+                submitting || nodes.length === 0 || name.trim().length === 0
+              }
+            >
+              <Plus className="h-4 w-4" />
+              {submitting ? 'Aanmaken…' : 'Workflow aanmaken'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function NodeRow({
+  index,
+  node,
+  onChange,
+  onRemove,
+}: {
+  index: number
+  node: BuilderNode
+  onChange: (patch: Partial<BuilderNode>) => void
+  onRemove: () => void
+}) {
+  const meta =
+    node.type === 'delay'
+      ? NODE_TEMPLATES.delay
+      : node.subType === 'send_email'
+        ? NODE_TEMPLATES.email
+        : node.subType === 'send_sms'
+          ? NODE_TEMPLATES.sms
+          : NODE_TEMPLATES.whatsapp
+  const Icon = meta.icon
+
+  return (
+    <li className="rounded-md border border-zinc-200 bg-zinc-50/50 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-xs font-mono text-zinc-400">#{index + 1}</span>
+        <Icon className="h-3.5 w-3.5 text-zinc-600" />
+        <span className="text-sm font-medium text-zinc-700">{meta.label}</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onRemove}
+          className="ml-auto h-6 w-6 p-0 text-zinc-400 hover:text-red-600"
+          title="Node verwijderen"
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      </div>
+
+      {node.type === 'delay' && (
+        <div className="flex items-center gap-2">
+          <Label className="shrink-0 text-xs text-zinc-500">
+            Vertraging
+          </Label>
+          <Input
+            type="number"
+            min="1"
+            value={node.delaySeconds}
+            onChange={(e) =>
+              onChange({
+                type: 'delay',
+                delaySeconds: Number(e.target.value),
+              })
+            }
+            className="h-8 w-32"
+          />
+          <span className="text-xs text-zinc-500">seconden</span>
+        </div>
+      )}
+
+      {node.type === 'action' && node.subType === 'send_email' && (
+        <div className="space-y-2">
+          <div className="space-y-1">
+            <Label className="text-xs text-zinc-500">Onderwerp</Label>
+            <Input
+              value={node.subject}
+              onChange={(e) =>
+                onChange({
+                  type: 'action',
+                  subType: 'send_email',
+                  subject: e.target.value,
+                  body: node.body,
+                })
+              }
+              className="h-8"
+            />
+          </div>
+          <NodeBodyTextarea
+            value={node.body}
+            onChange={(v) =>
+              onChange({
+                type: 'action',
+                subType: 'send_email',
+                subject: node.subject,
+                body: v,
+              })
+            }
+            rows={4}
+          />
+        </div>
+      )}
+
+      {node.type === 'action' &&
+        (node.subType === 'send_sms' || node.subType === 'send_whatsapp') && (
+          <NodeBodyTextarea
+            value={node.body}
+            onChange={(v) =>
+              onChange({
+                type: 'action',
+                subType: node.subType,
+                body: v,
+              } as BuilderNode)
+            }
+            rows={node.subType === 'send_sms' ? 2 : 3}
+            showCharCount={node.subType === 'send_sms'}
+          />
+        )}
+    </li>
+  )
+}
+
+function NodeBodyTextarea({
+  value,
+  onChange,
+  rows,
+  showCharCount = false,
+}: {
+  value: string
+  onChange: (v: string) => void
+  rows: number
+  showCharCount?: boolean
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-zinc-500">Bericht</Label>
+        {showCharCount && (
+          <span
+            className={cn(
+              'text-xs',
+              value.length > 160
+                ? 'font-medium text-red-600'
+                : 'text-zinc-400',
+            )}
+          >
+            {value.length}/160
+          </span>
+        )}
+      </div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={rows}
+        className="block w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm shadow-xs placeholder:text-zinc-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+        placeholder="Gebruik {{contact.firstName}} voor personalisatie"
+      />
+    </div>
+  )
+}

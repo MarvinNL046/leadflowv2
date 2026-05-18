@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { query, type QueryCtx } from "./_generated/server";
+import {
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
 /**
@@ -10,7 +15,7 @@ import type { Id } from "./_generated/dataModel";
  */
 
 async function requireWorkspaceMembership(
-  ctx: QueryCtx,
+  ctx: QueryCtx | MutationCtx,
   workspaceId: Id<"workspaces">,
 ): Promise<Id<"users">> {
   const userId = await getAuthUserId(ctx);
@@ -244,5 +249,154 @@ export const getDetail = query({
       .collect();
 
     return { workflow: wf, nodes, edges };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// BUILDER MUTATIONS
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Validator voor één builder-node. Lineaire ketting: trigger gevolgd
+ * door N actie/delay nodes. Edges worden automatisch sequentieel
+ * aangemaakt op basis van array-volgorde.
+ */
+const linearNodeValidator = v.union(
+  v.object({
+    type: v.literal("delay"),
+    delaySeconds: v.number(),
+  }),
+  v.object({
+    type: v.literal("action"),
+    subType: v.literal("send_email"),
+    subject: v.string(),
+    body: v.string(),
+  }),
+  v.object({
+    type: v.literal("action"),
+    subType: v.literal("send_sms"),
+    body: v.string(),
+  }),
+  v.object({
+    type: v.literal("action"),
+    subType: v.literal("send_whatsapp"),
+    body: v.string(),
+  }),
+);
+
+/**
+ * Maakt een nieuwe lineaire workflow met trigger + sequentiële nodes.
+ * Voor non-lineair (parallel branches): hardcoded seed (Snelle Response)
+ * of toekomstige visual builder.
+ */
+export const createLinear = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    triggerType: v.literal("contact_created"),
+    nodes: v.array(linearNodeValidator),
+    activate: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    await requireWorkspaceMembership(ctx, args.workspaceId);
+
+    const name = args.name.trim();
+    if (name.length === 0) throw new Error("Naam mag niet leeg zijn");
+    if (args.nodes.length === 0) {
+      throw new Error("Voeg minstens één node toe");
+    }
+
+    const workflowId = await ctx.db.insert("workflows", {
+      workspaceId: args.workspaceId,
+      name,
+      description: args.description?.trim() || undefined,
+      status: args.activate ? "active" : "draft",
+      triggerConfig: [
+        { type: args.triggerType, nodeId: "trigger-1" },
+      ],
+      version: 1,
+      totalExecutions: 0,
+      successfulExecutions: 0,
+      failedExecutions: 0,
+    });
+
+    // Trigger-node
+    await ctx.db.insert("workflowNodes", {
+      workflowId,
+      nodeId: "trigger-1",
+      type: "trigger",
+      subType: args.triggerType,
+      positionX: 0,
+      positionY: 0,
+      config: {},
+      label: "Nieuw contact",
+    });
+
+    // Action/delay nodes + edges sequentieel
+    let prevNodeId = "trigger-1";
+    for (let i = 0; i < args.nodes.length; i++) {
+      const n = args.nodes[i];
+      const nodeId = `node-${i + 1}`;
+      let label = nodeId;
+      let config: Record<string, unknown> = {};
+
+      if (n.type === "delay") {
+        label = `Wacht ${n.delaySeconds}s`;
+        config = { delaySeconds: n.delaySeconds };
+      } else if (n.subType === "send_email") {
+        label = "Email";
+        config = { subject: n.subject, body: n.body };
+      } else if (n.subType === "send_sms") {
+        label = "SMS";
+        config = { body: n.body };
+      } else if (n.subType === "send_whatsapp") {
+        label = "WhatsApp";
+        config = { body: n.body };
+      }
+
+      await ctx.db.insert("workflowNodes", {
+        workflowId,
+        nodeId,
+        type: n.type,
+        subType: n.type === "action" ? n.subType : undefined,
+        positionX: 200 * (i + 1),
+        positionY: 0,
+        config,
+        label,
+      });
+
+      await ctx.db.insert("workflowEdges", {
+        workflowId,
+        sourceNodeId: prevNodeId,
+        targetNodeId: nodeId,
+      });
+
+      prevNodeId = nodeId;
+    }
+
+    return { workflowId };
+  },
+});
+
+/**
+ * Status togglen: draft → active → paused → archived. Engine respecteert
+ * status=active filter bij trigger-matching.
+ */
+export const setStatus = mutation({
+  args: {
+    workflowId: v.id("workflows"),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("active"),
+      v.literal("paused"),
+      v.literal("archived"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const wf = await ctx.db.get(args.workflowId);
+    if (!wf) throw new Error("Workflow niet gevonden");
+    await requireWorkspaceMembership(ctx, wf.workspaceId);
+    await ctx.db.patch(args.workflowId, { status: args.status });
   },
 });

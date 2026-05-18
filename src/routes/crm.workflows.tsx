@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQuery } from 'convex/react'
+import { useQuery, useMutation } from 'convex/react'
+import { toast } from 'sonner'
 import {
   Zap,
   CheckCircle2,
@@ -7,6 +9,10 @@ import {
   PauseCircle,
   PlayCircle,
   Clock,
+  Plus,
+  Archive,
+  Play,
+  Pause,
 } from 'lucide-react'
 import {
   Card,
@@ -14,11 +20,13 @@ import {
   CardHeader,
   CardTitle,
 } from '#/components/ui/card.tsx'
+import { Button } from '#/components/ui/button.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { cn } from '#/lib/utils.ts'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
+import { NewWorkflowDialog } from '../components/crm/new-workflow-dialog'
 
 export const Route = createFileRoute('/crm/workflows')({
   component: WorkflowsPage,
@@ -48,19 +56,26 @@ function WorkflowsContent({
   workspaceId: Id<'workspaces'>
 }) {
   const workflows = useQuery(api.workflows.listForDashboard, { workspaceId })
+  const [addOpen, setAddOpen] = useState(false)
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20">
-          <Zap className="h-4.5 w-4.5 text-amber-600" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20">
+            <Zap className="h-4.5 w-4.5 text-amber-600" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-zinc-900">Workflows</h1>
+            <p className="text-xs text-zinc-500">
+              Automations die triggeren op events
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-semibold text-zinc-900">Workflows</h1>
-          <p className="text-xs text-zinc-500">
-            Automations die triggeren op events
-          </p>
-        </div>
+        <Button type="button" onClick={() => setAddOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Nieuwe workflow
+        </Button>
       </div>
 
       {workflows === undefined ? (
@@ -88,6 +103,12 @@ function WorkflowsContent({
           ))}
         </div>
       )}
+
+      <NewWorkflowDialog
+        workspaceId={workspaceId}
+        open={addOpen}
+        onOpenChange={setAddOpen}
+      />
     </div>
   )
 }
@@ -118,12 +139,24 @@ function WorkflowCard({
     }>
   }
 }) {
+  const setStatus = useMutation(api.workflows.setStatus)
   const successRate =
     workflow.totalExecutions > 0
       ? Math.round(
           (workflow.successfulExecutions / workflow.totalExecutions) * 100,
         )
       : null
+
+  async function changeStatus(
+    newStatus: 'active' | 'paused' | 'archived',
+  ) {
+    try {
+      await setStatus({ workflowId: workflow._id, status: newStatus })
+      toast.success(`Workflow ${newStatus}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kon niet wijzigen')
+    }
+  }
 
   return (
     <Card>
@@ -138,6 +171,43 @@ function WorkflowCard({
               <p className="mt-1 text-sm text-zinc-500">
                 {workflow.description}
               </p>
+            )}
+          </div>
+          <div className="flex shrink-0 gap-1">
+            {workflow.status === 'active' && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => changeStatus('paused')}
+                title="Pauzeren"
+              >
+                <Pause className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {(workflow.status === 'paused' ||
+              workflow.status === 'draft') && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => changeStatus('active')}
+                title="Activeren"
+              >
+                <Play className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {workflow.status !== 'archived' && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => changeStatus('archived')}
+                title="Archiveren"
+                className="text-zinc-500 hover:text-zinc-700"
+              >
+                <Archive className="h-3.5 w-3.5" />
+              </Button>
             )}
           </div>
         </div>
