@@ -12,11 +12,13 @@ import {
   StickyNote,
   Copy,
   Check,
+  UserPlus,
 } from 'lucide-react'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { cn } from '#/lib/utils.ts'
+import { getMetaFormLabel } from '#/lib/meta-forms.ts'
 import { LeadDialog } from './lead-dialog'
 
 export interface IncomingLead {
@@ -89,6 +91,8 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
         ? `${Math.floor(minutesAgo / 60)}u`
         : `${Math.floor(minutesAgo / (24 * 60))}d`
 
+  const metaFormLabel = getMetaFormLabel(lead.metaFormId)
+
   return (
     <Card
       className={cn(
@@ -117,9 +121,10 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
                 <Badge
                   variant="secondary"
                   className="border-0 bg-blue-100 text-blue-700"
+                  title={lead.metaFormId ? `Form-ID: ${lead.metaFormId}` : undefined}
                 >
                   <Megaphone className="mr-1 h-3 w-3" />
-                  Meta
+                  {metaFormLabel ? `Meta · ${metaFormLabel}` : 'Meta'}
                 </Badge>
               )}
               {lead.leadSource === 'api' && (
@@ -129,6 +134,15 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
                 >
                   <Globe className="mr-1 h-3 w-3" />
                   Website
+                </Badge>
+              )}
+              {lead.leadSource === 'manual' && (
+                <Badge
+                  variant="secondary"
+                  className="border-0 bg-zinc-100 text-zinc-700"
+                >
+                  <UserPlus className="mr-1 h-3 w-3" />
+                  Handmatig
                 </Badge>
               )}
               {lead.callCount > 0 && (
