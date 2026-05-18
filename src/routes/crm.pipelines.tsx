@@ -222,21 +222,15 @@ function OpportunityCard({
     <div
       ref={setNodeRef}
       style={style}
+      {...listeners}
+      {...attributes}
       className={cn(
-        'group rounded-md border border-zinc-200 bg-white p-3 shadow-xs',
-        isDragging && 'opacity-40',
+        'group cursor-grab touch-none rounded-md border border-zinc-200 bg-white p-3 shadow-xs hover:border-zinc-300 active:cursor-grabbing',
+        isDragging && 'opacity-40 shadow-md',
       )}
     >
       <div className="flex items-start gap-2">
-        <button
-          type="button"
-          {...listeners}
-          {...attributes}
-          className="touch-none rounded p-0.5 text-zinc-400 hover:bg-zinc-100"
-          aria-label="Sleep deze opportunity"
-        >
-          <GripVertical className="h-3.5 w-3.5" />
-        </button>
+        <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-300 group-hover:text-zinc-400" />
         <div className="min-w-0 flex-1">
           <h4 className="truncate text-sm font-medium text-zinc-900">
             {opp.title}
