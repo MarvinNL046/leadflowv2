@@ -15,6 +15,8 @@ import type * as metaIngest from "../metaIngest.js";
 import type * as metaProcessor from "../metaProcessor.js";
 import type * as migration from "../migration.js";
 import type * as notes from "../notes.js";
+import type * as opportunities from "../opportunities.js";
+import type * as pipelines from "../pipelines.js";
 import type * as userProfiles from "../userProfiles.js";
 
 import type {
@@ -31,6 +33,8 @@ declare const fullApi: ApiFromModules<{
   metaProcessor: typeof metaProcessor;
   migration: typeof migration;
   notes: typeof notes;
+  opportunities: typeof opportunities;
+  pipelines: typeof pipelines;
   userProfiles: typeof userProfiles;
 }>;
 

@@ -37,6 +37,113 @@ export const getStaycoolWorkspaceId = query({
 });
 
 /**
+ * Auth-less seed van Staycool's default Sales pipeline (+ 5 stages) +
+ * 3 test-opportunities op recente contacts. Voor dev-bootstrap; weg
+ * bij cleanup.
+ */
+const SEED_STAGES = [
+  { name: "Lead", color: "#94a3b8", isWonStage: false, isLostStage: false },
+  { name: "Contact", color: "#60a5fa", isWonStage: false, isLostStage: false },
+  { name: "Voorstel", color: "#a78bfa", isWonStage: false, isLostStage: false },
+  { name: "Gewonnen", color: "#34d399", isWonStage: true, isLostStage: false },
+  { name: "Verloren", color: "#f87171", isWonStage: false, isLostStage: true },
+];
+
+export const seedStaycoolPipeline = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const org = await ctx.db
+      .query("orgs")
+      .withIndex("by_slug", (q) => q.eq("slug", "staycool"))
+      .unique();
+    if (!org) throw new Error("Staycool org niet gevonden");
+    const workspace = await ctx.db
+      .query("workspaces")
+      .withIndex("by_org", (q) => q.eq("orgId", org._id))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    if (!workspace) throw new Error("Geen default workspace");
+
+    // Idempotent: skip als er al een default pipeline is
+    const existing = await ctx.db
+      .query("pipelines")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", workspace._id))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    if (existing) {
+      const oppsCount = await ctx.db
+        .query("opportunities")
+        .withIndex("by_workspace_stage", (q) =>
+          q.eq("workspaceId", workspace._id),
+        )
+        .collect();
+      return {
+        pipelineId: existing._id,
+        created: false,
+        opportunities: oppsCount.length,
+      };
+    }
+
+    const pipelineId = await ctx.db.insert("pipelines", {
+      workspaceId: workspace._id,
+      name: "Sales",
+      isDefault: true,
+    });
+    const stageIds: Array<Id<"pipelineStages">> = [];
+    for (let i = 0; i < SEED_STAGES.length; i++) {
+      const s = SEED_STAGES[i];
+      const id = await ctx.db.insert("pipelineStages", {
+        pipelineId,
+        name: s.name,
+        order: i,
+        color: s.color,
+        isWonStage: s.isWonStage,
+        isLostStage: s.isLostStage,
+      });
+      stageIds.push(id);
+    }
+
+    // 3 test-opps op de 3 meest recente contacts (niet outside-area)
+    const contacts = await ctx.db
+      .query("contacts")
+      .withIndex("by_workspace_created", (q) =>
+        q.eq("workspaceId", workspace._id),
+      )
+      .order("desc")
+      .take(20);
+    const eligible = contacts.filter((c) => !c.outsideArea).slice(0, 3);
+    for (let i = 0; i < eligible.length; i++) {
+      const c = eligible[i];
+      const name =
+        [c.firstName, c.lastName].filter(Boolean).join(" ") ||
+        c.email ||
+        "Onbekend";
+      // Spread over Lead/Contact/Voorstel (eerste 3 stages)
+      const targetStage = stageIds[Math.min(i, 2)];
+      const oppId = await ctx.db.insert("opportunities", {
+        workspaceId: workspace._id,
+        contactId: c._id,
+        pipelineId,
+        stageId: targetStage,
+        title: `Airco-installatie — ${name}`,
+        value: 2500 + i * 500,
+        currency: "EUR",
+      });
+      await ctx.db.insert("opportunityStageHistory", {
+        opportunityId: oppId,
+        toStageId: targetStage,
+      });
+    }
+
+    return {
+      pipelineId,
+      created: true,
+      opportunities: eligible.length,
+    };
+  },
+});
+
+/**
  * DEBUG — pak een metaLeadRaw + bijbehorende contact + attribution op
  * leadgenId. Voor verifiëren van live webhook-tests. Verwijder bij
  * cleanup (samen met de rest van migration.ts).
