@@ -93,9 +93,14 @@ export function SidebarContent({
       {/* Footer */}
       <div className="shrink-0 border-t border-zinc-200 p-2">
         <Link
-          to="/crm"
+          to="/crm/settings"
           onClick={onNavigate}
-          className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+          className={cn(
+            'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+            location.pathname === '/crm/settings'
+              ? 'bg-violet-50 text-violet-900'
+              : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700',
+          )}
         >
           <Settings className="h-4 w-4" />
           Instellingen

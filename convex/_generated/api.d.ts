@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as contacts from "../contacts.js";
+import type * as crmSettings from "../crmSettings.js";
 import type * as http from "../http.js";
 import type * as lib_phone from "../lib/phone.js";
 import type * as messaging from "../messaging.js";
@@ -32,6 +33,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   contacts: typeof contacts;
+  crmSettings: typeof crmSettings;
   http: typeof http;
   "lib/phone": typeof lib_phone;
   messaging: typeof messaging;

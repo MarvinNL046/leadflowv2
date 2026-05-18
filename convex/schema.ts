@@ -228,7 +228,12 @@ export default defineSchema({
     timezone: v.string(),
     businessHours: v.optional(v.any()),
     leadAssignmentStrategy: v.optional(v.string()),
+    /** Aantal dagen tussen "Niet bereikt"-pogingen (default 2). */
     defaultFollowUpDays: v.optional(v.number()),
+    /** 3-strike threshold: max belpogingen voor lead → Verloren (default 3). */
+    maxCallAttempts: v.optional(v.number()),
+    /** Dagen vóór follow_up_due trigger vuurt na "Niet bereikt" (default 2). */
+    followUpReminderDays: v.optional(v.number()),
   }).index("by_workspace", ["workspaceId"]),
 
   // ════════════════════════════════════════════════════════════════════

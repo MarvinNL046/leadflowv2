@@ -10,6 +10,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { normalizeEmail, normalizePhone } from "./lib/phone";
+import { getEffectiveSettings } from "./crmSettings";
 
 /**
  * Contacts queries + mutations voor het CRM core.
@@ -505,8 +506,9 @@ export const recordCallNoAnswer = mutation({
       ctx,
       args.contactId,
     );
+    const settings = await getEffectiveSettings(ctx, contact.workspaceId);
     const newCount = (contact.callCount ?? 0) + 1;
-    const isFinalStrike = newCount >= 3;
+    const isFinalStrike = newCount >= settings.maxCallAttempts;
 
     const patch: Record<string, unknown> = {
       callCount: newCount,
@@ -517,7 +519,8 @@ export const recordCallNoAnswer = mutation({
       patch.unreachable = true;
       patch.nextFollowUpAt = undefined;  // geen follow-up meer
     } else {
-      patch.nextFollowUpAt = Date.now() + 2 * 24 * 60 * 60 * 1000;
+      patch.nextFollowUpAt =
+        Date.now() + settings.defaultFollowUpDays * 24 * 60 * 60 * 1000;
     }
     await ctx.db.patch(args.contactId, patch);
 
@@ -554,10 +557,10 @@ export const recordCallNoAnswer = mutation({
         { workspaceId: contact.workspaceId, contactId: args.contactId },
       );
     } else {
-      // Schedule follow_up_due trigger over 2 dagen. Triggert alleen
-      // als contact dan nog steeds open is (geen unreachable/won/lost).
+      // Schedule follow_up_due trigger na N dagen (settings). Triggert
+      // alleen als contact dan nog steeds open is (engine-side check).
       await ctx.scheduler.runAfter(
-        2 * 24 * 60 * 60 * 1000,
+        settings.followUpReminderDays * 24 * 60 * 60 * 1000,
         internal.workflowEngine.triggerFollowUpDue,
         { workspaceId: contact.workspaceId, contactId: args.contactId },
       );
@@ -567,8 +570,8 @@ export const recordCallNoAnswer = mutation({
       workspaceId: contact.workspaceId,
       contactId: args.contactId,
       body: isFinalStrike
-        ? `❌ Niet bereikt (poging ${newCount} — 3-strike-rule). Lead gemarkeerd als onbereikbaar.`
-        : `📞 Niet bereikt (poging ${newCount}). Volgende belpoging over 2 dagen.`,
+        ? `❌ Niet bereikt (poging ${newCount} — ${settings.maxCallAttempts}-strike-rule). Lead gemarkeerd als onbereikbaar.`
+        : `📞 Niet bereikt (poging ${newCount}). Volgende belpoging over ${settings.defaultFollowUpDays} dagen.`,
       createdById: userId,
     });
   },
