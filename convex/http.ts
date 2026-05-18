@@ -367,13 +367,13 @@ http.route({
 // ════════════════════════════════════════════════════════════════════
 //
 // V1: simpele header x-webhook-secret check (geen HMAC). Voor v2 MVP
-// hetzelfde — gebruikt VOIDFIX_WEBHOOK_SECRET env.
+// hetzelfde — gebruikt VOIDFIX_API_SECRET env.
 
 http.route({
   path: "/webhooks/voidfix-wa",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const expectedSecret = process.env.VOIDFIX_WEBHOOK_SECRET;
+    const expectedSecret = process.env.VOIDFIX_API_SECRET;
     if (!expectedSecret) {
       return jsonResponse({ error: "Server misconfigured" }, 500);
     }

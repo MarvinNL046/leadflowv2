@@ -9,17 +9,28 @@
  * Run: npx tsx scripts/test-inbound-webhooks.ts
  */
 import { config } from "dotenv";
+import { readFileSync } from "node:fs";
 import { createHmac } from "node:crypto";
 
-config({ path: ".env.meta-test" });
 config({ path: ".env.local" });
 
-const SITE_URL = process.env.VITE_CONVEX_SITE_URL;
-const WA_SECRET = process.env.VOIDFIX_WEBHOOK_SECRET;
-const SMS_SECRET = process.env.META_APP_SECRET; // we hergebruiken voor SMS-test? Nee, andere key
+// V1's .env.local heeft de echte VOIDFIX_API_SECRET (geen aparte
+// VOIDFIX_WEBHOOK_SECRET). Voidfix gebruikt 1 key voor zowel send als
+// webhook-verify (per v1 prod-config).
+const V1_ENV: Record<string, string> = {};
+for (const line of readFileSync(
+  "C:/Users/M_Smi/claudeProjecten/wetryleadflow/.env.local",
+  "utf8",
+).split("\n")) {
+  const m = line.match(/^([A-Z0-9_]+)=(?:"([^"]*)"|(.*))$/);
+  if (m) V1_ENV[m[1]] = m[2] ?? m[3] ?? "";
+}
 
-if (!SITE_URL || !WA_SECRET) {
-  console.error("❌ Missing VITE_CONVEX_SITE_URL of VOIDFIX_WEBHOOK_SECRET");
+const SITE_URL = process.env.VITE_CONVEX_SITE_URL;
+const VOIDFIX_SECRET = V1_ENV.VOIDFIX_API_SECRET;
+
+if (!SITE_URL || !VOIDFIX_SECRET) {
+  console.error("❌ Missing VITE_CONVEX_SITE_URL of VOIDFIX_API_SECRET");
   process.exit(1);
 }
 
@@ -36,7 +47,7 @@ async function testVoidfixWaInbound() {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-webhook-secret": WA_SECRET!,
+      "x-webhook-secret": VOIDFIX_SECRET!,
     },
     body: JSON.stringify(payload),
   });
@@ -69,11 +80,7 @@ async function testVoidfixWaBadSecret() {
 
 async function testVoidfixSmsInbound() {
   const url = `${SITE_URL}/webhooks/voidfix-sms`;
-  const sms_secret = process.env.VOIDFIX_API_SECRET;
-  if (!sms_secret) {
-    console.warn("⚠ VOIDFIX_API_SECRET niet in .env — skip SMS test");
-    return;
-  }
+  const sms_secret = VOIDFIX_SECRET;  // zelfde key als WA
   const payload = {
     status: "Received",
     from: "+31648169416",
