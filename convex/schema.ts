@@ -131,10 +131,16 @@ export default defineSchema({
     // Source flags
     outsideArea: v.optional(v.boolean()),
     externalId: v.optional(v.string()),
+    // Migration breadcrumb: integer-id van de bron-row in v1 Neon.
+    // Idempotency-key voor de Neon→Convex ETL; rerun van migratie
+    // detecteert bestaande row en doet patch i.p.v. duplicate insert.
+    // Mag eventueel later weg na cutover (geen runtime-gebruik).
+    legacyContactId: v.optional(v.number()),
   }).index("by_workspace_created", ["workspaceId"])
     .index("by_workspace_email", ["workspaceId", "email"])
     .index("by_workspace_phone", ["workspaceId", "phone"])
-    .index("by_messengerPsid", ["messengerPsid"]),
+    .index("by_messengerPsid", ["messengerPsid"])
+    .index("by_legacyContactId", ["legacyContactId"]),
 
   pipelines: defineTable({
     workspaceId: v.id("workspaces"),

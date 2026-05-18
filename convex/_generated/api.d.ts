@@ -11,6 +11,7 @@
 import type * as auth from "../auth.js";
 import type * as contacts from "../contacts.js";
 import type * as http from "../http.js";
+import type * as migration from "../migration.js";
 import type * as userProfiles from "../userProfiles.js";
 
 import type {
@@ -23,6 +24,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   contacts: typeof contacts;
   http: typeof http;
+  migration: typeof migration;
   userProfiles: typeof userProfiles;
 }>;
 
