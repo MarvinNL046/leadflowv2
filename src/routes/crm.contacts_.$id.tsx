@@ -18,9 +18,9 @@ import {
   Pencil,
   PhoneOff,
   Send,
-  MapPinOff,
   MessageCircle,
   MessageSquare,
+  Trash2,
 } from 'lucide-react'
 import { LeadDialog } from '../components/crm/lead-dialog'
 import type { IncomingLead } from '../components/crm/lead-card'
@@ -52,9 +52,10 @@ export const Route = createFileRoute('/crm/contacts_/$id')({
 function ContactDetailPage() {
   const { id } = Route.useParams()
   const navigate = useNavigate()
-  const markOutsideArea = useMutation(api.contacts.markOutsideArea)
+  const softDelete = useMutation(api.contacts.softDelete)
+  const restore = useMutation(api.contacts.restore)
   const [callDialogOpen, setCallDialogOpen] = useState(false)
-  const [markingArea, setMarkingArea] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [sendChannel, setSendChannel] = useState<Channel | null>(null)
 
   const detail = useQuery(api.contacts.getDetail, {
@@ -64,18 +65,33 @@ function ContactDetailPage() {
     contactId: id as Id<'contacts'>,
   })
 
-  async function handleMarkOutsideArea() {
-    if (markingArea) return
-    setMarkingArea(true)
+  async function handleDelete() {
+    if (deleting) return
+    setDeleting(true)
+    const contactId = id as Id<'contacts'>
     try {
-      await markOutsideArea({ contactId: id as Id<'contacts'> })
-      toast.success('Lead gemarkeerd als buiten werkgebied')
+      await softDelete({ contactId })
+      toast.success('Contact verwijderd', {
+        action: {
+          label: 'Ongedaan maken',
+          onClick: () => {
+            void restore({ contactId })
+              .then(() => toast.success('Contact hersteld'))
+              .catch((e) =>
+                toast.error(
+                  e instanceof Error ? e.message : 'Kon niet herstellen',
+                ),
+              )
+          },
+        },
+        duration: 8000,
+      })
       void navigate({ to: '/crm' })
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Kon niet markeren',
+        err instanceof Error ? err.message : 'Kon niet verwijderen',
       )
-      setMarkingArea(false)
+      setDeleting(false)
     }
   }
 
@@ -226,19 +242,17 @@ function ContactDetailPage() {
               <MessageCircle className="h-4 w-4" />
             </Button>
           </div>
-          {!contact.outsideArea && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={handleMarkOutsideArea}
-              disabled={markingArea}
-              className="border-orange-200 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
-            >
-              <MapPinOff className="h-4 w-4" />
-              {markingArea ? 'Markeren…' : 'Buiten werkgebied'}
-            </Button>
-          )}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+            title="Contact verwijderen (8s undo)"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 

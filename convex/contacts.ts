@@ -65,6 +65,7 @@ export const list = query({
       .withIndex("by_workspace_created", (q) =>
         q.eq("workspaceId", args.workspaceId),
       )
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .order("desc")
       .take(100);
   },
@@ -87,6 +88,7 @@ export const listPaginated = query({
       .withIndex("by_workspace_created", (q) =>
         q.eq("workspaceId", args.workspaceId),
       )
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .order("desc")
       .paginate(args.paginationOpts);
   },
@@ -108,6 +110,7 @@ export const count = query({
       .withIndex("by_workspace_created", (q) =>
         q.eq("workspaceId", args.workspaceId),
       )
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
     return rows.length;
   },
@@ -143,9 +146,9 @@ export const listIncomingLeads = query({
       .order("desc")
       .take(limit * 2);  // overshoot zodat na filter nog ~limit overblijft
 
-    // Filter: skip outside-area markeerde contacts uit het dashboard
+    // Filter: skip outside-area + soft-deleted contacts uit het dashboard
     const contacts = rawContacts
-      .filter((c) => !c.outsideArea)
+      .filter((c) => !c.outsideArea && c.deletedAt === undefined)
       .slice(0, limit);
 
     // Per contact: laad attribution + latest note in parallel
@@ -327,6 +330,30 @@ export const recordCall = mutation({
       lastCallAt: Date.now(),
       lastCallResult: args.result,
     });
+  },
+});
+
+/**
+ * Soft-delete: contact verbergen uit alle list-views maar bewaren in DB
+ * voor audit (notes, messages, attribution blijven gekoppeld). Restore-
+ * baar binnen UI-undo-window via restore() mutation.
+ */
+export const softDelete = mutation({
+  args: { contactId: v.id("contacts") },
+  handler: async (ctx, args) => {
+    await requireMembershipForContact(ctx, args.contactId);
+    await ctx.db.patch(args.contactId, { deletedAt: Date.now() });
+  },
+});
+
+/**
+ * Restore: maakt soft-deleted contact weer zichtbaar. Voor undo-toast.
+ */
+export const restore = mutation({
+  args: { contactId: v.id("contacts") },
+  handler: async (ctx, args) => {
+    await requireMembershipForContact(ctx, args.contactId);
+    await ctx.db.patch(args.contactId, { deletedAt: undefined });
   },
 });
 

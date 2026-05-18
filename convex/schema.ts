@@ -131,6 +131,10 @@ export default defineSchema({
     // Source flags
     outsideArea: v.optional(v.boolean()),
     externalId: v.optional(v.string()),
+    // Soft-delete: timestamp van verwijdering, of undefined als actief.
+    // Filter in alle list-queries; child-data (notes, messages,
+    // attribution) blijven bestaan voor audit-trail.
+    deletedAt: v.optional(v.number()),
     // Migration breadcrumb: integer-id van de bron-row in v1 Neon.
     // Idempotency-key voor de Neon→Convex ETL; rerun van migratie
     // detecteert bestaande row en doet patch i.p.v. duplicate insert.
