@@ -19,9 +19,15 @@ import {
   PhoneOff,
   Send,
   MapPinOff,
+  MessageCircle,
+  MessageSquare,
 } from 'lucide-react'
 import { LeadDialog } from '../components/crm/lead-dialog'
 import type { IncomingLead } from '../components/crm/lead-card'
+import {
+  SendMessageDialog,
+  type Channel,
+} from '../components/crm/send-message-dialog'
 import { Button } from '#/components/ui/button.tsx'
 import {
   Card,
@@ -49,6 +55,7 @@ function ContactDetailPage() {
   const markOutsideArea = useMutation(api.contacts.markOutsideArea)
   const [callDialogOpen, setCallDialogOpen] = useState(false)
   const [markingArea, setMarkingArea] = useState(false)
+  const [sendChannel, setSendChannel] = useState<Channel | null>(null)
 
   const detail = useQuery(api.contacts.getDetail, {
     contactId: id as Id<'contacts'>,
@@ -187,6 +194,38 @@ function ContactDetailPage() {
             <Phone className="h-4 w-4" />
             Bel Nu
           </Button>
+          <div className="flex gap-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              title={contact.email ? `Email naar ${contact.email}` : 'Geen email'}
+              disabled={!contact.email}
+              onClick={() => setSendChannel('email')}
+            >
+              <Mail className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              title={contact.phone ? `SMS naar ${contact.phone}` : 'Geen telefoon'}
+              disabled={!contact.phone}
+              onClick={() => setSendChannel('sms')}
+            >
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              title={contact.phone ? `WA naar ${contact.phone}` : 'Geen telefoon'}
+              disabled={!contact.phone}
+              onClick={() => setSendChannel('whatsapp')}
+            >
+              <MessageCircle className="h-4 w-4" />
+            </Button>
+          </div>
           {!contact.outsideArea && (
             <Button
               type="button"
@@ -218,6 +257,14 @@ function ContactDetailPage() {
         lead={incomingLead}
         open={callDialogOpen}
         onOpenChange={setCallDialogOpen}
+      />
+
+      <SendMessageDialog
+        contactId={id as Id<'contacts'>}
+        channel={sendChannel}
+        recipient={sendChannel === 'email' ? contact.email : contact.phone}
+        contactName={fullName}
+        onClose={() => setSendChannel(null)}
       />
     </div>
   )
