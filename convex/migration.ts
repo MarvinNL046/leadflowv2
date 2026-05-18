@@ -269,6 +269,50 @@ export const seedSnelleResponse = mutation({
 });
 
 /**
+ * Update delay op de Snelle Response workflow. Voor test gebruiken we
+ * 15s, voor productie 180s. Verwijder na cleanup van migration.ts.
+ */
+export const updateSnelleResponseDelay = mutation({
+  args: { delaySeconds: v.number() },
+  handler: async (ctx, args) => {
+    const org = await ctx.db
+      .query("orgs")
+      .withIndex("by_slug", (q) => q.eq("slug", "staycool"))
+      .unique();
+    if (!org) throw new Error("Staycool org niet gevonden");
+    const workspace = await ctx.db
+      .query("workspaces")
+      .withIndex("by_org", (q) => q.eq("orgId", org._id))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    if (!workspace) throw new Error("Geen default workspace");
+
+    const wf = await ctx.db
+      .query("workflows")
+      .withIndex("by_workspace_status", (q) =>
+        q.eq("workspaceId", workspace._id),
+      )
+      .filter((q) => q.eq(q.field("name"), "Snelle Response"))
+      .first();
+    if (!wf) throw new Error("Snelle Response workflow niet gevonden");
+
+    const delayNode = await ctx.db
+      .query("workflowNodes")
+      .withIndex("by_workflow", (q) => q.eq("workflowId", wf._id))
+      .filter((q) => q.eq(q.field("nodeId"), "delay-1"))
+      .first();
+    if (!delayNode) throw new Error("delay-1 node niet gevonden");
+
+    await ctx.db.patch(delayNode._id, {
+      config: { delaySeconds: args.delaySeconds },
+      label: `Wacht ${args.delaySeconds}s`,
+    });
+
+    return { previousDelay: (delayNode.config as { delaySeconds?: number })?.delaySeconds, newDelay: args.delaySeconds };
+  },
+});
+
+/**
  * DEBUG — pak een metaLeadRaw + bijbehorende contact + attribution op
  * leadgenId. Voor verifiëren van live webhook-tests. Verwijder bij
  * cleanup (samen met de rest van migration.ts).
