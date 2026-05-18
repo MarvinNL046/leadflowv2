@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import {
   Phone,
@@ -116,7 +117,13 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
           {/* Body */}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">{displayName}</span>
+              <Link
+                to="/crm/contacts/$id"
+                params={{ id: lead._id }}
+                className="font-medium text-zinc-900 hover:text-blue-600 hover:underline"
+              >
+                {displayName}
+              </Link>
               {lead.leadSource === 'meta' && (
                 <Badge
                   variant="secondary"

@@ -154,6 +154,108 @@ export const listIncomingLeads = query({
 });
 
 /**
+ * Detail-view query — contact + laatste attribution + laatste raw Meta
+ * lead + sample meta_lead_raw payload. Eén query i.p.v. vier voor lagere
+ * dashboard-latency en simpeler React.
+ */
+export const getDetail = query({
+  args: { contactId: v.id("contacts") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const contact = await ctx.db.get(args.contactId);
+    if (!contact) return null;
+
+    // Membership-check
+    const workspace = await ctx.db.get(contact.workspaceId);
+    if (!workspace) throw new Error("Workspace not found");
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) =>
+        q.eq("userId", userId).eq("orgId", workspace.orgId),
+      )
+      .first();
+    if (!membership) throw new Error("Not a member of this workspace");
+
+    const attribution = await ctx.db
+      .query("leadAttribution")
+      .withIndex("by_contact", (q) => q.eq("contactId", args.contactId))
+      .order("desc")
+      .first();
+
+    // Bij Meta-source: pak de bijbehorende raw row voor field_data.
+    let metaRaw: {
+      fieldData: unknown;
+      payload: unknown;
+      adName?: string;
+      adsetName?: string;
+      campaignName?: string;
+    } | null = null;
+    if (attribution?.metaLeadgenId) {
+      const raw = await ctx.db
+        .query("metaLeadRaw")
+        .withIndex("by_leadgenId", (q) =>
+          q.eq("leadgenId", attribution.metaLeadgenId!),
+        )
+        .first();
+      if (raw) {
+        const payloadAny = raw.payload as Record<string, unknown> | null;
+        metaRaw = {
+          fieldData: raw.fieldData,
+          payload: raw.payload,
+          adName: typeof payloadAny?.ad_name === "string" ? payloadAny.ad_name : undefined,
+          adsetName:
+            typeof payloadAny?.adset_name === "string" ? payloadAny.adset_name : undefined,
+          campaignName:
+            typeof payloadAny?.campaign_name === "string"
+              ? payloadAny.campaign_name
+              : undefined,
+        };
+      }
+    }
+
+    return { contact, attribution, metaRaw };
+  },
+});
+
+/**
+ * Update contact-velden vanaf de detail-page edit-form. Alleen de velden
+ * die meegegeven worden, worden gepatcht (undefined velden blijven).
+ */
+export const update = mutation({
+  args: {
+    contactId: v.id("contacts"),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    company: v.optional(v.string()),
+    position: v.optional(v.string()),
+    street: v.optional(v.string()),
+    houseNumber: v.optional(v.string()),
+    postalCode: v.optional(v.string()),
+    city: v.optional(v.string()),
+    province: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await requireMembershipForContact(ctx, args.contactId);
+
+    const { contactId, ...rest } = args;
+    // Normalisatie: trim + lowercase email, trim phone
+    const patch: Record<string, string | undefined> = {};
+    for (const [k, v] of Object.entries(rest)) {
+      if (v === undefined) continue;
+      const trimmed = v.trim();
+      patch[k] = trimmed.length === 0 ? undefined : trimmed;
+    }
+    if (typeof patch.email === "string") patch.email = patch.email.toLowerCase();
+
+    await ctx.db.patch(contactId, patch);
+  },
+});
+
+/**
  * Per-contact action mutations voor call-flow vanaf het dashboard.
  * Alle vier vereisen workspace-membership voor de contact's workspace.
  */

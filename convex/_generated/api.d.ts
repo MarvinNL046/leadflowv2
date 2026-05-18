@@ -14,6 +14,7 @@ import type * as http from "../http.js";
 import type * as metaIngest from "../metaIngest.js";
 import type * as metaProcessor from "../metaProcessor.js";
 import type * as migration from "../migration.js";
+import type * as notes from "../notes.js";
 import type * as userProfiles from "../userProfiles.js";
 
 import type {
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   metaIngest: typeof metaIngest;
   metaProcessor: typeof metaProcessor;
   migration: typeof migration;
+  notes: typeof notes;
   userProfiles: typeof userProfiles;
 }>;
 
