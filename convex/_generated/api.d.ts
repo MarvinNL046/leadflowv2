@@ -11,6 +11,7 @@
 import type * as auth from "../auth.js";
 import type * as contacts from "../contacts.js";
 import type * as http from "../http.js";
+import type * as lib_phone from "../lib/phone.js";
 import type * as messaging from "../messaging.js";
 import type * as metaIngest from "../metaIngest.js";
 import type * as metaProcessor from "../metaProcessor.js";
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   contacts: typeof contacts;
   http: typeof http;
+  "lib/phone": typeof lib_phone;
   messaging: typeof messaging;
   metaIngest: typeof metaIngest;
   metaProcessor: typeof metaProcessor;

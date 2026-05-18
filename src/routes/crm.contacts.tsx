@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, usePaginatedQuery } from 'convex/react'
 import { toast } from 'sonner'
 import { Plus, ChevronDown } from 'lucide-react'
@@ -163,6 +163,7 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
 
 function CreateContactForm({ workspaceId }: { workspaceId: any }) {
   const create = useMutation(api.contacts.create)
+  const navigate = useNavigate()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -175,7 +176,7 @@ function CreateContactForm({ workspaceId }: { workspaceId: any }) {
     e.preventDefault()
     setSubmitting(true)
     try {
-      await create({
+      const result = await create({
         workspaceId,
         firstName: firstName || undefined,
         lastName: lastName || undefined,
@@ -184,13 +185,23 @@ function CreateContactForm({ workspaceId }: { workspaceId: any }) {
         company: company || undefined,
         city: city || undefined,
       })
-      toast.success('Contact toegevoegd')
-      setFirstName('')
-      setLastName('')
-      setEmail('')
-      setPhone('')
-      setCompany('')
-      setCity('')
+      if (result.isDuplicate && result.contact) {
+        toast.info('Bestaand contact gevonden — geopend i.p.v. nieuwe', {
+          duration: 5000,
+        })
+        void navigate({
+          to: '/crm/contacts/$id',
+          params: { id: result.contact._id },
+        })
+      } else {
+        toast.success('Contact toegevoegd')
+        setFirstName('')
+        setLastName('')
+        setEmail('')
+        setPhone('')
+        setCompany('')
+        setCity('')
+      }
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Kon contact niet toevoegen',

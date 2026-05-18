@@ -11,6 +11,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
+import { normalizeEmail, normalizePhone } from "./lib/phone";
 
 /**
  * Unified messaging — één action `send` met channel-discriminator routes
@@ -402,39 +403,31 @@ export const recordInbound = internalMutation({
       if (existing) return { duplicate: true, messageId: existing._id };
     }
 
-    // Contact-lookup: phone voor sms/wa, email voor email
+    // Contact-lookup: gebruik centrale normalisatie zodat input
+    // (Voidfix-formats, NL 06-prefix, oud-int 00...) altijd matchet
+    // tegen E.164-stored contact phones.
     let contactId: Id<"contacts"> | undefined;
-
     if (args.channel === "email") {
-      const normalizedEmail = args.from.toLowerCase().trim();
-      const contact = await ctx.db
-        .query("contacts")
-        .withIndex("by_workspace_email", (q) =>
-          q
-            .eq("workspaceId", args.workspaceId)
-            .eq("email", normalizedEmail),
-        )
-        .first();
-      if (contact) contactId = contact._id;
+      const normalized = normalizeEmail(args.from);
+      if (normalized) {
+        const contact = await ctx.db
+          .query("contacts")
+          .withIndex("by_workspace_email", (q) =>
+            q.eq("workspaceId", args.workspaceId).eq("email", normalized),
+          )
+          .first();
+        if (contact) contactId = contact._id;
+      }
     } else {
-      // Voidfix kan met of zonder + prefix sturen. Probeer beide
-      // varianten zodat lookup matched ongeacht format.
-      const digits = args.from.replace(/[^\d+]/g, "");
-      const withPlus = digits.startsWith("+") ? digits : `+${digits}`;
-      const withoutPlus = digits.startsWith("+") ? digits.slice(1) : digits;
-
-      const variants = [withPlus, withoutPlus];
-      for (const phone of variants) {
+      const normalized = normalizePhone(args.from);
+      if (normalized) {
         const contact = await ctx.db
           .query("contacts")
           .withIndex("by_workspace_phone", (q) =>
-            q.eq("workspaceId", args.workspaceId).eq("phone", phone),
+            q.eq("workspaceId", args.workspaceId).eq("phone", normalized),
           )
           .first();
-        if (contact) {
-          contactId = contact._id;
-          break;
-        }
+        if (contact) contactId = contact._id;
       }
     }
 

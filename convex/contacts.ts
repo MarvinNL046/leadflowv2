@@ -4,6 +4,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { normalizeEmail, normalizePhone } from "./lib/phone";
 
 /**
  * Contacts queries + mutations voor het CRM core.
@@ -535,12 +536,46 @@ export const create = mutation({
       );
     }
 
+    // Normaliseer voor consistent storage + dedup
+    const normalizedEmail = normalizeEmail(args.email);
+    const normalizedPhone = normalizePhone(args.phone);
+
+    // Dedup-check: email of phone match binnen workspace?
+    if (normalizedEmail) {
+      const existing = await ctx.db
+        .query("contacts")
+        .withIndex("by_workspace_email", (q) =>
+          q
+            .eq("workspaceId", args.workspaceId)
+            .eq("email", normalizedEmail),
+        )
+        .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        .first();
+      if (existing) {
+        return { contact: existing, isDuplicate: true as const };
+      }
+    }
+    if (normalizedPhone) {
+      const existing = await ctx.db
+        .query("contacts")
+        .withIndex("by_workspace_phone", (q) =>
+          q
+            .eq("workspaceId", args.workspaceId)
+            .eq("phone", normalizedPhone),
+        )
+        .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        .first();
+      if (existing) {
+        return { contact: existing, isDuplicate: true as const };
+      }
+    }
+
     const contactId = await ctx.db.insert("contacts", {
       workspaceId: args.workspaceId,
       firstName: args.firstName?.trim() || undefined,
       lastName: args.lastName?.trim() || undefined,
-      email: args.email?.trim().toLowerCase() || undefined,
-      phone: args.phone?.trim() || undefined,
+      email: normalizedEmail,
+      phone: normalizedPhone,
       company: args.company?.trim() || undefined,
       city: args.city?.trim() || undefined,
       callCount: 0,
@@ -555,6 +590,7 @@ export const create = mutation({
       { workspaceId: args.workspaceId, contactId },
     );
 
-    return await ctx.db.get(contactId);
+    const contact = await ctx.db.get(contactId);
+    return { contact, isDuplicate: false as const };
   },
 });
