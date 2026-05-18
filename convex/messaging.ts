@@ -329,6 +329,145 @@ export const insertPendingInternal = internalMutation({
   },
 });
 
+// ──────────────────────────────────────────────────────────────────────
+// INBOUND WEBHOOKS — delivery-receipts + replies vanaf Resend/Voidfix
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Update messages-row op externalMessageId match. Voor Resend
+ * delivery/bounce events of toekomstige Voidfix delivery-receipts.
+ * Silent skip als externalId niet gevonden (campaign-mails van buiten
+ * v2 of duplicate events na cleanup).
+ */
+export const updateStatusByExternalId = internalMutation({
+  args: {
+    externalMessageId: v.string(),
+    newStatus: v.union(
+      v.literal("delivered"),
+      v.literal("failed"),
+      v.literal("bounced"),
+      v.literal("read"),
+    ),
+    deliveredAt: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const msg = await ctx.db
+      .query("messages")
+      .withIndex("by_external_id", (q) =>
+        q.eq("externalMessageId", args.externalMessageId),
+      )
+      .first();
+    if (!msg) return { matched: false };
+
+    const patch: Record<string, unknown> = { status: args.newStatus };
+    if (args.deliveredAt !== undefined) patch.deliveredAt = args.deliveredAt;
+    if (args.errorMessage !== undefined) patch.errorMessage = args.errorMessage;
+    if (args.newStatus === "read") patch.readAt = Date.now();
+
+    await ctx.db.patch(msg._id, patch);
+    return { matched: true, messageId: msg._id };
+  },
+});
+
+/**
+ * Record inbound message (reply van klant). Lookup contact via phone
+ * binnen workspace. Contact niet gevonden → bewaar message met
+ * contactId=undefined zodat Marvin via UI kan koppelen.
+ */
+export const recordInbound = internalMutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    channel: v.union(
+      v.literal("sms"),
+      v.literal("whatsapp"),
+      v.literal("email"),
+    ),
+    from: v.string(),
+    body: v.string(),
+    externalMessageId: v.optional(v.string()),
+    mediaUrl: v.optional(v.string()),
+    mediaType: v.optional(v.string()),
+    receivedAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    // Idempotency: skip als externalId al binnenkwam
+    if (args.externalMessageId) {
+      const existing = await ctx.db
+        .query("messages")
+        .withIndex("by_external_id", (q) =>
+          q.eq("externalMessageId", args.externalMessageId),
+        )
+        .first();
+      if (existing) return { duplicate: true, messageId: existing._id };
+    }
+
+    // Contact-lookup: phone voor sms/wa, email voor email
+    let contactId: Id<"contacts"> | undefined;
+    const normalizedFrom =
+      args.channel === "email"
+        ? args.from.toLowerCase().trim()
+        : args.from.replace(/[^\d+]/g, "");
+
+    const contact =
+      args.channel === "email"
+        ? await ctx.db
+            .query("contacts")
+            .withIndex("by_workspace_email", (q) =>
+              q
+                .eq("workspaceId", args.workspaceId)
+                .eq("email", normalizedFrom),
+            )
+            .first()
+        : await ctx.db
+            .query("contacts")
+            .withIndex("by_workspace_phone", (q) =>
+              q
+                .eq("workspaceId", args.workspaceId)
+                .eq("phone", normalizedFrom),
+            )
+            .first();
+
+    if (contact) contactId = contact._id;
+
+    const messageId = await ctx.db.insert("messages", {
+      workspaceId: args.workspaceId,
+      contactId,
+      channel: args.channel,
+      direction: "inbound",
+      status: "delivered",
+      externalMessageId: args.externalMessageId,
+      to: "",  // inbound — recipient is wijzelf, leeg laten
+      from: args.from,
+      body: args.body,
+      mediaUrl: args.mediaUrl,
+      mediaType: args.mediaType,
+      sentAt: args.receivedAt ?? Date.now(),
+      deliveredAt: args.receivedAt ?? Date.now(),
+    });
+
+    return { matched: !!contactId, messageId };
+  },
+});
+
+/** Internal: Staycool default workspace voor inbound webhooks (MVP single-tenant). */
+export const getStaycoolWorkspaceIdInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const org = await ctx.db
+      .query("orgs")
+      .withIndex("by_slug", (q) => q.eq("slug", "staycool"))
+      .unique();
+    if (!org) return null;
+    const ws = await ctx.db
+      .query("workspaces")
+      .withIndex("by_org", (q) => q.eq("orgId", org._id))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    return ws?._id ?? null;
+  },
+});
+
 /** Auth-loze resolver voor systeem-sends. */
 export const resolveForSendInternal = internalQuery({
   args: {
