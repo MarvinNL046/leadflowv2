@@ -269,6 +269,126 @@ export const seedSnelleResponse = mutation({
 });
 
 /**
+ * Auth-less wrapper rond contacts.mergeInto voor cleanup-scripts.
+ * Verwijder bij productie-cleanup.
+ */
+export const adminMergeContacts = mutation({
+  args: {
+    loserId: v.id("contacts"),
+    winnerId: v.id("contacts"),
+  },
+  handler: async (ctx, args): Promise<{
+    winnerId: Id<"contacts">;
+    loserId: Id<"contacts">;
+    counts: {
+      messages: number;
+      notes: number;
+      leadAttribution: number;
+      opportunities: number;
+      metaLeadRaw: number;
+    };
+  }> => {
+    if (args.loserId === args.winnerId) {
+      throw new Error("Cannot merge contact into itself");
+    }
+    const loser = await ctx.db.get(args.loserId);
+    const winner = await ctx.db.get(args.winnerId);
+    if (!loser || !winner) throw new Error("Contact not found");
+    if (loser.workspaceId !== winner.workspaceId) {
+      throw new Error("Contacts not in same workspace");
+    }
+
+    const counts = {
+      messages: 0,
+      notes: 0,
+      leadAttribution: 0,
+      opportunities: 0,
+      metaLeadRaw: 0,
+    };
+
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_contact_sent", (q) => q.eq("contactId", args.loserId))
+      .collect();
+    for (const m of messages) {
+      await ctx.db.patch(m._id, { contactId: args.winnerId });
+      counts.messages++;
+    }
+
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_contact", (q) => q.eq("contactId", args.loserId))
+      .collect();
+    for (const n of notes) {
+      await ctx.db.patch(n._id, { contactId: args.winnerId });
+      counts.notes++;
+    }
+
+    const attrs = await ctx.db
+      .query("leadAttribution")
+      .withIndex("by_contact", (q) => q.eq("contactId", args.loserId))
+      .collect();
+    for (const a of attrs) {
+      await ctx.db.patch(a._id, { contactId: args.winnerId });
+      counts.leadAttribution++;
+    }
+
+    const opps = await ctx.db
+      .query("opportunities")
+      .withIndex("by_contact", (q) => q.eq("contactId", args.loserId))
+      .collect();
+    for (const o of opps) {
+      await ctx.db.patch(o._id, { contactId: args.winnerId });
+      counts.opportunities++;
+    }
+
+    const raws = await ctx.db
+      .query("metaLeadRaw")
+      .filter((q) => q.eq(q.field("contactId"), args.loserId))
+      .collect();
+    for (const r of raws) {
+      await ctx.db.patch(r._id, { contactId: args.winnerId });
+      counts.metaLeadRaw++;
+    }
+
+    // Fill empty winner-fields with loser's
+    const fields = [
+      "firstName",
+      "lastName",
+      "email",
+      "phone",
+      "company",
+      "position",
+      "street",
+      "houseNumber",
+      "houseNumberAddition",
+      "postalCode",
+      "city",
+      "province",
+      "country",
+    ] as const;
+    const patch: Record<string, unknown> = {};
+    for (const f of fields) {
+      const wv = winner[f];
+      const lv = loser[f];
+      if ((wv === undefined || wv === null || wv === "") && lv) {
+        patch[f] = lv;
+      }
+    }
+    if ((loser.callCount ?? 0) > 0) {
+      patch.callCount = (winner.callCount ?? 0) + (loser.callCount ?? 0);
+    }
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(args.winnerId, patch);
+    }
+
+    await ctx.db.patch(args.loserId, { deletedAt: Date.now() });
+
+    return { winnerId: args.winnerId, loserId: args.loserId, counts };
+  },
+});
+
+/**
  * Backfill contactId voor inbound messages die orphan zijn (contactId
  * undefined). Probeer phone-match met variants (met/zonder + prefix).
  * Wegwerp — verwijderen na productie-cleanup.

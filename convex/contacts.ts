@@ -334,6 +334,139 @@ export const recordCall = mutation({
 });
 
 /**
+ * Merge duplicate contact: reparent alle child-data (messages, notes,
+ * leadAttribution, opportunities, metaLeadRaw) van loser naar winner,
+ * vul lege velden op winner op met loser's data, dan soft-delete loser.
+ *
+ * Beide contacts moeten in dezelfde workspace zitten — anders cross-
+ * tenant leak risk.
+ */
+export const mergeInto = mutation({
+  args: {
+    loserId: v.id("contacts"),
+    winnerId: v.id("contacts"),
+  },
+  handler: async (ctx, args) => {
+    if (args.loserId === args.winnerId) {
+      throw new Error("Cannot merge contact into itself");
+    }
+    const loser = await ctx.db.get(args.loserId);
+    const winner = await ctx.db.get(args.winnerId);
+    if (!loser || !winner) throw new Error("Contact not found");
+    if (loser.workspaceId !== winner.workspaceId) {
+      throw new Error("Contacts not in same workspace");
+    }
+    await requireWorkspaceMembership(ctx, winner.workspaceId);
+
+    // Tellers voor return
+    const counts = {
+      messages: 0,
+      notes: 0,
+      leadAttribution: 0,
+      opportunities: 0,
+      metaLeadRaw: 0,
+    };
+
+    // 1. Messages
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_contact_sent", (q) => q.eq("contactId", args.loserId))
+      .collect();
+    for (const m of messages) {
+      await ctx.db.patch(m._id, { contactId: args.winnerId });
+      counts.messages++;
+    }
+
+    // 2. Notes
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_contact", (q) => q.eq("contactId", args.loserId))
+      .collect();
+    for (const n of notes) {
+      await ctx.db.patch(n._id, { contactId: args.winnerId });
+      counts.notes++;
+    }
+
+    // 3. Lead attribution
+    const attrs = await ctx.db
+      .query("leadAttribution")
+      .withIndex("by_contact", (q) => q.eq("contactId", args.loserId))
+      .collect();
+    for (const a of attrs) {
+      await ctx.db.patch(a._id, { contactId: args.winnerId });
+      counts.leadAttribution++;
+    }
+
+    // 4. Opportunities
+    const opps = await ctx.db
+      .query("opportunities")
+      .withIndex("by_contact", (q) => q.eq("contactId", args.loserId))
+      .collect();
+    for (const o of opps) {
+      await ctx.db.patch(o._id, { contactId: args.winnerId });
+      counts.opportunities++;
+    }
+
+    // 5. metaLeadRaw (via filter want geen by_contact index)
+    const raws = await ctx.db
+      .query("metaLeadRaw")
+      .filter((q) => q.eq(q.field("contactId"), args.loserId))
+      .collect();
+    for (const r of raws) {
+      await ctx.db.patch(r._id, { contactId: args.winnerId });
+      counts.metaLeadRaw++;
+    }
+
+    // 6. Vul lege velden op winner met loser's data (loser wint NIET
+    // van winner — winner-bias)
+    const fields: Array<keyof typeof loser> = [
+      "firstName",
+      "lastName",
+      "email",
+      "phone",
+      "company",
+      "position",
+      "street",
+      "houseNumber",
+      "houseNumberAddition",
+      "postalCode",
+      "city",
+      "province",
+      "country",
+      "messengerPsid",
+      "messengerPageId",
+      "externalId",
+    ];
+    const patch: Record<string, unknown> = {};
+    for (const f of fields) {
+      const wv = winner[f];
+      const lv = loser[f];
+      if ((wv === undefined || wv === null || wv === "") && lv) {
+        patch[f] = lv;
+      }
+    }
+    // Tags merge (union)
+    const winnerTags = new Set(winner.tags ?? []);
+    for (const t of loser.tags ?? []) winnerTags.add(t);
+    if (winnerTags.size > (winner.tags?.length ?? 0)) {
+      patch.tags = Array.from(winnerTags);
+    }
+    // Call-count som
+    if ((loser.callCount ?? 0) > 0) {
+      patch.callCount = (winner.callCount ?? 0) + (loser.callCount ?? 0);
+    }
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(args.winnerId, patch);
+    }
+
+    // 7. Soft-delete loser
+    await ctx.db.patch(args.loserId, { deletedAt: Date.now() });
+
+    return { winnerId: args.winnerId, loserId: args.loserId, counts };
+  },
+});
+
+/**
  * Soft-delete: contact verbergen uit alle list-views maar bewaren in DB
  * voor audit (notes, messages, attribution blijven gekoppeld). Restore-
  * baar binnen UI-undo-window via restore() mutation.
