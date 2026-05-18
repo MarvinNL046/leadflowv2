@@ -499,8 +499,11 @@ export const replaceContent = mutation({
 });
 
 /**
- * Permanent delete (alleen voor archived workflows). Verwijdert ook
- * alle nodes/edges, maar BEHOUDT executions+logs voor audit-trail.
+ * Permanent delete van een workflow + alle nodes/edges. BEHOUDT
+ * executions+logs voor audit-trail (FK naar workflowId blijft, maar
+ * workflow-row is weg — getDetail returnt null voor die executions).
+ *
+ * Geen status-guard: confirm-dialog op UI is voldoende safety.
  */
 export const permanentDelete = mutation({
   args: { workflowId: v.id("workflows") },
@@ -508,11 +511,6 @@ export const permanentDelete = mutation({
     const wf = await ctx.db.get(args.workflowId);
     if (!wf) throw new Error("Workflow niet gevonden");
     await requireWorkspaceMembership(ctx, wf.workspaceId);
-    if (wf.status !== "archived") {
-      throw new Error(
-        "Alleen gearchiveerde workflows kunnen permanent worden verwijderd",
-      );
-    }
     const nodes = await ctx.db
       .query("workflowNodes")
       .withIndex("by_workflow", (q) => q.eq("workflowId", args.workflowId))

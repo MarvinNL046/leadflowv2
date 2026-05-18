@@ -352,24 +352,22 @@ function WorkflowCard({
                 size="sm"
                 variant="outline"
                 onClick={() => changeStatus('archived')}
-                title="Archiveren"
+                title="Archiveren (workflow blijft bestaan voor backup)"
                 className="text-zinc-500 hover:text-zinc-700"
               >
                 <Archive className="h-3.5 w-3.5" />
               </Button>
             )}
-            {workflow.status === 'archived' && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handlePermanentDelete}
-                title="Permanent verwijderen"
-                className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handlePermanentDelete}
+              title="Permanent verwijderen (executions-historie blijft)"
+              className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
