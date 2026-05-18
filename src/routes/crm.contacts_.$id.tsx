@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation } from 'convex/react'
 import { toast } from 'sonner'
 import {
@@ -18,7 +18,10 @@ import {
   Pencil,
   PhoneOff,
   Send,
+  MapPinOff,
 } from 'lucide-react'
+import { LeadDialog } from '../components/crm/lead-dialog'
+import type { IncomingLead } from '../components/crm/lead-card'
 import { Button } from '#/components/ui/button.tsx'
 import {
   Card,
@@ -42,12 +45,32 @@ export const Route = createFileRoute('/crm/contacts_/$id')({
 
 function ContactDetailPage() {
   const { id } = Route.useParams()
+  const navigate = useNavigate()
+  const markOutsideArea = useMutation(api.contacts.markOutsideArea)
+  const [callDialogOpen, setCallDialogOpen] = useState(false)
+  const [markingArea, setMarkingArea] = useState(false)
+
   const detail = useQuery(api.contacts.getDetail, {
     contactId: id as Id<'contacts'>,
   })
   const notes = useQuery(api.notes.listByContact, {
     contactId: id as Id<'contacts'>,
   })
+
+  async function handleMarkOutsideArea() {
+    if (markingArea) return
+    setMarkingArea(true)
+    try {
+      await markOutsideArea({ contactId: id as Id<'contacts'> })
+      toast.success('Lead gemarkeerd als buiten werkgebied')
+      void navigate({ to: '/crm' })
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Kon niet markeren',
+      )
+      setMarkingArea(false)
+    }
+  }
 
   if (detail === undefined) {
     return (
@@ -86,13 +109,31 @@ function ContactDetailPage() {
   ).toUpperCase()
   const metaFormLabel = getMetaFormLabel(attribution?.metaFormId)
 
+  // Construct IncomingLead-shape voor hergebruik van bestaande LeadDialog
+  const incomingLead: IncomingLead = {
+    _id: contact._id,
+    _creationTime: contact._creationTime,
+    firstName: contact.firstName,
+    lastName: contact.lastName,
+    email: contact.email,
+    phone: contact.phone,
+    company: contact.company,
+    city: contact.city,
+    callCount: contact.callCount,
+    lastCallAt: contact.lastCallAt,
+    leadSource: attribution?.source ?? null,
+    metaFormId: attribution?.metaFormId ?? null,
+    latestNote: null,
+    leadCreatedAt: attribution?._creationTime ?? contact._creationTime,
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <Link
           to="/crm"
-          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+          className="mt-1 rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
           aria-label="Terug naar dashboard"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -136,6 +177,30 @@ function ContactDetailPage() {
             )}
           </div>
         </div>
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => setCallDialogOpen(true)}
+            className="bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700"
+          >
+            <Phone className="h-4 w-4" />
+            Bel Nu
+          </Button>
+          {!contact.outsideArea && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleMarkOutsideArea}
+              disabled={markingArea}
+              className="border-orange-200 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
+            >
+              <MapPinOff className="h-4 w-4" />
+              {markingArea ? 'Markeren…' : 'Buiten werkgebied'}
+            </Button>
+          )}
+        </div>
       </div>
 
       <DetailsSection contact={contact} />
@@ -147,6 +212,12 @@ function ContactDetailPage() {
         contact={contact}
         attribution={attribution}
         metaRaw={metaRaw}
+      />
+
+      <LeadDialog
+        lead={incomingLead}
+        open={callDialogOpen}
+        onOpenChange={setCallDialogOpen}
       />
     </div>
   )
