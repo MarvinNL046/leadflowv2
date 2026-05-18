@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -65,6 +66,28 @@ export const list = query({
       )
       .order("desc")
       .take(100);
+  },
+});
+
+/**
+ * Paginated contacts voor de Contacts-page. usePaginatedQuery in React
+ * doet de cursor-paging automatisch (load-more pattern). Pak 25 per page.
+ */
+export const listPaginated = query({
+  args: {
+    workspaceId: v.id("workspaces"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    await requireWorkspaceMembership(ctx, args.workspaceId);
+
+    return await ctx.db
+      .query("contacts")
+      .withIndex("by_workspace_created", (q) =>
+        q.eq("workspaceId", args.workspaceId),
+      )
+      .order("desc")
+      .paginate(args.paginationOpts);
   },
 });
 

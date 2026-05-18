@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
-import { useQuery, useMutation } from 'convex/react'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useQuery, useMutation, usePaginatedQuery } from 'convex/react'
 import { toast } from 'sonner'
-import { Plus } from 'lucide-react'
+import { Plus, ChevronDown } from 'lucide-react'
 import { Button } from '#/components/ui/button.tsx'
 import {
   Card,
@@ -15,6 +15,9 @@ import { Label } from '#/components/ui/label.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { api } from '../../convex/_generated/api'
+import type { Id } from '../../convex/_generated/dataModel'
+
+const PAGE_SIZE = 25
 
 export const Route = createFileRoute('/crm/contacts')({
   component: ContactsPage,
@@ -44,9 +47,17 @@ function ContactsPage() {
   return <ContactsContent workspaceId={workspaceId} />
 }
 
-function ContactsContent({ workspaceId }: { workspaceId: any }) {
-  const contacts = useQuery(api.contacts.list, { workspaceId })
+function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const totalCount = useQuery(api.contacts.count, { workspaceId })
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.contacts.listPaginated,
+    { workspaceId },
+    { initialNumItems: PAGE_SIZE },
+  )
+
+  const isLoading = status === 'LoadingFirstPage'
+  const hasMore = status === 'CanLoadMore'
+  const isLoadingMore = status === 'LoadingMore'
 
   return (
     <div className="space-y-6">
@@ -54,7 +65,9 @@ function ContactsContent({ workspaceId }: { workspaceId: any }) {
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">Contacts</h1>
           <p className="mt-1 text-sm text-zinc-500">
-            {totalCount ?? '…'} {totalCount === 1 ? 'contact' : 'contacts'} in deze workspace
+            {totalCount === undefined
+              ? '…'
+              : `${results.length} van ${totalCount.toLocaleString('nl-NL')} ${totalCount === 1 ? 'contact' : 'contacts'}`}
           </p>
         </div>
       </div>
@@ -66,61 +79,81 @@ function ContactsContent({ workspaceId }: { workspaceId: any }) {
           <CardTitle className="text-base">Alle contacts</CardTitle>
         </CardHeader>
         <CardContent>
-          {contacts === undefined ? (
+          {isLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
             </div>
-          ) : contacts.length === 0 ? (
+          ) : results.length === 0 ? (
             <p className="py-8 text-center text-sm text-zinc-500">
               Nog geen contacts. Voeg je eerste hierboven toe.
             </p>
           ) : (
-            <ul className="divide-y divide-zinc-100">
-              {contacts.map((c) => {
-                const fullName = [c.firstName, c.lastName]
-                  .filter(Boolean)
-                  .join(' ')
-                const display =
-                  fullName || c.email || c.phone || '(naamloos)'
-                const initials = (
-                  fullName ||
-                  c.email ||
-                  '?'
-                )
-                  .slice(0, 2)
-                  .toUpperCase()
-                return (
-                  <li
-                    key={c._id}
-                    className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+            <>
+              <ul className="divide-y divide-zinc-100">
+                {results.map((c) => {
+                  const fullName = [c.firstName, c.lastName]
+                    .filter(Boolean)
+                    .join(' ')
+                  const display =
+                    fullName || c.email || c.phone || '(naamloos)'
+                  const initials = (
+                    fullName ||
+                    c.email ||
+                    '?'
+                  )
+                    .slice(0, 2)
+                    .toUpperCase()
+                  return (
+                    <li key={c._id}>
+                      <Link
+                        to="/crm/contacts/$id"
+                        params={{ id: c._id }}
+                        className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-zinc-50/60 -mx-2 px-2 rounded-md"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-medium text-violet-800">
+                          {initials}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium text-zinc-900">
+                            {display}
+                          </div>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-zinc-500">
+                            {c.email && <span className="truncate">{c.email}</span>}
+                            {c.phone && <span>· {c.phone}</span>}
+                            {c.company && <span>· {c.company}</span>}
+                            {c.city && (
+                              <Badge variant="secondary" className="text-xs">
+                                {c.city}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-xs text-zinc-400">
+                          {new Date(c._creationTime).toLocaleDateString('nl-NL')}
+                        </div>
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+
+              {hasMore && (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => loadMore(PAGE_SIZE)}
+                    disabled={isLoadingMore}
+                    className="w-full max-w-xs border-dashed"
                   >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-medium text-violet-800">
-                      {initials}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium text-zinc-900">
-                        {display}
-                      </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-zinc-500">
-                        {c.email && <span>{c.email}</span>}
-                        {c.phone && <span>· {c.phone}</span>}
-                        {c.company && <span>· {c.company}</span>}
-                        {c.city && (
-                          <Badge variant="secondary" className="text-xs">
-                            {c.city}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-xs text-zinc-400">
-                      {new Date(c._creationTime).toLocaleDateString('nl-NL')}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+                    <ChevronDown className="h-4 w-4" />
+                    {isLoadingMore ? 'Laden…' : `Toon ${PAGE_SIZE} meer`}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
