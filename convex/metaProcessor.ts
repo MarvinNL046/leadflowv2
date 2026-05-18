@@ -342,6 +342,52 @@ export const upsertContactFromMetaLead = internalMutation({
       rawPayload: args.rawPayloadEnriched,
     });
 
+    // Opportunity in default pipeline aanmaken zodat lead in Kanban
+    // verschijnt (alleen bij nieuw contact; bij dedup-merge bestaat
+    // mogelijk al een opp).
+    if (isNewContact) {
+      const pipeline = await ctx.db
+        .query("pipelines")
+        .withIndex("by_workspace", (q) =>
+          q.eq("workspaceId", workspace._id),
+        )
+        .filter((q) => q.eq(q.field("isDefault"), true))
+        .first();
+      if (pipeline) {
+        const stages = await ctx.db
+          .query("pipelineStages")
+          .withIndex("by_pipeline_order", (q) =>
+            q.eq("pipelineId", pipeline._id),
+          )
+          .collect();
+        const leadStage = stages.find(
+          (s) => !s.isWonStage && !s.isLostStage,
+        );
+        if (leadStage) {
+          const oppContact = await ctx.db.get(contactId);
+          const oppTitle =
+            (oppContact &&
+              [oppContact.firstName, oppContact.lastName]
+                .filter(Boolean)
+                .join(" ")) ||
+            oppContact?.email ||
+            oppContact?.phone ||
+            "Nieuwe lead";
+          const oppId = await ctx.db.insert("opportunities", {
+            workspaceId: workspace._id,
+            contactId,
+            pipelineId: pipeline._id,
+            stageId: leadStage._id,
+            title: oppTitle,
+          });
+          await ctx.db.insert("opportunityStageHistory", {
+            opportunityId: oppId,
+            toStageId: leadStage._id,
+          });
+        }
+      }
+    }
+
     // Unmapped fields → note voor traceability (kort, line-per-field).
     if (args.unmappedFields.length > 0) {
       const noteBody = [

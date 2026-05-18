@@ -1,9 +1,14 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query, type QueryCtx } from "./_generated/server";
+import {
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { normalizeEmail, normalizePhone } from "./lib/phone";
 
 /**
@@ -288,9 +293,9 @@ export const update = mutation({
  * Alle vier vereisen workspace-membership voor de contact's workspace.
  */
 async function requireMembershipForContact(
-  ctx: any,
+  ctx: MutationCtx,
   contactId: Id<"contacts">,
-): Promise<{ contact: any; userId: Id<"users"> }> {
+): Promise<{ contact: Doc<"contacts">; userId: Id<"users"> }> {
   const userId = await getAuthUserId(ctx);
   if (!userId) throw new Error("Not authenticated");
 
@@ -302,7 +307,7 @@ async function requireMembershipForContact(
 
   const membership = await ctx.db
     .query("memberships")
-    .withIndex("by_user_org", (q: any) =>
+    .withIndex("by_user_org", (q) =>
       q.eq("userId", userId).eq("orgId", workspace.orgId),
     )
     .first();
@@ -314,6 +319,9 @@ async function requireMembershipForContact(
 /**
  * Markeer dat er gebeld is + uitkomst. Bumpt callCount, set lastCallAt,
  * set lastCallResult. Gebruikt door call-flow modal op /crm dashboard.
+ *
+ * @deprecated — gebruik recordCallNoAnswer / recordCallAnswered voor
+ * de geüpgrade lead-actions met opp-stage updates + auto-notes.
  */
 export const recordCall = mutation({
   args: {
@@ -330,6 +338,317 @@ export const recordCall = mutation({
       callCount: (contact.callCount ?? 0) + 1,
       lastCallAt: Date.now(),
       lastCallResult: args.result,
+    });
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// LEAD-ACTION MUTATIONS — vervangen v1's call-flow modal
+// ──────────────────────────────────────────────────────────────────────
+// Elk van deze:
+//   - Patch contact (callCount / lastCallResult / nextFollowUpAt)
+//   - Optioneel: move opportunity naar passende stage
+//   - Auto-note voor audit-trail
+//
+// Stage-mapping zonder fuzzy naam-match: gebruik isWonStage/isLostStage
+// flags + order (laatste niet-Won/Lost stage = "Voorstel"-equivalent).
+
+/**
+ * Helper: vind default pipeline + alle stages voor een workspace. Pakt
+ * eerste pipeline gemarkeerd als default. Returnt null als geen.
+ */
+async function getDefaultPipelineStages(
+  ctx: MutationCtx,
+  workspaceId: Id<"workspaces">,
+): Promise<{
+  pipelineId: Id<"pipelines">;
+  stages: Array<Doc<"pipelineStages">>;
+} | null> {
+  const pipeline = await ctx.db
+    .query("pipelines")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .filter((q) => q.eq(q.field("isDefault"), true))
+    .first();
+  if (!pipeline) return null;
+  const stages = await ctx.db
+    .query("pipelineStages")
+    .withIndex("by_pipeline_order", (q) => q.eq("pipelineId", pipeline._id))
+    .collect();
+  return { pipelineId: pipeline._id, stages };
+}
+
+/** Pick een stage op basis van rol — fuzzy-naam-match vermeden. */
+function pickStageByRole(
+  stages: Array<Doc<"pipelineStages">>,
+  role: "lead" | "qualified" | "lost" | "won",
+): Doc<"pipelineStages"> | null {
+  if (role === "won") return stages.find((s) => s.isWonStage) ?? null;
+  if (role === "lost") return stages.find((s) => s.isLostStage) ?? null;
+  if (role === "lead") {
+    // Eerste niet-Won/Lost stage
+    return (
+      stages.find((s) => !s.isWonStage && !s.isLostStage) ?? null
+    );
+  }
+  // "qualified" = laatste niet-Won/Lost stage (b.v. "Voorstel" in 5-stages)
+  const inProgress = stages.filter(
+    (s) => !s.isWonStage && !s.isLostStage,
+  );
+  return inProgress.length > 0 ? inProgress[inProgress.length - 1] : null;
+}
+
+/**
+ * Vind bestaande open opp voor contact in default pipeline, of maak
+ * nieuwe in Lead-stage. Returnt opportunityId.
+ */
+async function findOrCreateOpportunity(
+  ctx: MutationCtx,
+  workspaceId: Id<"workspaces">,
+  contactId: Id<"contacts">,
+  contactName: string,
+): Promise<Id<"opportunities"> | null> {
+  const pipelineData = await getDefaultPipelineStages(ctx, workspaceId);
+  if (!pipelineData) return null;
+  const { pipelineId, stages } = pipelineData;
+
+  // Bestaande opp voor dit contact in deze pipeline (non-closed)
+  const existing = await ctx.db
+    .query("opportunities")
+    .withIndex("by_contact", (q) => q.eq("contactId", contactId))
+    .filter((q) =>
+      q.and(
+        q.eq(q.field("pipelineId"), pipelineId),
+        q.eq(q.field("closedAt"), undefined),
+      ),
+    )
+    .first();
+  if (existing) return existing._id;
+
+  const leadStage = pickStageByRole(stages, "lead");
+  if (!leadStage) return null;
+
+  const oppId = await ctx.db.insert("opportunities", {
+    workspaceId,
+    contactId,
+    pipelineId,
+    stageId: leadStage._id,
+    title: contactName,
+  });
+  await ctx.db.insert("opportunityStageHistory", {
+    opportunityId: oppId,
+    toStageId: leadStage._id,
+  });
+  return oppId;
+}
+
+/** Patch opp naar nieuwe stage + history-row + closedAt bij Won/Lost. */
+async function moveOppToStage(
+  ctx: MutationCtx,
+  opportunityId: Id<"opportunities">,
+  targetStage: Doc<"pipelineStages">,
+  userId: Id<"users">,
+  reason?: string,
+): Promise<void> {
+  const opp = await ctx.db.get(opportunityId);
+  if (!opp) return;
+  if (opp.stageId === targetStage._id) return;
+  const updates: Record<string, unknown> = { stageId: targetStage._id };
+  if (
+    (targetStage.isWonStage || targetStage.isLostStage) &&
+    !opp.closedAt
+  ) {
+    updates.closedAt = Date.now();
+    updates.closedReason =
+      reason ?? (targetStage.isWonStage ? "won" : "lost");
+  }
+  if (!targetStage.isWonStage && !targetStage.isLostStage && opp.closedAt) {
+    updates.closedAt = undefined;
+    updates.closedReason = undefined;
+  }
+  await ctx.db.patch(opportunityId, updates);
+  await ctx.db.insert("opportunityStageHistory", {
+    opportunityId,
+    fromStageId: opp.stageId,
+    toStageId: targetStage._id,
+    changedById: userId,
+  });
+}
+
+function contactDisplay(contact: Doc<"contacts">): string {
+  return (
+    [contact.firstName, contact.lastName].filter(Boolean).join(" ") ||
+    contact.email ||
+    contact.phone ||
+    "Naamloos"
+  );
+}
+
+/**
+ * "Niet bereikt" — geen gehoor of voicemail. Bump callCount, set
+ * lastCallResult + nextFollowUpAt +2 dagen. Stage blijft Lead. Note
+ * voor audit.
+ */
+export const recordCallNoAnswer = mutation({
+  args: { contactId: v.id("contacts") },
+  handler: async (ctx, args) => {
+    const { contact, userId } = await requireMembershipForContact(
+      ctx,
+      args.contactId,
+    );
+    const newCount = (contact.callCount ?? 0) + 1;
+    await ctx.db.patch(args.contactId, {
+      callCount: newCount,
+      lastCallAt: Date.now(),
+      lastCallResult: "not_answered",
+      nextFollowUpAt: Date.now() + 2 * 24 * 60 * 60 * 1000,
+    });
+    await ctx.db.insert("notes", {
+      workspaceId: contact.workspaceId,
+      contactId: args.contactId,
+      body: `📞 Niet bereikt (poging ${newCount}). Volgende belpoging over 2 dagen.`,
+      createdById: userId,
+    });
+  },
+});
+
+/**
+ * "Heeft opgenomen" — 3 outcomes:
+ *   - appointment: opp naar "qualified" stage, followUpAt = afspraak-datum
+ *   - callback: opp blijft Lead, followUpAt = +N dagen
+ *   - notInterested: opp naar Lost stage, note met reden
+ *
+ * Optioneel body als notitie-aanvulling.
+ */
+export const recordCallAnswered = mutation({
+  args: {
+    contactId: v.id("contacts"),
+    outcome: v.union(
+      v.literal("appointment"),
+      v.literal("callback"),
+      v.literal("not_interested"),
+    ),
+    /** Voor appointment: afspraak-datum (epoch ms). Voor callback: terugbel-datum. */
+    followUpAt: v.optional(v.number()),
+    /** Optionele aanvulling op de auto-note. */
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { contact, userId } = await requireMembershipForContact(
+      ctx,
+      args.contactId,
+    );
+
+    const patch: Record<string, unknown> = {
+      lastCallAt: Date.now(),
+      lastCallResult: `answered_${args.outcome}`,
+    };
+    if (args.followUpAt !== undefined) {
+      patch.nextFollowUpAt = args.followUpAt;
+    } else if (args.outcome === "callback") {
+      // Default 7 dagen
+      patch.nextFollowUpAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+    }
+    await ctx.db.patch(args.contactId, patch);
+
+    // Opp-stage update
+    const oppId = await findOrCreateOpportunity(
+      ctx,
+      contact.workspaceId,
+      args.contactId,
+      contactDisplay(contact),
+    );
+    if (oppId) {
+      const pipelineData = await getDefaultPipelineStages(
+        ctx,
+        contact.workspaceId,
+      );
+      if (pipelineData) {
+        const targetRole =
+          args.outcome === "appointment"
+            ? "qualified"
+            : args.outcome === "not_interested"
+              ? "lost"
+              : null;
+        if (targetRole) {
+          const targetStage = pickStageByRole(pipelineData.stages, targetRole);
+          if (targetStage) {
+            await moveOppToStage(
+              ctx,
+              oppId,
+              targetStage,
+              userId,
+              targetRole,
+            );
+          }
+        }
+      }
+    }
+
+    const noteBody = (() => {
+      if (args.outcome === "appointment") {
+        const date = args.followUpAt
+          ? new Date(args.followUpAt).toLocaleString("nl-NL")
+          : "(geen datum)";
+        return `✅ Opgenomen — afspraak ingepland: ${date}${args.note ? `\n${args.note}` : ""}`;
+      }
+      if (args.outcome === "callback") {
+        const date = args.followUpAt
+          ? new Date(args.followUpAt).toLocaleString("nl-NL")
+          : "over 7 dagen";
+        return `🔄 Opgenomen — wil teruggebeld worden: ${date}${args.note ? `\n${args.note}` : ""}`;
+      }
+      return `❌ Opgenomen — niet geïnteresseerd${args.note ? `\n${args.note}` : ""}`;
+    })();
+
+    await ctx.db.insert("notes", {
+      workspaceId: contact.workspaceId,
+      contactId: args.contactId,
+      body: noteBody,
+      createdById: userId,
+    });
+  },
+});
+
+/**
+ * "Ongeldig nummer" — telefoon-veld is foutief. Mark contact als
+ * outsideArea (verbergt uit dashboard) + opp naar Lost. Note.
+ */
+export const markInvalidNumber = mutation({
+  args: { contactId: v.id("contacts") },
+  handler: async (ctx, args) => {
+    const { contact, userId } = await requireMembershipForContact(
+      ctx,
+      args.contactId,
+    );
+    await ctx.db.patch(args.contactId, {
+      lastCallResult: "invalid",
+      outsideArea: true,
+    });
+
+    const oppId = await findOrCreateOpportunity(
+      ctx,
+      contact.workspaceId,
+      args.contactId,
+      contactDisplay(contact),
+    );
+    if (oppId) {
+      const pipelineData = await getDefaultPipelineStages(
+        ctx,
+        contact.workspaceId,
+      );
+      if (pipelineData) {
+        const lostStage = pickStageByRole(pipelineData.stages, "lost");
+        if (lostStage) {
+          await moveOppToStage(ctx, oppId, lostStage, userId, "invalid_number");
+        }
+      }
+    }
+
+    await ctx.db.insert("notes", {
+      workspaceId: contact.workspaceId,
+      contactId: args.contactId,
+      body: `🚫 Ongeldig telefoonnummer (${contact.phone ?? "—"})`,
+      createdById: userId,
     });
   },
 });
@@ -499,8 +818,38 @@ export const restore = mutation({
 export const markOutsideArea = mutation({
   args: { contactId: v.id("contacts") },
   handler: async (ctx, args) => {
-    await requireMembershipForContact(ctx, args.contactId);
+    const { contact, userId } = await requireMembershipForContact(
+      ctx,
+      args.contactId,
+    );
     await ctx.db.patch(args.contactId, { outsideArea: true });
+
+    // Opp naar Lost (consistent met v1 — buiten gebied = unrealizable)
+    const oppId = await findOrCreateOpportunity(
+      ctx,
+      contact.workspaceId,
+      args.contactId,
+      contactDisplay(contact),
+    );
+    if (oppId) {
+      const pipelineData = await getDefaultPipelineStages(
+        ctx,
+        contact.workspaceId,
+      );
+      if (pipelineData) {
+        const lostStage = pickStageByRole(pipelineData.stages, "lost");
+        if (lostStage) {
+          await moveOppToStage(ctx, oppId, lostStage, userId, "outside_area");
+        }
+      }
+    }
+
+    await ctx.db.insert("notes", {
+      workspaceId: contact.workspaceId,
+      contactId: args.contactId,
+      body: "📍 Lead buiten werkgebied gemarkeerd",
+      createdById: userId,
+    });
   },
 });
 
