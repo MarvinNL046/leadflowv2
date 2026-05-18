@@ -562,6 +562,110 @@ export const listByContact = query({
 });
 
 /**
+ * Conversations-list voor chat-UI: groepeer messages per contactId,
+ * returnt {contactId, contact-info, lastMessage, lastChannel, lastDirection,
+ * lastActivity, totalCount, hasUnreadInbound (= laatste = inbound)} per
+ * conversation, gesorteerd op lastActivity desc.
+ *
+ * MVP: pakt laatste 500 messages, groepeert client-side. Voor schaal
+ * later: aparte conversations table met denormalized aggregates.
+ */
+export const listConversations = query({
+  args: {
+    workspaceId: v.id("workspaces"),
+    channel: v.optional(
+      v.union(
+        v.literal("email"),
+        v.literal("sms"),
+        v.literal("whatsapp"),
+        v.literal("messenger"),
+      ),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const workspace = await ctx.db.get(args.workspaceId);
+    if (!workspace) throw new Error("Workspace not found");
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) =>
+        q.eq("userId", userId).eq("orgId", workspace.orgId),
+      )
+      .first();
+    if (!membership) throw new Error("Not a member of this workspace");
+
+    // Pak recente messages (500) en groepeer
+    const baseQuery = args.channel
+      ? ctx.db
+          .query("messages")
+          .withIndex("by_workspace_channel_sent", (q) =>
+            q
+              .eq("workspaceId", args.workspaceId)
+              .eq("channel", args.channel!),
+          )
+      : ctx.db
+          .query("messages")
+          .withIndex("by_workspace_channel_sent", (q) =>
+            q.eq("workspaceId", args.workspaceId),
+          );
+    const recentMessages = await baseQuery.order("desc").take(500);
+
+    // Groepeer per contactId (skip null contactIds — unassigned messages
+    // krijgen aparte sectie later)
+    const byContact = new Map<
+      Id<"contacts">,
+      {
+        latestMessage: Doc<"messages">;
+        count: number;
+      }
+    >();
+    for (const m of recentMessages) {
+      if (!m.contactId) continue;
+      const existing = byContact.get(m.contactId);
+      if (!existing) {
+        byContact.set(m.contactId, { latestMessage: m, count: 1 });
+      } else {
+        existing.count++;
+        // recentMessages is desc gesorteerd, latestMessage is dus al
+        // de eerste die we tegenkomen
+      }
+    }
+
+    // Verrijk met contact-info
+    const conversations = await Promise.all(
+      Array.from(byContact.entries()).map(async ([contactId, agg]) => {
+        const c = await ctx.db.get(contactId);
+        if (!c || c.deletedAt !== undefined) return null;
+        const m = agg.latestMessage;
+        return {
+          contactId,
+          contactName:
+            [c.firstName, c.lastName].filter(Boolean).join(" ") ||
+            c.email ||
+            c.phone ||
+            "Onbekend",
+          contactEmail: c.email ?? null,
+          contactPhone: c.phone ?? null,
+          contactCity: c.city ?? null,
+          lastMessageBody: m.body,
+          lastMessageSubject: m.subject ?? null,
+          lastMessageChannel: m.channel,
+          lastMessageDirection: m.direction,
+          lastActivity: m.sentAt ?? m._creationTime,
+          totalCount: agg.count,
+          unread: m.direction === "inbound",
+        };
+      }),
+    );
+
+    return conversations
+      .filter((c): c is NonNullable<typeof c> => c !== null)
+      .sort((a, b) => b.lastActivity - a.lastActivity);
+  },
+});
+
+/**
  * Paginated workspace-wide messages voor de /crm/messages inbox.
  * Optionele channel-filter; default = alle kanalen.
  */

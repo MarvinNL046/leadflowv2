@@ -1,35 +1,32 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQuery, usePaginatedQuery } from 'convex/react'
+import { useQuery, useAction } from 'convex/react'
+import { toast } from 'sonner'
 import {
   Mail,
   MessageSquare,
   MessageCircle,
   Inbox,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  ChevronDown,
-  AlertCircle,
+  Search,
+  Send,
+  Phone,
+  MapPin,
+  ExternalLink,
+  ArrowLeft,
 } from 'lucide-react'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '#/components/ui/card.tsx'
+import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
+import { Input } from '#/components/ui/input.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { cn } from '#/lib/utils.ts'
 import { api } from '../../convex/_generated/api'
-import type { Id } from '../../convex/_generated/dataModel'
+import type { Doc, Id } from '../../convex/_generated/dataModel'
 
 export const Route = createFileRoute('/crm/messages')({
   component: MessagesPage,
 })
 
-const PAGE_SIZE = 25
 type Channel = 'all' | 'email' | 'sms' | 'whatsapp'
 
 function MessagesPage() {
@@ -47,258 +44,601 @@ function MessagesPage() {
       </Card>
     )
   }
-  return <MessagesContent workspaceId={workspaceId} />
+  return <MessagesShell workspaceId={workspaceId} />
 }
 
-function MessagesContent({
-  workspaceId,
-}: {
-  workspaceId: Id<'workspaces'>
-}) {
+function MessagesShell({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const [channel, setChannel] = useState<Channel>('all')
-  const { results, status, loadMore } = usePaginatedQuery(
-    api.messaging.listByWorkspace,
-    {
-      workspaceId,
-      ...(channel === 'all' ? {} : { channel }),
-    },
-    { initialNumItems: PAGE_SIZE },
-  )
+  const [search, setSearch] = useState('')
+  const [selectedContactId, setSelectedContactId] =
+    useState<Id<'contacts'> | null>(null)
 
-  const isLoading = status === 'LoadingFirstPage'
-  const hasMore = status === 'CanLoadMore'
-  const isLoadingMore = status === 'LoadingMore'
+  const conversations = useQuery(api.messaging.listConversations, {
+    workspaceId,
+    ...(channel === 'all' ? {} : { channel }),
+  })
+
+  const filtered = useMemo(() => {
+    if (!conversations) return []
+    const q = search.trim().toLowerCase()
+    if (!q) return conversations
+    return conversations.filter((c) =>
+      [c.contactName, c.contactEmail, c.contactPhone, c.lastMessageBody]
+        .filter(Boolean)
+        .some((f) => f!.toLowerCase().includes(q)),
+    )
+  }, [conversations, search])
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500/20 to-blue-500/20">
-          <Inbox className="h-4.5 w-4.5 text-sky-600" />
-        </div>
-        <div>
-          <h1 className="text-xl font-semibold text-zinc-900">Messages</h1>
-          <p className="text-xs text-zinc-500">
-            Alle outbound berichten via Resend + Voidfix
-          </p>
-        </div>
-      </div>
-
-      {/* Filter tabs */}
-      <div className="grid grid-cols-4 gap-1 rounded-lg bg-zinc-100 p-1">
-        <FilterTab
-          active={channel === 'all'}
-          onClick={() => setChannel('all')}
+    // Sub: 14 (topbar) + 4 (main padding) + 6 (gap to header) ≈ 96px taken
+    <div className="-m-4 flex h-[calc(100vh-3.5rem)] flex-col bg-white sm:-m-6">
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left: Conversation list */}
+        <div
+          className={cn(
+            'flex w-full flex-col border-r border-zinc-200 sm:w-80 md:w-96',
+            selectedContactId && 'hidden sm:flex',
+          )}
         >
-          <Inbox className="h-3.5 w-3.5" /> Alle
-        </FilterTab>
-        <FilterTab
-          active={channel === 'email'}
-          onClick={() => setChannel('email')}
-        >
-          <Mail className="h-3.5 w-3.5" /> Email
-        </FilterTab>
-        <FilterTab
-          active={channel === 'sms'}
-          onClick={() => setChannel('sms')}
-        >
-          <MessageSquare className="h-3.5 w-3.5" /> SMS
-        </FilterTab>
-        <FilterTab
-          active={channel === 'whatsapp'}
-          onClick={() => setChannel('whatsapp')}
-        >
-          <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-        </FilterTab>
-      </div>
-
-      {/* List */}
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="space-y-2 p-4">
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
+          <div className="border-b border-zinc-200 p-3 space-y-2">
+            <h1 className="flex items-center gap-2 px-1 text-base font-semibold text-zinc-900">
+              <Inbox className="h-4 w-4 text-sky-600" />
+              Berichten
+              {conversations && (
+                <Badge variant="secondary" className="text-xs">
+                  {conversations.length}
+                </Badge>
+              )}
+            </h1>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Zoek op naam, email, telefoon, tekst…"
+                className="h-9 pl-8"
+              />
             </div>
-          ) : results.length === 0 ? (
-            <p className="py-12 text-center text-sm text-zinc-500">
-              Geen berichten in dit filter
-            </p>
-          ) : (
-            <ul className="divide-y divide-zinc-100">
-              {results.map((m) => (
-                <MessageRow key={m._id} message={m} />
+            <div className="grid grid-cols-4 gap-1 rounded-md bg-zinc-100 p-0.5">
+              {(['all', 'email', 'sms', 'whatsapp'] as Channel[]).map((c) => (
+                <ChannelFilterButton
+                  key={c}
+                  active={channel === c}
+                  channel={c}
+                  onClick={() => setChannel(c)}
+                />
               ))}
-            </ul>
-          )}
-
-          {hasMore && (
-            <div className="border-t border-zinc-100 p-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => loadMore(PAGE_SIZE)}
-                disabled={isLoadingMore}
-                className="w-full border-dashed"
-              >
-                <ChevronDown className="h-4 w-4" />
-                {isLoadingMore ? 'Laden…' : `Toon ${PAGE_SIZE} meer`}
-              </Button>
             </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {conversations === undefined ? (
+              <div className="space-y-1 p-2">
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              <p className="py-12 text-center text-sm text-zinc-400">
+                Geen conversaties in dit filter
+              </p>
+            ) : (
+              <ul className="divide-y divide-zinc-100">
+                {filtered.map((c) => (
+                  <ConversationRow
+                    key={c.contactId}
+                    conv={c}
+                    active={selectedContactId === c.contactId}
+                    onClick={() => setSelectedContactId(c.contactId)}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Conversation view */}
+        <div
+          className={cn(
+            'flex flex-1 flex-col',
+            !selectedContactId && 'hidden sm:flex',
           )}
-        </CardContent>
-      </Card>
+        >
+          {selectedContactId ? (
+            <ConversationView
+              contactId={selectedContactId}
+              onBack={() => setSelectedContactId(null)}
+            />
+          ) : (
+            <EmptyView />
+          )}
+        </div>
+      </div>
     </div>
   )
 }
 
-function FilterTab({
+// ────────────────────────────────────────────────────────────────────────
+// Conversation list rij
+// ────────────────────────────────────────────────────────────────────────
+
+function ChannelFilterButton({
   active,
+  channel,
   onClick,
-  children,
 }: {
   active: boolean
+  channel: Channel
   onClick: () => void
-  children: React.ReactNode
 }) {
+  const Icon =
+    channel === 'all'
+      ? Inbox
+      : channel === 'email'
+        ? Mail
+        : channel === 'sms'
+          ? MessageSquare
+          : MessageCircle
+  const label =
+    channel === 'all'
+      ? 'Alle'
+      : channel === 'email'
+        ? 'Email'
+        : channel === 'sms'
+          ? 'SMS'
+          : 'WA'
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+        'flex items-center justify-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors',
         active
           ? 'bg-white text-zinc-900 shadow-sm'
           : 'text-zinc-600 hover:bg-zinc-200',
       )}
     >
-      {children}
+      <Icon className="h-3 w-3" />
+      {label}
     </button>
   )
 }
 
-function MessageRow({
-  message,
+function ConversationRow({
+  conv,
+  active,
+  onClick,
 }: {
-  message: {
-    _id: string
-    _creationTime: number
-    channel: string
-    status: string
-    to: string
-    subject?: string
-    body: string
-    contactId?: string
-    contactName: string | null
-    errorMessage?: string
-    sentAt?: number
+  conv: {
+    contactId: Id<'contacts'>
+    contactName: string
+    lastMessageBody: string
+    lastMessageSubject: string | null
+    lastMessageChannel: string
+    lastMessageDirection: string
+    lastActivity: number
+    totalCount: number
+    unread: boolean
   }
+  active: boolean
+  onClick: () => void
 }) {
-  const meta: Record<
-    string,
-    { icon: typeof Mail; className: string; label: string }
-  > = {
-    email: {
-      icon: Mail,
-      className: 'bg-blue-100 text-blue-700',
-      label: 'Email',
-    },
-    sms: {
-      icon: MessageSquare,
-      className: 'bg-emerald-100 text-emerald-700',
-      label: 'SMS',
-    },
-    whatsapp: {
-      icon: MessageCircle,
-      className: 'bg-green-100 text-green-700',
-      label: 'WhatsApp',
-    },
-    messenger: {
-      icon: MessageCircle,
-      className: 'bg-violet-100 text-violet-700',
-      label: 'Messenger',
-    },
-  }
-  const m = meta[message.channel] ?? {
-    icon: Inbox,
-    className: 'bg-zinc-100 text-zinc-700',
-    label: message.channel,
-  }
-  const Icon = m.icon
-  const bodyPreview = message.body.length > 140
-    ? message.body.slice(0, 140) + '…'
-    : message.body
-  const when = message.sentAt ?? message._creationTime
+  const initials = (conv.contactName || '?').slice(0, 2).toUpperCase()
+  const preview =
+    conv.lastMessageChannel === 'email' && conv.lastMessageSubject
+      ? conv.lastMessageSubject
+      : conv.lastMessageBody
+  const time = new Date(conv.lastActivity)
+  const today = new Date().toDateString() === time.toDateString()
+  const timeLabel = today
+    ? time.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+    : time.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+
+  const ChannelIcon =
+    conv.lastMessageChannel === 'email'
+      ? Mail
+      : conv.lastMessageChannel === 'sms'
+        ? MessageSquare
+        : MessageCircle
 
   return (
-    <li className="flex items-start gap-3 p-4">
-      <Badge
+    <li>
+      <button
+        type="button"
+        onClick={onClick}
         className={cn(
-          'mt-0.5 border-0 px-2 py-0.5 text-xs',
-          m.className,
+          'flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-zinc-50',
+          active && 'bg-violet-50/60',
         )}
       >
-        <Icon className="mr-1 h-3 w-3" /> {m.label}
-      </Badge>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          {message.contactId ? (
-            <Link
-              to="/crm/contacts/$id"
-              params={{ id: message.contactId }}
-              className="font-medium text-zinc-900 hover:text-blue-600 hover:underline"
-            >
-              {message.contactName ?? message.to}
-            </Link>
-          ) : (
-            <span className="font-medium text-zinc-700">{message.to}</span>
-          )}
-          <span className="text-xs text-zinc-400">· {message.to}</span>
-          <StatusBadge status={message.status} />
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-500 text-xs font-medium text-white">
+          {initials}
         </div>
-        {message.subject && (
-          <p className="mt-0.5 truncate text-sm font-medium text-zinc-700">
-            {message.subject}
-          </p>
-        )}
-        <p className="mt-0.5 line-clamp-2 whitespace-pre-line text-sm text-zinc-500">
-          {bodyPreview}
-        </p>
-        {message.errorMessage && (
-          <p className="mt-1 flex items-start gap-1 text-xs text-red-600">
-            <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
-            {message.errorMessage}
-          </p>
-        )}
-      </div>
-      <span className="shrink-0 text-xs text-zinc-400">
-        {new Date(when).toLocaleString('nl-NL', {
-          dateStyle: 'short',
-          timeStyle: 'short',
-        })}
-      </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="truncate text-sm font-medium text-zinc-900">
+              {conv.contactName}
+            </h3>
+            <span className="shrink-0 text-xs text-zinc-400">{timeLabel}</span>
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500">
+            <ChannelIcon className="h-3 w-3 shrink-0" />
+            {conv.lastMessageDirection === 'outbound' && (
+              <span className="text-zinc-400">Jij:</span>
+            )}
+            <span className="truncate">{preview}</span>
+            {conv.unread && (
+              <span
+                aria-hidden
+                className="ml-auto h-2 w-2 shrink-0 rounded-full bg-blue-500"
+              />
+            )}
+          </div>
+        </div>
+      </button>
     </li>
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
-  if (status === 'sent' || status === 'delivered') {
-    return (
-      <span className="flex items-center gap-0.5 text-xs text-emerald-600">
-        <CheckCircle2 className="h-3 w-3" /> {status}
-      </span>
-    )
-  }
-  if (status === 'failed' || status === 'bounced') {
-    return (
-      <span className="flex items-center gap-0.5 text-xs text-red-600">
-        <XCircle className="h-3 w-3" /> {status}
-      </span>
-    )
-  }
+function EmptyView() {
   return (
-    <span className="flex items-center gap-0.5 text-xs text-zinc-400">
-      <Clock className="h-3 w-3" /> {status}
-    </span>
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-100">
+        <Inbox className="h-6 w-6 text-zinc-400" />
+      </div>
+      <h2 className="text-base font-medium text-zinc-700">
+        Selecteer een conversatie
+      </h2>
+      <p className="max-w-xs text-sm text-zinc-500">
+        Klik links op een contact om de berichten-geschiedenis te zien en te
+        reageren.
+      </p>
+    </div>
   )
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Conversation view (right panel)
+// ────────────────────────────────────────────────────────────────────────
+
+function ConversationView({
+  contactId,
+  onBack,
+}: {
+  contactId: Id<'contacts'>
+  onBack: () => void
+}) {
+  const detail = useQuery(api.contacts.getDetail, { contactId })
+  const messages = useQuery(api.messaging.listByContact, { contactId })
+
+  if (detail === undefined || messages === undefined) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <Skeleton className="h-32 w-64" />
+      </div>
+    )
+  }
+  if (detail === null) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">
+        Contact niet gevonden
+      </div>
+    )
+  }
+  const { contact } = detail
+
+  return (
+    <>
+      {/* Conversation header */}
+      <header className="flex items-center gap-3 border-b border-zinc-200 px-4 py-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="sm:hidden"
+          onClick={onBack}
+          aria-label="Terug naar lijst"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-500 text-xs font-medium text-white">
+          {((contact.firstName?.[0] ?? '') +
+            (contact.lastName?.[0] ?? '') ||
+            contact.email?.[0] ||
+            '?').toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-sm font-semibold text-zinc-900">
+            {[contact.firstName, contact.lastName].filter(Boolean).join(' ') ||
+              'Naamloos'}
+          </h2>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-zinc-500">
+            {contact.email && (
+              <span className="flex items-center gap-1 truncate">
+                <Mail className="h-3 w-3" /> {contact.email}
+              </span>
+            )}
+            {contact.phone && (
+              <span className="flex items-center gap-1">
+                <Phone className="h-3 w-3" /> {contact.phone}
+              </span>
+            )}
+            {contact.city && (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3 w-3" /> {contact.city}
+              </span>
+            )}
+          </div>
+        </div>
+        <Link
+          to="/crm/contacts/$id"
+          params={{ id: contactId }}
+          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+          title="Open contact-detail"
+        >
+          <ExternalLink className="h-4 w-4" />
+        </Link>
+      </header>
+
+      {/* Messages stream */}
+      <div className="flex-1 space-y-2 overflow-y-auto bg-zinc-50/40 p-4">
+        {messages.length === 0 ? (
+          <p className="py-12 text-center text-sm text-zinc-400">
+            Nog geen berichten met deze contact
+          </p>
+        ) : (
+          [...messages].reverse().map((m, idx, arr) => {
+            const prev = idx > 0 ? arr[idx - 1] : null
+            const showDate =
+              !prev ||
+              new Date(m._creationTime).toDateString() !==
+                new Date(prev._creationTime).toDateString()
+            return (
+              <div key={m._id}>
+                {showDate && (
+                  <div className="my-3 flex items-center justify-center">
+                    <span className="rounded-full bg-white px-3 py-0.5 text-xs text-zinc-500 shadow-xs">
+                      {new Date(m._creationTime).toLocaleDateString('nl-NL', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                      })}
+                    </span>
+                  </div>
+                )}
+                <ChatBubble message={m} />
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Reply form */}
+      <ReplyForm contact={contact} />
+    </>
+  )
+}
+
+function ChatBubble({
+  message,
+}: {
+  message: Doc<'messages'>
+}) {
+  const isOutbound = message.direction === 'outbound'
+  const channelMeta: Record<
+    string,
+    { icon: typeof Mail; bg: string; label: string }
+  > = {
+    email: { icon: Mail, bg: 'bg-blue-50 border-blue-200', label: 'Email' },
+    sms: {
+      icon: MessageSquare,
+      bg: 'bg-emerald-50 border-emerald-200',
+      label: 'SMS',
+    },
+    whatsapp: {
+      icon: MessageCircle,
+      bg: 'bg-green-50 border-green-200',
+      label: 'WhatsApp',
+    },
+    messenger: {
+      icon: MessageCircle,
+      bg: 'bg-violet-50 border-violet-200',
+      label: 'Messenger',
+    },
+  }
+  const m = channelMeta[message.channel] ?? channelMeta.sms
+  const Icon = m.icon
+  const failed = message.status === 'failed' || message.status === 'bounced'
+
+  return (
+    <div className={cn('flex', isOutbound ? 'justify-end' : 'justify-start')}>
+      <div
+        className={cn(
+          'max-w-[70%] rounded-lg border px-3 py-2 text-sm shadow-xs',
+          isOutbound
+            ? 'border-zinc-900 bg-zinc-900 text-white'
+            : `${m.bg} text-zinc-800`,
+          failed && 'opacity-60',
+        )}
+      >
+        <div
+          className={cn(
+            'mb-1 flex items-center gap-1.5 text-xs',
+            isOutbound ? 'text-zinc-300' : 'text-zinc-500',
+          )}
+        >
+          <Icon className="h-3 w-3" />
+          <span>{m.label}</span>
+          <span>·</span>
+          <span>
+            {new Date(message._creationTime).toLocaleTimeString('nl-NL', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+          {failed && (
+            <Badge className="ml-1 border-0 bg-red-100 text-red-700 text-[10px]">
+              {message.status}
+            </Badge>
+          )}
+        </div>
+        {message.subject && message.channel === 'email' && (
+          <p
+            className={cn(
+              'mb-1 font-medium',
+              isOutbound ? 'text-white' : 'text-zinc-900',
+            )}
+          >
+            {message.subject}
+          </p>
+        )}
+        <p className="whitespace-pre-line">{message.body}</p>
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Reply form
+// ────────────────────────────────────────────────────────────────────────
+
+function ReplyForm({
+  contact,
+}: {
+  contact: Doc<'contacts'>
+}) {
+  const send = useAction(api.messaging.send)
+  const [channel, setChannel] = useState<'email' | 'sms' | 'whatsapp'>(() => {
+    // Default = laatste channel waar contact iets in heeft? Voor MVP:
+    // whatsapp als phone aanwezig, anders email
+    if (contact.phone) return 'whatsapp'
+    return 'email'
+  })
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+  const [sending, setSending] = useState(false)
+
+  const channelsAvailable = {
+    email: !!contact.email,
+    sms: !!contact.phone,
+    whatsapp: !!contact.phone,
+  }
+  const recipient =
+    channel === 'email' ? contact.email : contact.phone
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (sending || !body.trim()) return
+    if (channel === 'email' && !subject.trim()) {
+      toast.error('Geef een onderwerp voor de email')
+      return
+    }
+    setSending(true)
+    try {
+      await send({
+        contactId: contact._id,
+        channel,
+        body,
+        ...(channel === 'email' ? { subject } : {}),
+      })
+      setBody('')
+      if (channel === 'email') setSubject('')
+      toast.success(`${channelLabel(channel)} verstuurd`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Versturen mislukt')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (!recipient) {
+    return (
+      <div className="border-t border-zinc-200 bg-zinc-50 p-3 text-center text-xs text-zinc-500">
+        Geen {channel === 'email' ? 'email' : 'telefoonnummer'} bekend voor
+        deze contact
+      </div>
+    )
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="border-t border-zinc-200 bg-white p-3 space-y-2"
+    >
+      <div className="flex items-center gap-1 text-xs">
+        <span className="text-zinc-500">Verstuur als:</span>
+        {(['email', 'sms', 'whatsapp'] as const).map((c) => {
+          const Icon =
+            c === 'email' ? Mail : c === 'sms' ? MessageSquare : MessageCircle
+          const available = channelsAvailable[c]
+          return (
+            <button
+              key={c}
+              type="button"
+              disabled={!available}
+              onClick={() => setChannel(c)}
+              className={cn(
+                'flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors',
+                channel === c && available
+                  ? c === 'whatsapp'
+                    ? 'bg-green-100 text-green-800'
+                    : c === 'sms'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-blue-100 text-blue-800'
+                  : available
+                    ? 'text-zinc-600 hover:bg-zinc-100'
+                    : 'cursor-not-allowed text-zinc-300',
+              )}
+              title={
+                available
+                  ? channelLabel(c)
+                  : `Geen ${c === 'email' ? 'email' : 'telefoon'}`
+              }
+            >
+              <Icon className="h-3 w-3" />
+              {channelLabel(c)}
+            </button>
+          )
+        })}
+        <span className="ml-auto text-zinc-400">→ {recipient}</span>
+      </div>
+
+      {channel === 'email' && (
+        <Input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder="Onderwerp…"
+          className="h-9"
+        />
+      )}
+
+      <div className="flex gap-2">
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder={
+            channel === 'email'
+              ? 'Schrijf een email…'
+              : channel === 'sms'
+                ? 'Korte SMS-tekst…'
+                : 'WhatsApp-bericht…'
+          }
+          rows={channel === 'email' ? 4 : 2}
+          className="block w-full resize-none rounded-md border border-zinc-200 px-3 py-2 text-sm shadow-xs placeholder:text-zinc-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+        />
+        <Button
+          type="submit"
+          disabled={sending || !body.trim()}
+          className="self-end"
+        >
+          <Send className="h-4 w-4" />
+          {sending ? '…' : 'Verstuur'}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+function channelLabel(c: 'email' | 'sms' | 'whatsapp') {
+  return c === 'email' ? 'Email' : c === 'sms' ? 'SMS' : 'WhatsApp'
 }
