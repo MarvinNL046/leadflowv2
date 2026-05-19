@@ -220,15 +220,12 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
 
         {/* Action row — 5 acties + Copy */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          {/* Bel: tel: link via window.location (asChild + a met
-              gradient classes drop te veel styling) */}
+          {/* Bel — opent LeadDialog op main view. Daarin staat het
+              telefoonnummer prominent als tel:-link (één klik = bellen)
+              plus de 4 vervolg-acties voor na het gesprek. */}
           <Button
             type="button"
-            onClick={() => {
-              if (lead.phone) {
-                window.location.href = `tel:${lead.phone}`
-              }
-            }}
+            onClick={() => openQuickAction('main')}
             disabled={!lead.phone}
             title={lead.phone ? `Bel ${lead.phone}` : 'Geen telefoonnummer'}
             className="flex-1 min-w-[100px] bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 disabled:opacity-50"
