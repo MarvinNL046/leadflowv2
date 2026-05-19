@@ -6,6 +6,7 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
+  mutation,
   query,
   type QueryCtx,
 } from "./_generated/server";
@@ -333,6 +334,49 @@ export const insertPendingInternal = internalMutation({
 // ──────────────────────────────────────────────────────────────────────
 // INBOUND WEBHOOKS — delivery-receipts + replies vanaf Resend/Voidfix
 // ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Markeer alle inbound messages binnen een workspace als gelezen.
+ * Voor de "Alles als gelezen markeren"-knop bovenaan /crm/messages.
+ *
+ * Strategie: vind inbound rows zonder readAt — patch readAt naar nu.
+ * Bounded scan: filter via workspace-channel-sent index, dan in-memory
+ * filter op direction + readAt. Voor groot volume later sharden via
+ * paginate, voor MVP volstaat één pass.
+ */
+export const markAllRead = mutation({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const workspace = await ctx.db.get(args.workspaceId);
+    if (!workspace) throw new Error("Workspace not found");
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) =>
+        q.eq("userId", userId).eq("orgId", workspace.orgId),
+      )
+      .first();
+    if (!membership) throw new Error("Not a member of this workspace");
+
+    const rows = await ctx.db
+      .query("messages")
+      .withIndex("by_workspace_channel_sent", (q) =>
+        q.eq("workspaceId", args.workspaceId),
+      )
+      .collect();
+
+    let marked = 0;
+    const now = Date.now();
+    for (const m of rows) {
+      if (m.direction !== "inbound") continue;
+      if (m.readAt !== undefined) continue;
+      await ctx.db.patch(m._id, { readAt: now });
+      marked++;
+    }
+    return { marked };
+  },
+});
 
 /**
  * Update messages-row op externalMessageId match. Voor Resend

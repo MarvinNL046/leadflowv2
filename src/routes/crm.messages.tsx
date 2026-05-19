@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQuery, useAction } from 'convex/react'
+import { useQuery, useAction, useMutation } from 'convex/react'
 import { toast } from 'sonner'
 import {
   Mail,
@@ -13,6 +13,7 @@ import {
   MapPin,
   ExternalLink,
   ArrowLeft,
+  CheckCheck,
 } from 'lucide-react'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
@@ -53,11 +54,33 @@ function MessagesShell({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const [search, setSearch] = useState('')
   const [selectedContactId, setSelectedContactId] =
     useState<Id<'contacts'> | null>(null)
+  const [markingAllRead, setMarkingAllRead] = useState(false)
 
   const conversations = useQuery(api.messaging.listConversations, {
     workspaceId,
     ...(channel === 'all' ? {} : { channel }),
   })
+  const markAllRead = useMutation(api.messaging.markAllRead)
+
+  const unreadCount =
+    conversations?.reduce((sum, c) => sum + (c.unread ? 1 : 0), 0) ?? 0
+
+  async function handleMarkAllRead() {
+    if (markingAllRead || unreadCount === 0) return
+    setMarkingAllRead(true)
+    try {
+      const result = await markAllRead({ workspaceId })
+      toast.success(
+        result.marked === 0
+          ? 'Geen ongelezen berichten'
+          : `${result.marked} ${result.marked === 1 ? 'bericht' : 'berichten'} gemarkeerd als gelezen`,
+      )
+    } catch (err) {
+      toast.error(humanizeConvexError(err, 'Markeren mislukt'))
+    } finally {
+      setMarkingAllRead(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     if (!conversations) return []
@@ -82,15 +105,38 @@ function MessagesShell({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
           )}
         >
           <div className="border-b border-zinc-200 p-3 space-y-2">
-            <h1 className="flex items-center gap-2 px-1 text-base font-semibold text-zinc-900">
-              <Inbox className="h-4 w-4 text-sky-600" />
-              Berichten
-              {conversations && (
-                <Badge variant="secondary" className="text-xs">
-                  {conversations.length}
-                </Badge>
-              )}
-            </h1>
+            <div className="flex items-center justify-between gap-2 px-1">
+              <h1 className="flex items-center gap-2 text-base font-semibold text-zinc-900">
+                <Inbox className="h-4 w-4 text-sky-600" />
+                Berichten
+                {conversations && (
+                  <Badge variant="secondary" className="text-xs">
+                    {conversations.length}
+                  </Badge>
+                )}
+                {unreadCount > 0 && (
+                  <Badge className="border-0 bg-sky-100 text-sky-700 text-xs">
+                    {unreadCount} ongelezen
+                  </Badge>
+                )}
+              </h1>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={handleMarkAllRead}
+                disabled={markingAllRead || unreadCount === 0}
+                title={
+                  unreadCount === 0
+                    ? 'Alle berichten zijn al gelezen'
+                    : `Markeer ${unreadCount} ongelezen ${unreadCount === 1 ? 'bericht' : 'berichten'} als gelezen`
+                }
+                className="h-7 text-xs text-zinc-600 hover:text-zinc-900"
+              >
+                <CheckCheck className="h-3.5 w-3.5" />
+                {markingAllRead ? 'Bezig…' : 'Alles gelezen'}
+              </Button>
+            </div>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />
               <Input
