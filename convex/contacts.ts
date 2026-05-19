@@ -591,6 +591,7 @@ export const recordCallAnswered = mutation({
     outcome: v.union(
       v.literal("appointment"),
       v.literal("callback"),
+      v.literal("customer_will_callback"),
       v.literal("not_interested"),
     ),
     /** Voor appointment: afspraak-datum (epoch ms). Voor callback: terugbel-datum. */
@@ -608,7 +609,14 @@ export const recordCallAnswered = mutation({
       lastCallAt: Date.now(),
       lastCallResult: `answered_${args.outcome}`,
     };
-    if (args.followUpAt !== undefined) {
+    if (args.outcome === "customer_will_callback") {
+      // Klant belt zelf terug — bumpt callCount (telt als 1× gebeld) +
+      // 7-dag safety-net follow-up zodat lead niet verdwijnt als klant
+      // vergeet. Geen stage-update (blijft waar 't is).
+      patch.callCount = (contact.callCount ?? 0) + 1;
+      patch.nextFollowUpAt =
+        args.followUpAt ?? Date.now() + 7 * 24 * 60 * 60 * 1000;
+    } else if (args.followUpAt !== undefined) {
       patch.nextFollowUpAt = args.followUpAt;
     } else if (args.outcome === "callback") {
       // Default 7 dagen
@@ -662,6 +670,9 @@ export const recordCallAnswered = mutation({
           ? new Date(args.followUpAt).toLocaleString("nl-NL")
           : "over 7 dagen";
         return `🔄 Opgenomen — wil teruggebeld worden: ${date}${args.note ? `\n${args.note}` : ""}`;
+      }
+      if (args.outcome === "customer_will_callback") {
+        return `📞 Opgenomen — klant belt zelf terug (7-dag safety-net follow-up)${args.note ? `\n${args.note}` : ""}`;
       }
       return `❌ Opgenomen — niet geïnteresseerd${args.note ? `\n${args.note}` : ""}`;
     })();
