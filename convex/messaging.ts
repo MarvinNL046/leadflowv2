@@ -698,7 +698,7 @@ export const listConversations = query({
           lastMessageDirection: m.direction,
           lastActivity: m.sentAt ?? m._creationTime,
           totalCount: agg.count,
-          unread: m.direction === "inbound",
+          unread: m.direction === "inbound" && m.readAt === undefined,
         };
       }),
     );
