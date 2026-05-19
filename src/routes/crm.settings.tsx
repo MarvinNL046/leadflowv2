@@ -6,6 +6,7 @@ import {
   MessageCircle,
   ChevronRight,
   Kanban as KanbanIcon,
+  Mail,
 } from 'lucide-react'
 import {
   Card,
@@ -51,6 +52,14 @@ const SECTIONS: HubSection[] = [
           'Stages toevoegen, volgorde, kleuren en Gewonnen/Verloren-markering',
         icon: KanbanIcon,
         iconColor: 'bg-violet-100 text-violet-700',
+      },
+      {
+        to: '/crm/settings/templates',
+        title: 'Email-templates',
+        description:
+          'Aanpassen wat verstuurd wordt bij Buiten werkgebied / Niet bereikt / Afspraak-reminder',
+        icon: Mail,
+        iconColor: 'bg-blue-100 text-blue-700',
       },
     ],
   },
