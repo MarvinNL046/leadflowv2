@@ -208,26 +208,29 @@ export function LeadDialog({ lead, open, onOpenChange }: LeadDialogProps) {
           />
         )}
 
-        {view === 'outside_area' && workspaceId && (
-          <OutsideAreaView
-            lead={lead}
-            workspaceId={workspaceId}
-            processing={processing}
-            onSubmit={(channel, subject, body) =>
-              markAndSend({
-                label: 'outside_area',
-                mark: () =>
-                  markOutsideArea({ contactId: lead._id as Id<'contacts'> }),
-                channel,
-                subject,
-                body,
-                successWithSend: 'Lead gemarkeerd buiten werkgebied',
-                successWithoutSend:
-                  'Lead gemarkeerd buiten werkgebied (geen bericht)',
-              })
-            }
-          />
-        )}
+        {view === 'outside_area' &&
+          (workspaceId ? (
+            <OutsideAreaView
+              lead={lead}
+              workspaceId={workspaceId}
+              processing={processing}
+              onSubmit={(channel, subject, body) =>
+                markAndSend({
+                  label: 'outside_area',
+                  mark: () =>
+                    markOutsideArea({ contactId: lead._id as Id<'contacts'> }),
+                  channel,
+                  subject,
+                  body,
+                  successWithSend: 'Lead gemarkeerd buiten werkgebied',
+                  successWithoutSend:
+                    'Lead gemarkeerd buiten werkgebied (geen bericht)',
+                })
+              }
+            />
+          ) : (
+            <LoadingView />
+          ))}
 
         {view === 'answered_options' && (
           <AnsweredOptionsView
@@ -287,53 +290,71 @@ export function LeadDialog({ lead, open, onOpenChange }: LeadDialogProps) {
           />
         )}
 
-        {view === 'not_answered' && workspaceId && (
-          <NotAnsweredView
-            lead={lead}
-            workspaceId={workspaceId}
-            processing={processing}
-            onSubmit={(channel, subject, body) =>
-              markAndSend({
-                label: 'not_answered',
-                mark: () =>
-                  recordCallNoAnswer({
-                    contactId: lead._id as Id<'contacts'>,
-                  }),
-                channel,
-                subject,
-                body,
-                successWithSend: `Niet bereikt — volgende belpoging ingepland`,
-                successWithoutSend:
-                  'Niet bereikt — volgende belpoging ingepland (geen bericht)',
-              })
-            }
-          />
-        )}
+        {view === 'not_answered' &&
+          (workspaceId ? (
+            <NotAnsweredView
+              lead={lead}
+              workspaceId={workspaceId}
+              processing={processing}
+              onSubmit={(channel, subject, body) =>
+                markAndSend({
+                  label: 'not_answered',
+                  mark: () =>
+                    recordCallNoAnswer({
+                      contactId: lead._id as Id<'contacts'>,
+                    }),
+                  channel,
+                  subject,
+                  body,
+                  successWithSend: `Niet bereikt — volgende belpoging ingepland`,
+                  successWithoutSend:
+                    'Niet bereikt — volgende belpoging ingepland (geen bericht)',
+                })
+              }
+            />
+          ) : (
+            <LoadingView />
+          ))}
 
-        {view === 'invalid_number' && workspaceId && (
-          <InvalidNumberView
-            lead={lead}
-            workspaceId={workspaceId}
-            processing={processing}
-            onSubmit={(channel, subject, body) =>
-              markAndSend({
-                label: 'invalid_number',
-                mark: () =>
-                  markInvalidNumber({
-                    contactId: lead._id as Id<'contacts'>,
-                  }),
-                channel,
-                subject,
-                body,
-                successWithSend: 'Nummer gemarkeerd ongeldig',
-                successWithoutSend:
-                  'Nummer gemarkeerd ongeldig (geen bericht)',
-              })
-            }
-          />
-        )}
+        {view === 'invalid_number' &&
+          (workspaceId ? (
+            <InvalidNumberView
+              lead={lead}
+              workspaceId={workspaceId}
+              processing={processing}
+              onSubmit={(channel, subject, body) =>
+                markAndSend({
+                  label: 'invalid_number',
+                  mark: () =>
+                    markInvalidNumber({
+                      contactId: lead._id as Id<'contacts'>,
+                    }),
+                  channel,
+                  subject,
+                  body,
+                  successWithSend: 'Nummer gemarkeerd ongeldig',
+                  successWithoutSend:
+                    'Nummer gemarkeerd ongeldig (geen bericht)',
+                })
+              }
+            />
+          ) : (
+            <LoadingView />
+          ))}
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// Loading placeholder — voor terwijl workspaceId nog laadt
+// ════════════════════════════════════════════════════════════════════════
+
+function LoadingView() {
+  return (
+    <div className="py-8 text-center text-sm text-zinc-400">
+      Even laden…
+    </div>
   )
 }
 
