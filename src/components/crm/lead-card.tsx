@@ -201,13 +201,21 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
                   Handmatig
                 </Badge>
               )}
-              {lead.callCount > 0 && (
+              {lead.callCount > 0 ? (
                 <Badge
                   variant="secondary"
                   className="border-0 bg-amber-100 text-amber-700"
                 >
                   <PhoneOff className="mr-1 h-3 w-3" />
                   {lead.callCount}× gebeld
+                </Badge>
+              ) : (
+                <Badge
+                  variant="secondary"
+                  className="border-0 bg-zinc-100 text-zinc-600"
+                >
+                  <Phone className="mr-1 h-3 w-3" />
+                  Nog niet gebeld
                 </Badge>
               )}
             </div>
@@ -240,7 +248,7 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
             {lead.latestNote && (
               <div className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
                 <StickyNote className="mt-0.5 h-3 w-3 shrink-0 text-amber-600" />
-                <p className="line-clamp-2 text-xs text-amber-800">
+                <p className="line-clamp-6 whitespace-pre-line text-xs text-amber-800">
                   {lead.latestNote}
                 </p>
               </div>
