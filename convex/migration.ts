@@ -17,6 +17,158 @@ import type { Id } from "./_generated/dataModel";
  * rows worden gepatcht in plaats van gedupliceerd.
  */
 
+/**
+ * Reset test-contact terug naar pre-test state. Wist call-history,
+ * outsideArea/unreachable flags, auto-generated notes (Niet bereikt /
+ * Ongeldig / Buiten werkgebied), en zet stage van eventuele opps die
+ * via die actions naar Verloren zijn gepushed terug naar de eerste
+ * niet-won/lost stage.
+ *
+ * Bedoeld voor manual testing tijdens v2-development. Verwijder vóór
+ * cutover-cleanup van migration.ts.
+ */
+export const resetTestContact = mutation({
+  args: { contactId: v.id("contacts") },
+  handler: async (ctx, args) => {
+    const contact = await ctx.db.get(args.contactId);
+    if (!contact) throw new Error("Contact niet gevonden");
+
+    // 1) Wis call-tracking + flags
+    await ctx.db.patch(args.contactId, {
+      callCount: 0,
+      lastCallAt: undefined,
+      lastCallResult: undefined,
+      nextFollowUpAt: undefined,
+      outsideArea: false,
+      unreachable: false,
+    });
+
+    // 2) Verwijder auto-generated notes (die starten met 🚫 of 📞 of 🔄 of ❌ of ✅)
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_contact", (q) => q.eq("contactId", args.contactId))
+      .collect();
+    let deletedNotes = 0;
+    for (const note of notes) {
+      if (/^[🚫📞🔄❌✅]/.test(note.body)) {
+        await ctx.db.delete(note._id);
+        deletedNotes++;
+      }
+    }
+
+    // 3) Reset opps die door deze flow naar Verloren zijn verplaatst.
+    //    Vind de pipeline + eerste actieve stage als reset-target.
+    const opps = await ctx.db
+      .query("opportunities")
+      .withIndex("by_contact", (q) => q.eq("contactId", args.contactId))
+      .collect();
+    let resetOpps = 0;
+    for (const opp of opps) {
+      if (!opp.closedAt) continue; // alleen closed-opps resetten
+      const pipeline = await ctx.db.get(opp.pipelineId);
+      if (!pipeline) continue;
+      const stages = await ctx.db
+        .query("pipelineStages")
+        .withIndex("by_pipeline_order", (q) =>
+          q.eq("pipelineId", opp.pipelineId),
+        )
+        .collect();
+      const firstActive = stages
+        .sort((a, b) => a.order - b.order)
+        .find((s) => !s.isWonStage && !s.isLostStage);
+      if (firstActive) {
+        await ctx.db.patch(opp._id, {
+          stageId: firstActive._id,
+          closedAt: undefined,
+          closedReason: undefined,
+        });
+        resetOpps++;
+      }
+    }
+
+    return {
+      deletedNotes,
+      resetOpps,
+      contactName: [contact.firstName, contact.lastName]
+        .filter(Boolean)
+        .join(" "),
+    };
+  },
+});
+
+/**
+ * Wrapper rond resetTestContact die per email zoekt — handig voor
+ * runtime via `npx convex run migration:resetTestContactByEmail`.
+ */
+export const resetTestContactByEmail = mutation({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    const contact = await ctx.db
+      .query("contacts")
+      .withIndex("by_workspace_email")
+      .filter((q) => q.eq(q.field("email"), args.email.toLowerCase().trim()))
+      .first();
+    if (!contact) {
+      return { error: `Contact niet gevonden voor email ${args.email}` };
+    }
+
+    await ctx.db.patch(contact._id, {
+      callCount: 0,
+      lastCallAt: undefined,
+      lastCallResult: undefined,
+      nextFollowUpAt: undefined,
+      outsideArea: false,
+      unreachable: false,
+    });
+
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_contact", (q) => q.eq("contactId", contact._id))
+      .collect();
+    let deletedNotes = 0;
+    for (const note of notes) {
+      if (/^[🚫📞🔄❌✅]/.test(note.body)) {
+        await ctx.db.delete(note._id);
+        deletedNotes++;
+      }
+    }
+
+    const opps = await ctx.db
+      .query("opportunities")
+      .withIndex("by_contact", (q) => q.eq("contactId", contact._id))
+      .collect();
+    let resetOpps = 0;
+    for (const opp of opps) {
+      if (!opp.closedAt) continue;
+      const stages = await ctx.db
+        .query("pipelineStages")
+        .withIndex("by_pipeline_order", (q) =>
+          q.eq("pipelineId", opp.pipelineId),
+        )
+        .collect();
+      const firstActive = stages
+        .sort((a, b) => a.order - b.order)
+        .find((s) => !s.isWonStage && !s.isLostStage);
+      if (firstActive) {
+        await ctx.db.patch(opp._id, {
+          stageId: firstActive._id,
+          closedAt: undefined,
+          closedReason: undefined,
+        });
+        resetOpps++;
+      }
+    }
+
+    return {
+      deletedNotes,
+      resetOpps,
+      contactName: [contact.firstName, contact.lastName]
+        .filter(Boolean)
+        .join(" "),
+    };
+  },
+});
+
 /** Vind het workspace-id voor Staycool (default workspace). */
 export const getStaycoolWorkspaceId = query({
   args: {},

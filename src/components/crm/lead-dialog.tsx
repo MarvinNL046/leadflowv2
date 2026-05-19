@@ -43,9 +43,11 @@ interface LeadDialogProps {
   lead: IncomingLead | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Initial sub-view bij open — voor direct-deep-link uit lead-card. */
+  initialView?: DialogView
 }
 
-type DialogView =
+export type DialogView =
   | 'main'
   | 'outside_area'
   | 'answered_options'
@@ -55,9 +57,19 @@ type DialogView =
 
 type Channel = 'email' | 'sms'
 
-export function LeadDialog({ lead, open, onOpenChange }: LeadDialogProps) {
+export function LeadDialog({
+  lead,
+  open,
+  onOpenChange,
+  initialView = 'main',
+}: LeadDialogProps) {
   const [processing, setProcessing] = useState<string | null>(null)
-  const [view, setView] = useState<DialogView>('main')
+  const [view, setView] = useState<DialogView>(initialView)
+
+  // Reset view naar initialView wanneer dialog opent
+  useEffect(() => {
+    if (open) setView(initialView)
+  }, [open, initialView])
   const recordCallNoAnswer = useMutation(api.contacts.recordCallNoAnswer)
   const recordCallAnswered = useMutation(api.contacts.recordCallAnswered)
   const markInvalidNumber = useMutation(api.contacts.markInvalidNumber)

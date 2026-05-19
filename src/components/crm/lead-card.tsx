@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useMutation } from 'convex/react'
 import { toast } from 'sonner'
 import {
   Phone,
@@ -24,10 +23,9 @@ import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { cn } from '#/lib/utils.ts'
-import { humanizeConvexError } from '#/lib/errors.ts'
 import { getMetaFormLabel } from '#/lib/meta-forms.ts'
 import { AnsweredDialog } from './answered-dialog'
-import { api } from '../../../convex/_generated/api'
+import { LeadDialog, type DialogView } from './lead-dialog'
 import type { Id } from '../../../convex/_generated/dataModel'
 
 export interface IncomingLead {
@@ -55,11 +53,11 @@ interface LeadCardProps {
 export function LeadCard({ lead, isNew = false }: LeadCardProps) {
   const [copied, setCopied] = useState(false)
   const [answeredOpen, setAnsweredOpen] = useState(false)
-  const [busy, setBusy] = useState<string | null>(null)
-
-  const recordCallNoAnswer = useMutation(api.contacts.recordCallNoAnswer)
-  const markInvalidNumber = useMutation(api.contacts.markInvalidNumber)
-  const markOutsideArea = useMutation(api.contacts.markOutsideArea)
+  /** Welke sub-view van de LeadDialog moet open — null = gesloten. */
+  const [quickActionView, setQuickActionView] = useState<DialogView | null>(
+    null,
+  )
+  const busy = false
 
   const displayName =
     [lead.firstName, lead.lastName].filter(Boolean).join(' ') ||
@@ -87,47 +85,11 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
     }
   }
 
-  async function runAction(
-    key: string,
-    fn: () => Promise<unknown>,
-    successMsg: string,
-  ) {
-    if (busy) return
-    setBusy(key)
-    try {
-      await fn()
-      toast.success(successMsg)
-    } catch (err) {
-      toast.error(humanizeConvexError(err, 'Mislukt'))
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  function handleNoAnswer() {
-    void runAction(
-      'no-answer',
-      () =>
-        recordCallNoAnswer({ contactId: lead._id as Id<'contacts'> }),
-      'Niet bereikt — volgende belpoging over 2 dagen',
-    )
-  }
-
-  function handleInvalid() {
-    void runAction(
-      'invalid',
-      () =>
-        markInvalidNumber({ contactId: lead._id as Id<'contacts'> }),
-      'Ongeldig nummer gemarkeerd',
-    )
-  }
-
-  function handleOutsideArea() {
-    void runAction(
-      'outside',
-      () => markOutsideArea({ contactId: lead._id as Id<'contacts'> }),
-      'Lead buiten werkgebied gemarkeerd',
-    )
+  // Quick-action knoppen openen de LeadDialog met de juiste sub-view —
+  // GEEN direct-mutation meer; gebruiker krijgt eerst preview met edit
+  // van email/SMS template voordat hij Verstuur of Skip kiest.
+  function openQuickAction(view: DialogView) {
+    setQuickActionView(view)
   }
 
   // Relatieve tijd, kort (b.v. "5 min geleden", "2u geleden", "3d geleden")
@@ -288,49 +250,43 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
             <span className="hidden sm:inline">Opgenomen</span>
           </Button>
 
-          {/* Niet bereikt → direct execute */}
+          {/* Niet bereikt → opent LeadDialog op not_answered sub-view */}
           <Button
             type="button"
             variant="outline"
-            onClick={handleNoAnswer}
+            onClick={() => openQuickAction('not_answered')}
             disabled={!!busy}
-            title="Niet bereikt — bump call-count, follow-up over 2 dagen"
+            title="Niet bereikt — open preview met optionele email/SMS"
             className="border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
           >
             <PhoneMissed className="h-4 w-4" />
-            <span className="hidden sm:inline">
-              {busy === 'no-answer' ? '…' : 'Niet bereikt'}
-            </span>
+            <span className="hidden sm:inline">Niet bereikt</span>
           </Button>
 
-          {/* Ongeldig nummer */}
+          {/* Ongeldig nummer → opent LeadDialog op invalid_number sub-view */}
           <Button
             type="button"
             variant="outline"
-            onClick={handleInvalid}
+            onClick={() => openQuickAction('invalid_number')}
             disabled={!!busy}
-            title="Ongeldig telefoonnummer"
+            title="Ongeldig telefoonnummer — open preview met optionele email"
             className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
           >
             <AlertTriangle className="h-4 w-4" />
-            <span className="hidden sm:inline">
-              {busy === 'invalid' ? '…' : 'Ongeldig'}
-            </span>
+            <span className="hidden sm:inline">Ongeldig</span>
           </Button>
 
-          {/* Buiten gebied */}
+          {/* Buiten gebied → opent LeadDialog op outside_area sub-view */}
           <Button
             type="button"
             variant="outline"
-            onClick={handleOutsideArea}
+            onClick={() => openQuickAction('outside_area')}
             disabled={!!busy}
-            title="Buiten werkgebied"
+            title="Buiten werkgebied — open preview met optionele email"
             className="border-orange-200 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
           >
             <MapPinOff className="h-4 w-4" />
-            <span className="hidden sm:inline">
-              {busy === 'outside' ? '…' : 'Buiten gebied'}
-            </span>
+            <span className="hidden sm:inline">Buiten gebied</span>
           </Button>
 
           {/* Copy */}
@@ -356,6 +312,13 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
         contactName={displayName}
         open={answeredOpen}
         onOpenChange={setAnsweredOpen}
+      />
+
+      <LeadDialog
+        lead={lead}
+        open={quickActionView !== null}
+        onOpenChange={(open) => !open && setQuickActionView(null)}
+        initialView={quickActionView ?? 'main'}
       />
     </Card>
   )
