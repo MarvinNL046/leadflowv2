@@ -12,7 +12,7 @@
 - [ ] Convex **productie**-deployment gemaakt (`npx convex deploy --prod`)
 - [ ] Convex prod-URL bekend en in `.env.production` gezet
 - [ ] Vercel project linked + `VITE_CONVEX_URL` → prod-URL
-- [ ] Custom domain in Vercel klaar (bv `app.wetryleadflow.com` of nieuwe URL)
+- [ ] Custom domain `app.wetryleadflow.com` in Vercel klaar (Cloudflare CNAME → Vercel target). v1 blijft op root `wetryleadflow.com` als 30d safety-net.
 - [ ] DNS-TTL voor cutover-domain verlaagd naar 5 min (zodat propagation snel gaat)
 
 ### Convex prod env vars (set via dashboard of `npx convex env set`)

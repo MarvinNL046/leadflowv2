@@ -13,7 +13,7 @@ LeadFlow v2 — rebuild op TanStack Start + Convex DB.
 - **Styling**: Tailwind CSS
 - **UI components**: shadcn/ui
 - **Auth**: TBD (@convex-dev/auth of Clerk — niet Stack Auth zoals v1)
-- **Deploy**: Vercel staging op `v2.wetryleadflow.com`, cutover later
+- **Deploy**: Vercel productie op `app.wetryleadflow.com` (root `wetryleadflow.com` blijft 30d v1 als safety-net na cutover)
 
 ## Setup-checklist (run in deze folder, niet in v1)
 
