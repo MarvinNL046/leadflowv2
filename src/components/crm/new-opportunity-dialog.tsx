@@ -13,6 +13,7 @@ import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
 import { cn } from '#/lib/utils.ts'
+import { humanizeConvexError } from '#/lib/errors.ts'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 
@@ -77,7 +78,7 @@ export function NewOpportunityDialog({
       toast.success('Opportunity aangemaakt')
       resetAndClose()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Kon niet aanmaken')
+      toast.error(humanizeConvexError(err, 'Kon niet aanmaken'))
     } finally {
       setSubmitting(false)
     }

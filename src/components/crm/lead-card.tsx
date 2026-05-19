@@ -24,6 +24,7 @@ import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { cn } from '#/lib/utils.ts'
+import { humanizeConvexError } from '#/lib/errors.ts'
 import { getMetaFormLabel } from '#/lib/meta-forms.ts'
 import { AnsweredDialog } from './answered-dialog'
 import { api } from '../../../convex/_generated/api'
@@ -97,7 +98,7 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
       await fn()
       toast.success(successMsg)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Mislukt')
+      toast.error(humanizeConvexError(err, 'Mislukt'))
     } finally {
       setBusy(null)
     }

@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from '#/components/ui/dialog.tsx'
 import { Button } from '#/components/ui/button.tsx'
+import { humanizeConvexError } from '#/lib/errors.ts'
 import { api } from '../../../convex/_generated/api'
 import type { IncomingLead } from './lead-card'
 
@@ -49,7 +50,7 @@ export function LeadDialog({ lead, open, onOpenChange }: LeadDialogProps) {
       toast.success(successMsg)
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Actie mislukt')
+      toast.error(humanizeConvexError(err, 'Actie mislukt'))
     } finally {
       setProcessing(null)
     }

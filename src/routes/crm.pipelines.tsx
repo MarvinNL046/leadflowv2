@@ -16,9 +16,11 @@ import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { cn } from '#/lib/utils.ts'
+import { humanizeConvexError } from '#/lib/errors.ts'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
 import { NewOpportunityDialog } from '../components/crm/new-opportunity-dialog'
+import { InlineEditText } from '../components/crm/inline-edit-text'
 
 export const Route = createFileRoute('/crm/pipelines')({
   component: PipelinesPage,
@@ -52,6 +54,8 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
     pipeline?.pipeline ? { pipelineId: pipeline.pipeline._id } : 'skip',
   )
   const moveToStage = useMutation(api.opportunities.moveToStage)
+  const renamePipeline = useMutation(api.pipelines.renamePipeline)
+  const renameStage = useMutation(api.pipelines.renameStage)
   const [addOpen, setAddOpen] = useState(false)
 
   const sensors = useSensors(
@@ -96,7 +100,7 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
       const targetStage = stages.find((s) => s._id === toStageId)
       toast.success(`Verplaatst naar ${targetStage?.name ?? 'stage'}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Verplaatsen mislukt')
+      toast.error(humanizeConvexError(err, 'Verplaatsen mislukt'))
     }
   }
 
@@ -107,7 +111,27 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-zinc-900">
-            {pipeline.pipeline.name}
+            <InlineEditText
+              value={pipeline.pipeline.name}
+              maxLength={80}
+              ariaLabel="Pipeline-naam bewerken"
+              className="text-xl font-semibold text-zinc-900"
+              inputClassName="text-xl font-semibold text-zinc-900 w-72"
+              onSave={async (next) => {
+                try {
+                  await renamePipeline({
+                    pipelineId: pipeline.pipeline._id,
+                    name: next,
+                  })
+                  toast.success('Pipeline hernoemd')
+                } catch (err) {
+                  toast.error(
+                    humanizeConvexError(err, 'Hernoemen mislukt'),
+                  )
+                  throw err
+                }
+              }}
+            />
           </h1>
           <p className="text-xs text-zinc-500">
             {opps.length} {opps.length === 1 ? 'opportunity' : 'opportunities'}
@@ -127,6 +151,17 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
               key={stage._id}
               stage={stage}
               opportunities={byStage.get(stage._id) ?? []}
+              onRename={async (next) => {
+                try {
+                  await renameStage({ stageId: stage._id, name: next })
+                  toast.success('Stage hernoemd')
+                } catch (err) {
+                  toast.error(
+                    humanizeConvexError(err, 'Hernoemen mislukt'),
+                  )
+                  throw err
+                }
+              }}
             />
           ))}
         </div>
@@ -135,7 +170,10 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
       <NewOpportunityDialog
         workspaceId={workspaceId}
         pipelineId={pipeline.pipeline._id}
-        firstStageId={stages[0]?._id}
+        firstStageId={
+          stages.find((s) => !s.isWonStage && !s.isLostStage)?._id ??
+          stages[0]?._id
+        }
         open={addOpen}
         onOpenChange={setAddOpen}
       />
@@ -146,6 +184,7 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
 function StageColumn({
   stage,
   opportunities,
+  onRename,
 }: {
   stage: Doc<'pipelineStages'>
   opportunities: Array<{
@@ -156,6 +195,7 @@ function StageColumn({
     contactName: string
     contactCity: string | null
   }>
+  onRename: (next: string) => Promise<void>
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage._id })
   const stageValue = opportunities.reduce((s, o) => s + (o.value ?? 0), 0)
@@ -174,7 +214,16 @@ function StageColumn({
           style={{ backgroundColor: stage.color ?? '#94a3b8' }}
           aria-hidden
         />
-        <h3 className="text-sm font-medium text-zinc-700">{stage.name}</h3>
+        <h3 className="text-sm font-medium text-zinc-700">
+          <InlineEditText
+            value={stage.name}
+            maxLength={50}
+            ariaLabel="Stage-naam bewerken"
+            className="text-sm font-medium text-zinc-700"
+            inputClassName="text-sm font-medium text-zinc-700 w-40"
+            onSave={onRename}
+          />
+        </h3>
         <span className="text-xs text-zinc-400">{opportunities.length}</span>
         {stageValue > 0 && (
           <span className="ml-auto text-xs text-zinc-500">

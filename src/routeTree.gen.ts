@@ -19,6 +19,10 @@ import { Route as CrmPipelinesRouteImport } from './routes/crm.pipelines'
 import { Route as CrmMessagesRouteImport } from './routes/crm.messages'
 import { Route as CrmContactsRouteImport } from './routes/crm.contacts'
 import { Route as CrmWorkflowsIdRouteImport } from './routes/crm.workflows_.$id'
+import { Route as CrmSettingsWhatsappRouteImport } from './routes/crm.settings_.whatsapp'
+import { Route as CrmSettingsPipelineRouteImport } from './routes/crm.settings_.pipeline'
+import { Route as CrmSettingsMetaRouteImport } from './routes/crm.settings_.meta'
+import { Route as CrmSettingsLeadFlowRouteImport } from './routes/crm.settings_.lead-flow'
 import { Route as CrmContactsIdRouteImport } from './routes/crm.contacts_.$id'
 
 const LoginRoute = LoginRouteImport.update({
@@ -71,6 +75,26 @@ const CrmWorkflowsIdRoute = CrmWorkflowsIdRouteImport.update({
   path: '/workflows/$id',
   getParentRoute: () => CrmRoute,
 } as any)
+const CrmSettingsWhatsappRoute = CrmSettingsWhatsappRouteImport.update({
+  id: '/settings_/whatsapp',
+  path: '/settings/whatsapp',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmSettingsPipelineRoute = CrmSettingsPipelineRouteImport.update({
+  id: '/settings_/pipeline',
+  path: '/settings/pipeline',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmSettingsMetaRoute = CrmSettingsMetaRouteImport.update({
+  id: '/settings_/meta',
+  path: '/settings/meta',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmSettingsLeadFlowRoute = CrmSettingsLeadFlowRouteImport.update({
+  id: '/settings_/lead-flow',
+  path: '/settings/lead-flow',
+  getParentRoute: () => CrmRoute,
+} as any)
 const CrmContactsIdRoute = CrmContactsIdRouteImport.update({
   id: '/contacts_/$id',
   path: '/contacts/$id',
@@ -88,6 +112,10 @@ export interface FileRoutesByFullPath {
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/crm/': typeof CrmIndexRoute
   '/crm/contacts/$id': typeof CrmContactsIdRoute
+  '/crm/settings/lead-flow': typeof CrmSettingsLeadFlowRoute
+  '/crm/settings/meta': typeof CrmSettingsMetaRoute
+  '/crm/settings/pipeline': typeof CrmSettingsPipelineRoute
+  '/crm/settings/whatsapp': typeof CrmSettingsWhatsappRoute
   '/crm/workflows/$id': typeof CrmWorkflowsIdRoute
 }
 export interface FileRoutesByTo {
@@ -100,6 +128,10 @@ export interface FileRoutesByTo {
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/crm': typeof CrmIndexRoute
   '/crm/contacts/$id': typeof CrmContactsIdRoute
+  '/crm/settings/lead-flow': typeof CrmSettingsLeadFlowRoute
+  '/crm/settings/meta': typeof CrmSettingsMetaRoute
+  '/crm/settings/pipeline': typeof CrmSettingsPipelineRoute
+  '/crm/settings/whatsapp': typeof CrmSettingsWhatsappRoute
   '/crm/workflows/$id': typeof CrmWorkflowsIdRoute
 }
 export interface FileRoutesById {
@@ -114,6 +146,10 @@ export interface FileRoutesById {
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/crm/': typeof CrmIndexRoute
   '/crm/contacts_/$id': typeof CrmContactsIdRoute
+  '/crm/settings_/lead-flow': typeof CrmSettingsLeadFlowRoute
+  '/crm/settings_/meta': typeof CrmSettingsMetaRoute
+  '/crm/settings_/pipeline': typeof CrmSettingsPipelineRoute
+  '/crm/settings_/whatsapp': typeof CrmSettingsWhatsappRoute
   '/crm/workflows_/$id': typeof CrmWorkflowsIdRoute
 }
 export interface FileRouteTypes {
@@ -129,6 +165,10 @@ export interface FileRouteTypes {
     | '/crm/workflows'
     | '/crm/'
     | '/crm/contacts/$id'
+    | '/crm/settings/lead-flow'
+    | '/crm/settings/meta'
+    | '/crm/settings/pipeline'
+    | '/crm/settings/whatsapp'
     | '/crm/workflows/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -141,6 +181,10 @@ export interface FileRouteTypes {
     | '/crm/workflows'
     | '/crm'
     | '/crm/contacts/$id'
+    | '/crm/settings/lead-flow'
+    | '/crm/settings/meta'
+    | '/crm/settings/pipeline'
+    | '/crm/settings/whatsapp'
     | '/crm/workflows/$id'
   id:
     | '__root__'
@@ -154,6 +198,10 @@ export interface FileRouteTypes {
     | '/crm/workflows'
     | '/crm/'
     | '/crm/contacts_/$id'
+    | '/crm/settings_/lead-flow'
+    | '/crm/settings_/meta'
+    | '/crm/settings_/pipeline'
+    | '/crm/settings_/whatsapp'
     | '/crm/workflows_/$id'
   fileRoutesById: FileRoutesById
 }
@@ -235,6 +283,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmWorkflowsIdRouteImport
       parentRoute: typeof CrmRoute
     }
+    '/crm/settings_/whatsapp': {
+      id: '/crm/settings_/whatsapp'
+      path: '/settings/whatsapp'
+      fullPath: '/crm/settings/whatsapp'
+      preLoaderRoute: typeof CrmSettingsWhatsappRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/settings_/pipeline': {
+      id: '/crm/settings_/pipeline'
+      path: '/settings/pipeline'
+      fullPath: '/crm/settings/pipeline'
+      preLoaderRoute: typeof CrmSettingsPipelineRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/settings_/meta': {
+      id: '/crm/settings_/meta'
+      path: '/settings/meta'
+      fullPath: '/crm/settings/meta'
+      preLoaderRoute: typeof CrmSettingsMetaRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/settings_/lead-flow': {
+      id: '/crm/settings_/lead-flow'
+      path: '/settings/lead-flow'
+      fullPath: '/crm/settings/lead-flow'
+      preLoaderRoute: typeof CrmSettingsLeadFlowRouteImport
+      parentRoute: typeof CrmRoute
+    }
     '/crm/contacts_/$id': {
       id: '/crm/contacts_/$id'
       path: '/contacts/$id'
@@ -253,6 +329,10 @@ interface CrmRouteChildren {
   CrmWorkflowsRoute: typeof CrmWorkflowsRoute
   CrmIndexRoute: typeof CrmIndexRoute
   CrmContactsIdRoute: typeof CrmContactsIdRoute
+  CrmSettingsLeadFlowRoute: typeof CrmSettingsLeadFlowRoute
+  CrmSettingsMetaRoute: typeof CrmSettingsMetaRoute
+  CrmSettingsPipelineRoute: typeof CrmSettingsPipelineRoute
+  CrmSettingsWhatsappRoute: typeof CrmSettingsWhatsappRoute
   CrmWorkflowsIdRoute: typeof CrmWorkflowsIdRoute
 }
 
@@ -264,6 +344,10 @@ const CrmRouteChildren: CrmRouteChildren = {
   CrmWorkflowsRoute: CrmWorkflowsRoute,
   CrmIndexRoute: CrmIndexRoute,
   CrmContactsIdRoute: CrmContactsIdRoute,
+  CrmSettingsLeadFlowRoute: CrmSettingsLeadFlowRoute,
+  CrmSettingsMetaRoute: CrmSettingsMetaRoute,
+  CrmSettingsPipelineRoute: CrmSettingsPipelineRoute,
+  CrmSettingsWhatsappRoute: CrmSettingsWhatsappRoute,
   CrmWorkflowsIdRoute: CrmWorkflowsIdRoute,
 }
 

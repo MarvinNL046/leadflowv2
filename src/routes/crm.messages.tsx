@@ -20,6 +20,7 @@ import { Input } from '#/components/ui/input.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { cn } from '#/lib/utils.ts'
+import { humanizeConvexError } from '#/lib/errors.ts'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
 
@@ -558,7 +559,7 @@ function ReplyForm({
       if (channel === 'email') setSubject('')
       toast.success(`${channelLabel(channel)} verstuurd`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Versturen mislukt')
+      toast.error(humanizeConvexError(err, 'Versturen mislukt'))
     } finally {
       setSending(false)
     }

@@ -5,7 +5,7 @@ import {
   internalQuery,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 
 /**
  * Meta lead processor — verwerkt metaLeadRaw rows tot contacts +
@@ -255,14 +255,62 @@ export const upsertContactFromMetaLead = internalMutation({
     rawPayloadEnriched: v.any(),
   },
   handler: async (ctx, args) => {
-    // Resolve default workspace voor deze org.
-    const workspace = await ctx.db
-      .query("workspaces")
-      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-      .filter((q) => q.eq(q.field("isDefault"), true))
-      .first();
+    // ── ROUTE RESOLUTION ────────────────────────────────────────────────
+    // Volgorde: 1) per-form leadIngestRoute  2) per-page workspaceId
+    // 3) default workspace van de org.
+    //
+    // Per-form route overschrijft page-mapping zodat je voor één form een
+    // specifieke pipeline/stage/assignee kunt instellen, terwijl de rest
+    // van de pagina naar de page-default gaat.
+
+    let route: Doc<"leadIngestRoutes"> | null = null;
+    if (args.formId) {
+      const r = await ctx.db
+        .query("leadIngestRoutes")
+        .withIndex("by_source", (q) =>
+          q.eq("sourceType", "meta_form").eq("sourceIdentifier", args.formId!),
+        )
+        .first();
+      if (r && r.orgId === args.orgId && (r.isActive ?? true)) {
+        route = r;
+      }
+    }
+
+    let workspaceId: Id<"workspaces"> | null = route?.targetWorkspaceId ?? null;
+
+    // Fallback 1: per-page workspaceId via metaPages.workspaceId
+    if (!workspaceId) {
+      const metaPage = await ctx.db
+        .query("metaPages")
+        .withIndex("by_pageId_active", (q) =>
+          q.eq("pageId", args.pageId).eq("isActive", true),
+        )
+        .first();
+      if (metaPage?.workspaceId) {
+        // Verifieer dat de gemapte workspace bij de juiste org hoort
+        const ws = await ctx.db.get(metaPage.workspaceId);
+        if (ws && ws.orgId === args.orgId) {
+          workspaceId = metaPage.workspaceId;
+        }
+      }
+    }
+
+    // Fallback 2: default workspace voor deze org
+    if (!workspaceId) {
+      const def = await ctx.db
+        .query("workspaces")
+        .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+        .filter((q) => q.eq(q.field("isDefault"), true))
+        .first();
+      if (!def) {
+        throw new Error(`Geen default workspace voor org ${args.orgId}`);
+      }
+      workspaceId = def._id;
+    }
+
+    const workspace = await ctx.db.get(workspaceId);
     if (!workspace) {
-      throw new Error(`Geen default workspace voor org ${args.orgId}`);
+      throw new Error(`Workspace ${workspaceId} bestaat niet`);
     }
 
     const f = args.contactFields;
@@ -342,28 +390,44 @@ export const upsertContactFromMetaLead = internalMutation({
       rawPayload: args.rawPayloadEnriched,
     });
 
-    // Opportunity in default pipeline aanmaken zodat lead in Kanban
-    // verschijnt (alleen bij nieuw contact; bij dedup-merge bestaat
-    // mogelijk al een opp).
+    // Opportunity aanmaken zodat lead in Kanban verschijnt (alleen bij
+    // nieuw contact; bij dedup-merge bestaat mogelijk al een opp).
+    //
+    // Pipeline-resolutie volgt de route: route.defaultPipelineId →
+    // workspace default pipeline. Stage: route.defaultStageId → eerste
+    // non-won/lost stage. Assignee en value komen uit de route.
     if (isNewContact) {
-      const pipeline = await ctx.db
-        .query("pipelines")
-        .withIndex("by_workspace", (q) =>
-          q.eq("workspaceId", workspace._id),
-        )
-        .filter((q) => q.eq(q.field("isDefault"), true))
-        .first();
-      if (pipeline) {
-        const stages = await ctx.db
-          .query("pipelineStages")
-          .withIndex("by_pipeline_order", (q) =>
-            q.eq("pipelineId", pipeline._id),
+      let pipeline = route?.defaultPipelineId
+        ? await ctx.db.get(route.defaultPipelineId)
+        : null;
+      if (!pipeline) {
+        pipeline = await ctx.db
+          .query("pipelines")
+          .withIndex("by_workspace", (q) =>
+            q.eq("workspaceId", workspace._id),
           )
-          .collect();
-        const leadStage = stages.find(
-          (s) => !s.isWonStage && !s.isLostStage,
-        );
-        if (leadStage) {
+          .filter((q) => q.eq(q.field("isDefault"), true))
+          .first();
+      }
+      if (pipeline) {
+        let stage = route?.defaultStageId
+          ? await ctx.db.get(route.defaultStageId)
+          : null;
+        // Als gekozen stage niet bij gekozen pipeline hoort, fallback.
+        if (stage && stage.pipelineId !== pipeline._id) {
+          stage = null;
+        }
+        if (!stage) {
+          const stages = await ctx.db
+            .query("pipelineStages")
+            .withIndex("by_pipeline_order", (q) =>
+              q.eq("pipelineId", pipeline._id),
+            )
+            .collect();
+          stage =
+            stages.find((s) => !s.isWonStage && !s.isLostStage) ?? null;
+        }
+        if (stage) {
           const oppContact = await ctx.db.get(contactId);
           const oppTitle =
             (oppContact &&
@@ -377,12 +441,15 @@ export const upsertContactFromMetaLead = internalMutation({
             workspaceId: workspace._id,
             contactId,
             pipelineId: pipeline._id,
-            stageId: leadStage._id,
+            stageId: stage._id,
             title: oppTitle,
+            value: route?.defaultLeadValue,
+            assignedToId: route?.assignToUserId,
           });
           await ctx.db.insert("opportunityStageHistory", {
             opportunityId: oppId,
-            toStageId: leadStage._id,
+            toStageId: stage._id,
+            changedById: route?.assignToUserId,
           });
         }
       }

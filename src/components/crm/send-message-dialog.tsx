@@ -12,6 +12,7 @@ import {
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
+import { humanizeConvexError } from '#/lib/errors.ts'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 
@@ -84,7 +85,7 @@ export function SendMessageDialog({
       toast.success(`${meta.label} verstuurd`)
       onClose()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Versturen mislukt')
+      toast.error(humanizeConvexError(err, 'Versturen mislukt'))
     } finally {
       setSending(false)
     }

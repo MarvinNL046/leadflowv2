@@ -14,6 +14,7 @@ import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
+import { humanizeConvexError } from '#/lib/errors.ts'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 
@@ -203,9 +204,7 @@ function CreateContactForm({ workspaceId }: { workspaceId: any }) {
         setCity('')
       }
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Kon contact niet toevoegen',
-      )
+      toast.error(humanizeConvexError(err, 'Kon contact niet toevoegen'))
     } finally {
       setSubmitting(false)
     }

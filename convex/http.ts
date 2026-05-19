@@ -2,10 +2,173 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
+import { verifyStateToken } from "./metaOauth";
 
 const http = httpRouter();
 
 auth.addHttpRoutes(http);
+
+// ════════════════════════════════════════════════════════════════════
+// META OAUTH CALLBACK
+// ════════════════════════════════════════════════════════════════════
+//
+// Flow:
+//   1. Frontend roept api.metaOauth.startOauth aan → krijgt redirectUrl.
+//   2. Browser doet window.location = redirectUrl → Facebook login + consent.
+//   3. Facebook redirect terug naar deze route met ?code=…&state=…
+//   4. We verifieren state-HMAC, exchangen code voor long-lived user-token,
+//      fetchen /me + /me/accounts, upsert metaConnections + metaPages.
+//   5. Redirect naar SITE_URL/crm/settings/meta?meta=connected (of ?error).
+
+const META_GRAPH_API = "https://graph.facebook.com/v21.0";
+
+http.route({
+  path: "/auth/meta/callback",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const siteUrl = process.env.SITE_URL ?? "http://localhost:5173";
+    const appId = process.env.META_APP_ID;
+    const appSecret = process.env.META_APP_SECRET;
+    const stateSecret = process.env.META_OAUTH_STATE_SECRET;
+    if (!appId || !appSecret || !stateSecret) {
+      return redirectToFrontend(
+        siteUrl,
+        "missing_oauth_config",
+      );
+    }
+
+    const url = new URL(request.url);
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+    const fbError = url.searchParams.get("error");
+    const fbErrorDesc = url.searchParams.get("error_description");
+
+    if (fbError) {
+      console.error("[meta-oauth] FB error:", fbError, fbErrorDesc);
+      return redirectToFrontend(siteUrl, `fb_${fbError}`);
+    }
+    if (!code || !state) {
+      return redirectToFrontend(siteUrl, "missing_code_or_state");
+    }
+
+    const payload = await verifyStateToken(state, stateSecret);
+    if (!payload) {
+      return redirectToFrontend(siteUrl, "invalid_state");
+    }
+
+    const redirectUri = `${process.env.CONVEX_SITE_URL}/auth/meta/callback`;
+
+    try {
+      // 1) Exchange code → short-lived user token
+      const shortLivedTokenRes = await fetch(
+        `${META_GRAPH_API}/oauth/access_token?` +
+          new URLSearchParams({
+            client_id: appId,
+            client_secret: appSecret,
+            redirect_uri: redirectUri,
+            code,
+          }).toString(),
+      );
+      const shortLivedJson = (await shortLivedTokenRes.json()) as {
+        access_token?: string;
+        error?: { message?: string };
+      };
+      if (shortLivedJson.error || !shortLivedJson.access_token) {
+        console.error("[meta-oauth] code-exchange faalde:", shortLivedJson);
+        return redirectToFrontend(siteUrl, "code_exchange_failed");
+      }
+
+      // 2) Exchange short-lived → long-lived user token (~60 dagen)
+      const longLivedRes = await fetch(
+        `${META_GRAPH_API}/oauth/access_token?` +
+          new URLSearchParams({
+            grant_type: "fb_exchange_token",
+            client_id: appId,
+            client_secret: appSecret,
+            fb_exchange_token: shortLivedJson.access_token,
+          }).toString(),
+      );
+      const longLivedJson = (await longLivedRes.json()) as {
+        access_token?: string;
+        error?: { message?: string };
+      };
+      const longLivedToken = longLivedJson.access_token;
+      if (!longLivedToken) {
+        console.error("[meta-oauth] long-lived exchange faalde:", longLivedJson);
+        return redirectToFrontend(siteUrl, "long_lived_failed");
+      }
+
+      // 3) Fetch user-info (id + name)
+      const meRes = await fetch(
+        `${META_GRAPH_API}/me?fields=id,name&access_token=${encodeURIComponent(longLivedToken)}`,
+      );
+      const meJson = (await meRes.json()) as {
+        id?: string;
+        name?: string;
+        error?: { message?: string };
+      };
+      if (!meJson.id) {
+        console.error("[meta-oauth] /me faalde:", meJson);
+        return redirectToFrontend(siteUrl, "me_fetch_failed");
+      }
+
+      // 4) Fetch managed pages (long-lived page-tokens komen via /me/accounts)
+      const pagesRes = await fetch(
+        `${META_GRAPH_API}/me/accounts?fields=id,name,access_token&limit=100&access_token=${encodeURIComponent(longLivedToken)}`,
+      );
+      const pagesJson = (await pagesRes.json()) as {
+        data?: Array<{ id: string; name: string; access_token?: string }>;
+        error?: { message?: string };
+      };
+      if (pagesJson.error) {
+        console.error("[meta-oauth] /me/accounts faalde:", pagesJson);
+        return redirectToFrontend(siteUrl, "pages_fetch_failed");
+      }
+      const pages = (pagesJson.data ?? [])
+        .filter((p): p is { id: string; name: string; access_token: string } =>
+          Boolean(p.access_token),
+        )
+        .map((p) => ({
+          pageId: p.id,
+          pageName: p.name,
+          accessToken: p.access_token,
+        }));
+
+      // 5) Upsert via internal mutation
+      await ctx.runMutation(internal.integrations.upsertMetaConnectionInternal, {
+        orgId: payload.orgId,
+        metaUserId: meJson.id,
+        accessToken: longLivedToken,
+        pages,
+      });
+
+      return redirectToFrontend(siteUrl, null, pages.length);
+    } catch (err) {
+      console.error("[meta-oauth] callback exception:", err);
+      return redirectToFrontend(siteUrl, "internal_error");
+    }
+  }),
+});
+
+function redirectToFrontend(
+  siteUrl: string,
+  error: string | null,
+  pageCount?: number,
+): Response {
+  const target = new URL(`${siteUrl}/crm/settings/meta`);
+  if (error) {
+    target.searchParams.set("meta_error", error);
+  } else {
+    target.searchParams.set("meta", "connected");
+    if (pageCount !== undefined) {
+      target.searchParams.set("pages", String(pageCount));
+    }
+  }
+  return new Response(null, {
+    status: 302,
+    headers: { Location: target.toString() },
+  });
+}
 
 // ════════════════════════════════════════════════════════════════════
 // META LEAD ADS WEBHOOK

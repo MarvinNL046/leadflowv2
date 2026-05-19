@@ -11,10 +11,13 @@
 import type * as auth from "../auth.js";
 import type * as contacts from "../contacts.js";
 import type * as crmSettings from "../crmSettings.js";
+import type * as customFields from "../customFields.js";
 import type * as http from "../http.js";
+import type * as integrations from "../integrations.js";
 import type * as lib_phone from "../lib/phone.js";
 import type * as messaging from "../messaging.js";
 import type * as metaIngest from "../metaIngest.js";
+import type * as metaOauth from "../metaOauth.js";
 import type * as metaProcessor from "../metaProcessor.js";
 import type * as migration from "../migration.js";
 import type * as notes from "../notes.js";
@@ -22,6 +25,7 @@ import type * as opportunities from "../opportunities.js";
 import type * as pipelines from "../pipelines.js";
 import type * as userProfiles from "../userProfiles.js";
 import type * as workflowEngine from "../workflowEngine.js";
+import type * as workflowExecutions from "../workflowExecutions.js";
 import type * as workflows from "../workflows.js";
 
 import type {
@@ -34,10 +38,13 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   contacts: typeof contacts;
   crmSettings: typeof crmSettings;
+  customFields: typeof customFields;
   http: typeof http;
+  integrations: typeof integrations;
   "lib/phone": typeof lib_phone;
   messaging: typeof messaging;
   metaIngest: typeof metaIngest;
+  metaOauth: typeof metaOauth;
   metaProcessor: typeof metaProcessor;
   migration: typeof migration;
   notes: typeof notes;
@@ -45,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   pipelines: typeof pipelines;
   userProfiles: typeof userProfiles;
   workflowEngine: typeof workflowEngine;
+  workflowExecutions: typeof workflowExecutions;
   workflows: typeof workflows;
 }>;
 

@@ -41,6 +41,7 @@ import { Badge } from '#/components/ui/badge.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { Separator } from '#/components/ui/separator.tsx'
 import { cn } from '#/lib/utils.ts'
+import { humanizeConvexError } from '#/lib/errors.ts'
 import { getMetaFormLabel } from '#/lib/meta-forms.ts'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
@@ -89,7 +90,7 @@ function ContactDetailPage() {
       void navigate({ to: '/crm' })
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Kon niet verwijderen',
+        humanizeConvexError(err, 'Kon niet verwijderen'),
       )
       setDeleting(false)
     }
@@ -198,6 +199,15 @@ function ContactDetailPage() {
                 Buiten werkgebied
               </Badge>
             )}
+            {contact.tags?.map((tag) => (
+              <Badge
+                key={tag}
+                variant="outline"
+                className="border-zinc-300 text-zinc-600"
+              >
+                {tag}
+              </Badge>
+            ))}
           </div>
         </div>
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
@@ -257,11 +267,14 @@ function ContactDetailPage() {
       </div>
 
       <DetailsSection contact={contact} />
+      <OpportunitiesSection contactId={id as Id<'contacts'>} />
+      <CustomFieldsSection contactId={id as Id<'contacts'>} />
       <ConversationSection contactId={id as Id<'contacts'>} />
       <NotesSection
         contactId={id as Id<'contacts'>}
         notes={notes ?? null}
       />
+      <WorkflowHistorySection contactId={id as Id<'contacts'>} />
       <ActivitySection
         contact={contact}
         attribution={attribution}
@@ -426,7 +439,7 @@ function EditForm({
       onDone()
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Kon contact niet bijwerken',
+        humanizeConvexError(err, 'Kon contact niet bijwerken'),
       )
     } finally {
       setSaving(false)
@@ -683,7 +696,7 @@ function NotesSection({
       setBody('')
       toast.success('Notitie toegevoegd')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Kon notitie niet opslaan')
+      toast.error(humanizeConvexError(err, 'Kon notitie niet opslaan'))
     } finally {
       setSaving(false)
     }
@@ -897,5 +910,165 @@ function DLRow({
       <dt className="text-zinc-500">{label}</dt>
       <dd className={cn('truncate', mono && 'font-mono')}>{value}</dd>
     </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Opportunities — alle opps voor dit contact, sorted open-first
+// ────────────────────────────────────────────────────────────────────────
+
+function OpportunitiesSection({ contactId }: { contactId: Id<'contacts'> }) {
+  const opps = useQuery(api.opportunities.listByContact, { contactId })
+
+  if (opps === undefined) return null
+  if (opps.length === 0) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Briefcase className="h-4 w-4" />
+          Opportunities ({opps.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {opps.map((opp) => (
+          <Link
+            key={opp._id}
+            to="/crm/pipelines"
+            className="flex items-center gap-3 rounded-md border border-zinc-200 bg-white p-3 hover:border-zinc-300 hover:bg-zinc-50"
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: opp.stageColor ?? '#94a3b8' }}
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-zinc-900">
+                {opp.title}
+              </p>
+              <p className="text-xs text-zinc-500">
+                {opp.stageName}
+                {opp.closedAt && ' · gesloten'}
+              </p>
+            </div>
+            {opp.value !== undefined && opp.value > 0 && (
+              <p className="shrink-0 text-sm font-semibold text-zinc-700">
+                € {opp.value.toLocaleString('nl-NL')}
+              </p>
+            )}
+          </Link>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Custom fields — gemigreerde v1 form-answers (welk type ruimte etc.)
+// ────────────────────────────────────────────────────────────────────────
+
+function CustomFieldsSection({ contactId }: { contactId: Id<'contacts'> }) {
+  const fields = useQuery(api.customFields.listForContact, { contactId })
+
+  if (fields === undefined || fields === null) return null
+  // Filter alleen velden met een waarde — toont leads "wat ze hebben
+  // ingevuld" niet "wat ze hadden kunnen invullen". Bij geen enkele
+  // waarde toont de hele sectie niets (clean).
+  const filled = fields.filter(
+    (f) => f.value !== null && f.value !== undefined && f.value !== '',
+  )
+  if (filled.length === 0) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <StickyNote className="h-4 w-4" />
+          Form-antwoorden
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid gap-3 sm:grid-cols-2">
+          {filled.map(({ definition, value }) => (
+            <div key={definition._id}>
+              <dt className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+                {definition.label}
+              </dt>
+              <dd className="mt-0.5 text-sm text-zinc-900">
+                {formatCustomFieldValue(value)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </CardContent>
+    </Card>
+  )
+}
+
+function formatCustomFieldValue(value: unknown): string {
+  if (Array.isArray(value)) return value.join(', ')
+  if (typeof value === 'string') {
+    // v1 sloeg vaak onderscore-tussenwoorden op ("hele_woning"); cosmetic fix
+    return value.replace(/_/g, ' ').replace(/^\s+|\s+$/g, '')
+  }
+  if (typeof value === 'boolean') return value ? 'Ja' : 'Nee'
+  if (value === null || value === undefined) return '—'
+  return String(value)
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Workflow history — workflow-uitvoeringen voor dit contact
+// ────────────────────────────────────────────────────────────────────────
+
+function WorkflowHistorySection({ contactId }: { contactId: Id<'contacts'> }) {
+  const executions = useQuery(api.workflowExecutions.listByContact, {
+    contactId,
+  })
+
+  if (executions === undefined) return null
+  if (executions.length === 0) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Send className="h-4 w-4" />
+          Workflow-uitvoeringen ({executions.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {executions.map((exec) => (
+          <div
+            key={exec._id}
+            className="flex items-center gap-3 rounded-md border border-zinc-200 bg-white p-2.5"
+          >
+            <Badge
+              className={cn(
+                'border-0 capitalize',
+                exec.status === 'completed' && 'bg-emerald-100 text-emerald-700',
+                exec.status === 'running' && 'bg-blue-100 text-blue-700',
+                exec.status === 'failed' && 'bg-red-100 text-red-700',
+                exec.status === 'paused' && 'bg-amber-100 text-amber-700',
+                exec.status === 'cancelled' && 'bg-zinc-100 text-zinc-700',
+              )}
+            >
+              {exec.status}
+            </Badge>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-zinc-900">
+                {exec.workflowName}
+              </p>
+              <p className="text-xs text-zinc-500">
+                {new Date(exec.startedAt).toLocaleString('nl-NL', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                })}
+              </p>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   )
 }

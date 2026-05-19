@@ -856,3 +856,1001 @@ export const upsertMetaLeadRawBatch = mutation({
     return { inserted, updated, total: args.docs.length };
   },
 });
+
+// ──────────────────────────────────────────────────────────────────────
+// NOTES ETL
+// ──────────────────────────────────────────────────────────────────────
+
+export const countMigratedNotes = query({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("notes")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
+      .collect();
+    return rows.filter((r) => r.legacyId !== undefined).length;
+  },
+});
+
+const noteDocValidator = v.object({
+  legacyId: v.number(),
+  legacyContactId: v.number(),
+  body: v.string(),
+  isPinned: v.optional(v.boolean()),
+});
+
+/**
+ * Batch-upsert notes vanuit Neon. FK contact_id wordt naar Convex
+ * contactId geresolved via by_legacyContactId. createdById blijft
+ * undefined — v1 users zijn niet 1-op-1 met Convex Auth users.
+ */
+export const upsertNotesBatch = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    docs: v.array(noteDocValidator),
+  },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+    let skippedNoContact = 0;
+
+    for (const doc of args.docs) {
+      const contact = await ctx.db
+        .query("contacts")
+        .withIndex("by_legacyContactId", (q) =>
+          q.eq("legacyContactId", doc.legacyContactId),
+        )
+        .first();
+      if (!contact) {
+        skippedNoContact++;
+        continue;
+      }
+
+      const existing = await ctx.db
+        .query("notes")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyId))
+        .first();
+
+      const patch = {
+        contactId: contact._id,
+        body: doc.body,
+        isPinned: doc.isPinned,
+      };
+
+      if (existing) {
+        await ctx.db.patch(existing._id, patch);
+        updated++;
+      } else {
+        await ctx.db.insert("notes", {
+          ...patch,
+          workspaceId: args.workspaceId,
+          legacyId: doc.legacyId,
+        });
+        inserted++;
+      }
+    }
+
+    return {
+      inserted,
+      updated,
+      skippedNoContact,
+      total: args.docs.length,
+    };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// OPPORTUNITIES ETL
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Helper voor het opportunity-script: geeft de default pipeline + stages
+ * van de target workspace terug, met stage-names. Het script gebruikt
+ * dat om v1 stage_id → v2 stageId te mappen op naam.
+ */
+export const getStaycoolPipelineWithStages = query({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    const pipeline = await ctx.db
+      .query("pipelines")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    if (!pipeline) return null;
+
+    const stages = await ctx.db
+      .query("pipelineStages")
+      .withIndex("by_pipeline_order", (q) => q.eq("pipelineId", pipeline._id))
+      .collect();
+
+    return {
+      pipelineId: pipeline._id,
+      stages: stages.map((s) => ({
+        _id: s._id,
+        name: s.name,
+        order: s.order,
+        isWonStage: s.isWonStage,
+        isLostStage: s.isLostStage,
+      })),
+    };
+  },
+});
+
+export const countMigratedOpportunities = query({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("opportunities")
+      .withIndex("by_workspace_stage", (q) => q.eq("workspaceId", args.workspaceId))
+      .collect();
+    return rows.filter((r) => r.legacyId !== undefined).length;
+  },
+});
+
+const opportunityDocValidator = v.object({
+  legacyId: v.number(),
+  legacyContactId: v.number(),
+  stageId: v.id("pipelineStages"),
+  pipelineId: v.id("pipelines"),
+  title: v.string(),
+  value: v.optional(v.number()),
+  currency: v.optional(v.string()),
+  expectedCloseDate: v.optional(v.number()),
+  closedAt: v.optional(v.number()),
+  closedReason: v.optional(v.string()),
+  description: v.optional(v.string()),
+});
+
+/**
+ * Batch-upsert opportunities. Het script doet de stage-name → stageId
+ * mapping client-side (via getStaycoolPipelineWithStages) en stuurt
+ * directe Convex IDs door. assignedToId blijft undefined — v1 users
+ * zijn niet 1-op-1 met Convex Auth.
+ */
+export const upsertOpportunitiesBatch = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    docs: v.array(opportunityDocValidator),
+  },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+    let skippedNoContact = 0;
+
+    for (const doc of args.docs) {
+      const contact = await ctx.db
+        .query("contacts")
+        .withIndex("by_legacyContactId", (q) =>
+          q.eq("legacyContactId", doc.legacyContactId),
+        )
+        .first();
+      if (!contact) {
+        skippedNoContact++;
+        continue;
+      }
+
+      const existing = await ctx.db
+        .query("opportunities")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyId))
+        .first();
+
+      const patch = {
+        contactId: contact._id,
+        pipelineId: doc.pipelineId,
+        stageId: doc.stageId,
+        title: doc.title,
+        value: doc.value,
+        currency: doc.currency,
+        expectedCloseDate: doc.expectedCloseDate,
+        closedAt: doc.closedAt,
+        closedReason: doc.closedReason,
+        description: doc.description,
+      };
+
+      if (existing) {
+        await ctx.db.patch(existing._id, patch);
+        updated++;
+      } else {
+        await ctx.db.insert("opportunities", {
+          ...patch,
+          workspaceId: args.workspaceId,
+          legacyId: doc.legacyId,
+        });
+        inserted++;
+      }
+    }
+
+    return {
+      inserted,
+      updated,
+      skippedNoContact,
+      total: args.docs.length,
+    };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// OPPORTUNITY STAGE HISTORY ETL
+// ──────────────────────────────────────────────────────────────────────
+
+export const countMigratedStageHistory = query({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("opportunityStageHistory").collect();
+    return rows.filter((r) => r.legacyId !== undefined).length;
+  },
+});
+
+const stageHistoryDocValidator = v.object({
+  legacyId: v.number(),
+  legacyOpportunityId: v.number(),
+  fromStageId: v.optional(v.id("pipelineStages")),
+  toStageId: v.id("pipelineStages"),
+});
+
+/**
+ * Batch-upsert opportunity_stage_history. opportunity_id wordt
+ * geresolved via by_legacyId op opportunities. Skip-counter voor rows
+ * waarvan de opportunity nog niet bestaat (orphan).
+ */
+export const upsertStageHistoryBatch = mutation({
+  args: { docs: v.array(stageHistoryDocValidator) },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+    let skippedNoOpportunity = 0;
+
+    for (const doc of args.docs) {
+      const opp = await ctx.db
+        .query("opportunities")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyOpportunityId))
+        .first();
+      if (!opp) {
+        skippedNoOpportunity++;
+        continue;
+      }
+
+      const existing = await ctx.db
+        .query("opportunityStageHistory")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyId))
+        .first();
+
+      const patch = {
+        opportunityId: opp._id,
+        fromStageId: doc.fromStageId,
+        toStageId: doc.toStageId,
+      };
+
+      if (existing) {
+        await ctx.db.patch(existing._id, patch);
+        updated++;
+      } else {
+        await ctx.db.insert("opportunityStageHistory", {
+          ...patch,
+          legacyId: doc.legacyId,
+        });
+        inserted++;
+      }
+    }
+
+    return {
+      inserted,
+      updated,
+      skippedNoOpportunity,
+      total: args.docs.length,
+    };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// CUSTOM FIELD DEFINITIONS ETL
+// ──────────────────────────────────────────────────────────────────────
+
+export const countMigratedCustomFieldDefs = query({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("customFieldDefinitions")
+      .withIndex("by_workspace_entity", (q) =>
+        q.eq("workspaceId", args.workspaceId),
+      )
+      .collect();
+    return rows.filter((r) => r.legacyId !== undefined).length;
+  },
+});
+
+const customFieldDefDocValidator = v.object({
+  legacyId: v.number(),
+  entityType: v.union(v.literal("contact"), v.literal("opportunity")),
+  key: v.string(),
+  label: v.string(),
+  fieldType: v.union(
+    v.literal("text"),
+    v.literal("number"),
+    v.literal("boolean"),
+    v.literal("date"),
+    v.literal("select"),
+  ),
+  selectOptions: v.optional(v.array(v.string())),
+  isRequired: v.boolean(),
+  sortOrder: v.number(),
+});
+
+export const upsertCustomFieldDefsBatch = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    docs: v.array(customFieldDefDocValidator),
+  },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+
+    for (const doc of args.docs) {
+      const existing = await ctx.db
+        .query("customFieldDefinitions")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyId))
+        .first();
+
+      const patch = {
+        entityType: doc.entityType,
+        key: doc.key,
+        label: doc.label,
+        fieldType: doc.fieldType,
+        selectOptions: doc.selectOptions,
+        isRequired: doc.isRequired,
+        sortOrder: doc.sortOrder,
+      };
+
+      if (existing) {
+        await ctx.db.patch(existing._id, patch);
+        updated++;
+      } else {
+        await ctx.db.insert("customFieldDefinitions", {
+          ...patch,
+          workspaceId: args.workspaceId,
+          legacyId: doc.legacyId,
+        });
+        inserted++;
+      }
+    }
+
+    return { inserted, updated, total: args.docs.length };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// CUSTOM FIELD VALUES ETL
+// ──────────────────────────────────────────────────────────────────────
+
+export const countMigratedCustomFieldValues = query({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("customFieldValues").collect();
+    return rows.filter((r) => r.legacyId !== undefined).length;
+  },
+});
+
+const customFieldValueDocValidator = v.object({
+  legacyId: v.number(),
+  legacyDefinitionId: v.number(),
+  entityType: v.union(v.literal("contact"), v.literal("opportunity")),
+  // Voor "contact": v1 contacts.id. Voor "opportunity": v1 opportunities.id.
+  legacyEntityId: v.number(),
+  value: v.any(),
+});
+
+/**
+ * Batch-upsert customFieldValues. Resolved drie FK's:
+ *  - definitionId via by_legacyId op customFieldDefinitions
+ *  - entityId via by_legacyContactId (contact) of by_legacyId (opp)
+ *
+ * Skipt rows met onresolved FK. entityId wordt opgeslagen als string
+ * (per v2 schema, voor cross-table use).
+ */
+export const upsertCustomFieldValuesBatch = mutation({
+  args: { docs: v.array(customFieldValueDocValidator) },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+    let skippedNoDefinition = 0;
+    let skippedNoEntity = 0;
+
+    for (const doc of args.docs) {
+      const definition = await ctx.db
+        .query("customFieldDefinitions")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyDefinitionId))
+        .first();
+      if (!definition) {
+        skippedNoDefinition++;
+        continue;
+      }
+
+      let entityId: string | undefined;
+      if (doc.entityType === "contact") {
+        const contact = await ctx.db
+          .query("contacts")
+          .withIndex("by_legacyContactId", (q) =>
+            q.eq("legacyContactId", doc.legacyEntityId),
+          )
+          .first();
+        entityId = contact?._id;
+      } else {
+        const opp = await ctx.db
+          .query("opportunities")
+          .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyEntityId))
+          .first();
+        entityId = opp?._id;
+      }
+      if (!entityId) {
+        skippedNoEntity++;
+        continue;
+      }
+
+      const existing = await ctx.db
+        .query("customFieldValues")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyId))
+        .first();
+
+      const patch = {
+        definitionId: definition._id,
+        entityType: doc.entityType,
+        entityId,
+        value: doc.value,
+      };
+
+      if (existing) {
+        await ctx.db.patch(existing._id, patch);
+        updated++;
+      } else {
+        await ctx.db.insert("customFieldValues", {
+          ...patch,
+          legacyId: doc.legacyId,
+        });
+        inserted++;
+      }
+    }
+
+    return {
+      inserted,
+      updated,
+      skippedNoDefinition,
+      skippedNoEntity,
+      total: args.docs.length,
+    };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// MESSAGE LOG ETL (v1 message_log → v2 messages, channel=sms/wa/messenger)
+// ──────────────────────────────────────────────────────────────────────
+
+export const countMigratedMessageLog = query({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    // Bounded: filter op channel != email + legacyId aanwezig.
+    const rows = await ctx.db
+      .query("messages")
+      .withIndex("by_workspace_channel_sent", (q) =>
+        q.eq("workspaceId", args.workspaceId).eq("channel", "sms"),
+      )
+      .collect();
+    const wa = await ctx.db
+      .query("messages")
+      .withIndex("by_workspace_channel_sent", (q) =>
+        q.eq("workspaceId", args.workspaceId).eq("channel", "whatsapp"),
+      )
+      .collect();
+    const mes = await ctx.db
+      .query("messages")
+      .withIndex("by_workspace_channel_sent", (q) =>
+        q.eq("workspaceId", args.workspaceId).eq("channel", "messenger"),
+      )
+      .collect();
+    return [...rows, ...wa, ...mes].filter((r) => r.legacyId !== undefined).length;
+  },
+});
+
+const messageLogDocValidator = v.object({
+  legacyId: v.number(),
+  channel: v.union(
+    v.literal("sms"),
+    v.literal("whatsapp"),
+    v.literal("messenger"),
+  ),
+  direction: v.union(v.literal("outbound"), v.literal("inbound")),
+  status: v.union(
+    v.literal("pending"),
+    v.literal("sent"),
+    v.literal("delivered"),
+    v.literal("read"),
+    v.literal("failed"),
+    v.literal("bounced"),
+    v.literal("rate_limited"),
+  ),
+  externalMessageId: v.optional(v.string()),
+  to: v.string(),
+  from: v.optional(v.string()),
+  body: v.string(),
+  mediaUrl: v.optional(v.string()),
+  mediaType: v.optional(v.string()),
+  templateVariables: v.optional(v.any()),
+  errorMessage: v.optional(v.string()),
+  legacyContactId: v.optional(v.number()),
+  relatedEntityType: v.optional(v.string()),
+  relatedEntityId: v.optional(v.string()),
+  metadata: v.optional(v.any()),
+  sentAt: v.optional(v.number()),
+  deliveredAt: v.optional(v.number()),
+  readAt: v.optional(v.number()),
+});
+
+/**
+ * Batch-upsert v1 message_log → v2 messages. workspaceId is verplicht
+ * in messages — rows met workspace_id=null in v1 worden door het script
+ * geskipt (SQL filter). contact_id via legacyContactId lookup, optional.
+ */
+export const upsertMessageLogBatch = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    docs: v.array(messageLogDocValidator),
+  },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+
+    for (const doc of args.docs) {
+      let contactId: Id<"contacts"> | undefined;
+      if (doc.legacyContactId !== undefined) {
+        const contact = await ctx.db
+          .query("contacts")
+          .withIndex("by_legacyContactId", (q) =>
+            q.eq("legacyContactId", doc.legacyContactId),
+          )
+          .first();
+        contactId = contact?._id;
+      }
+
+      const existing = await ctx.db
+        .query("messages")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyId))
+        .first();
+
+      const patch = {
+        contactId,
+        channel: doc.channel,
+        direction: doc.direction,
+        status: doc.status,
+        externalMessageId: doc.externalMessageId,
+        to: doc.to,
+        from: doc.from,
+        body: doc.body,
+        mediaUrl: doc.mediaUrl,
+        mediaType: doc.mediaType,
+        templateVariables: doc.templateVariables,
+        errorMessage: doc.errorMessage,
+        relatedEntityType: doc.relatedEntityType,
+        relatedEntityId: doc.relatedEntityId,
+        metadata: doc.metadata,
+        sentAt: doc.sentAt,
+        deliveredAt: doc.deliveredAt,
+        readAt: doc.readAt,
+      };
+
+      if (existing) {
+        await ctx.db.patch(existing._id, patch);
+        updated++;
+      } else {
+        await ctx.db.insert("messages", {
+          ...patch,
+          workspaceId: args.workspaceId,
+          legacyId: doc.legacyId,
+        });
+        inserted++;
+      }
+    }
+
+    return { inserted, updated, total: args.docs.length };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// EMAIL TEMPLATES ETL
+// ──────────────────────────────────────────────────────────────────────
+
+export const countMigratedEmailTemplates = query({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("emailTemplates")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
+      .collect();
+    return rows.filter((r) => r.legacyId !== undefined).length;
+  },
+});
+
+const emailTemplateDocValidator = v.object({
+  legacyId: v.number(),
+  name: v.string(),
+  subject: v.string(),
+  body: v.string(),
+  description: v.optional(v.string()),
+  isSystem: v.boolean(),
+});
+
+export const upsertEmailTemplatesBatch = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    docs: v.array(emailTemplateDocValidator),
+  },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+
+    for (const doc of args.docs) {
+      const existing = await ctx.db
+        .query("emailTemplates")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyId))
+        .first();
+
+      const patch = {
+        name: doc.name,
+        subject: doc.subject,
+        body: doc.body,
+        description: doc.description,
+        isSystem: doc.isSystem,
+      };
+
+      if (existing) {
+        await ctx.db.patch(existing._id, patch);
+        updated++;
+      } else {
+        await ctx.db.insert("emailTemplates", {
+          ...patch,
+          workspaceId: args.workspaceId,
+          legacyId: doc.legacyId,
+        });
+        inserted++;
+      }
+    }
+
+    return { inserted, updated, total: args.docs.length };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// WORKFLOWS ETL
+// ──────────────────────────────────────────────────────────────────────
+
+export const countMigratedWorkflows = query({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    // Bounded set: filter op workspaceId, dan check legacyId aanwezigheid
+    const draft = await ctx.db
+      .query("workflows")
+      .withIndex("by_workspace_status", (q) =>
+        q.eq("workspaceId", args.workspaceId).eq("status", "draft"),
+      )
+      .collect();
+    const active = await ctx.db
+      .query("workflows")
+      .withIndex("by_workspace_status", (q) =>
+        q.eq("workspaceId", args.workspaceId).eq("status", "active"),
+      )
+      .collect();
+    const paused = await ctx.db
+      .query("workflows")
+      .withIndex("by_workspace_status", (q) =>
+        q.eq("workspaceId", args.workspaceId).eq("status", "paused"),
+      )
+      .collect();
+    const archived = await ctx.db
+      .query("workflows")
+      .withIndex("by_workspace_status", (q) =>
+        q.eq("workspaceId", args.workspaceId).eq("status", "archived"),
+      )
+      .collect();
+    return [...draft, ...active, ...paused, ...archived].filter(
+      (r) => r.legacyId !== undefined,
+    ).length;
+  },
+});
+
+const workflowDocValidator = v.object({
+  legacyId: v.number(),
+  name: v.string(),
+  description: v.optional(v.string()),
+  status: v.union(
+    v.literal("draft"),
+    v.literal("active"),
+    v.literal("paused"),
+    v.literal("archived"),
+  ),
+  triggerConfig: v.array(v.object({ type: v.string(), nodeId: v.string() })),
+  version: v.number(),
+  totalExecutions: v.number(),
+  successfulExecutions: v.number(),
+  failedExecutions: v.number(),
+  lastExecutedAt: v.optional(v.number()),
+});
+
+export const upsertWorkflowsBatch = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    docs: v.array(workflowDocValidator),
+  },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+
+    for (const doc of args.docs) {
+      const existing = await ctx.db
+        .query("workflows")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyId))
+        .first();
+
+      const patch = {
+        name: doc.name,
+        description: doc.description,
+        status: doc.status,
+        triggerConfig: doc.triggerConfig,
+        version: doc.version,
+        totalExecutions: doc.totalExecutions,
+        successfulExecutions: doc.successfulExecutions,
+        failedExecutions: doc.failedExecutions,
+        lastExecutedAt: doc.lastExecutedAt,
+      };
+
+      if (existing) {
+        await ctx.db.patch(existing._id, patch);
+        updated++;
+      } else {
+        await ctx.db.insert("workflows", {
+          ...patch,
+          workspaceId: args.workspaceId,
+          legacyId: doc.legacyId,
+        });
+        inserted++;
+      }
+    }
+
+    return { inserted, updated, total: args.docs.length };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// WORKFLOW NODES ETL
+// ──────────────────────────────────────────────────────────────────────
+
+export const countMigratedWorkflowNodes = query({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("workflowNodes").collect();
+    return rows.filter((r) => r.legacyId !== undefined).length;
+  },
+});
+
+const workflowNodeDocValidator = v.object({
+  legacyId: v.number(),
+  legacyWorkflowId: v.number(),
+  nodeId: v.string(),
+  type: v.union(
+    v.literal("trigger"),
+    v.literal("action"),
+    v.literal("condition"),
+    v.literal("delay"),
+  ),
+  subType: v.optional(v.string()),
+  positionX: v.number(),
+  positionY: v.number(),
+  config: v.any(),
+  label: v.optional(v.string()),
+});
+
+export const upsertWorkflowNodesBatch = mutation({
+  args: { docs: v.array(workflowNodeDocValidator) },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+    let skippedNoWorkflow = 0;
+
+    for (const doc of args.docs) {
+      const workflow = await ctx.db
+        .query("workflows")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyWorkflowId))
+        .first();
+      if (!workflow) {
+        skippedNoWorkflow++;
+        continue;
+      }
+
+      const existing = await ctx.db
+        .query("workflowNodes")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyId))
+        .first();
+
+      const patch = {
+        workflowId: workflow._id,
+        nodeId: doc.nodeId,
+        type: doc.type,
+        subType: doc.subType,
+        positionX: doc.positionX,
+        positionY: doc.positionY,
+        config: doc.config,
+        label: doc.label,
+      };
+
+      if (existing) {
+        await ctx.db.patch(existing._id, patch);
+        updated++;
+      } else {
+        await ctx.db.insert("workflowNodes", {
+          ...patch,
+          legacyId: doc.legacyId,
+        });
+        inserted++;
+      }
+    }
+
+    return {
+      inserted,
+      updated,
+      skippedNoWorkflow,
+      total: args.docs.length,
+    };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// WORKFLOW EDGES ETL
+// ──────────────────────────────────────────────────────────────────────
+
+export const countMigratedWorkflowEdges = query({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("workflowEdges").collect();
+    return rows.filter((r) => r.legacyId !== undefined).length;
+  },
+});
+
+const workflowEdgeDocValidator = v.object({
+  legacyId: v.number(),
+  legacyWorkflowId: v.number(),
+  sourceNodeId: v.string(),
+  targetNodeId: v.string(),
+  branchLabel: v.optional(v.string()),
+});
+
+export const upsertWorkflowEdgesBatch = mutation({
+  args: { docs: v.array(workflowEdgeDocValidator) },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+    let skippedNoWorkflow = 0;
+
+    for (const doc of args.docs) {
+      const workflow = await ctx.db
+        .query("workflows")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyWorkflowId))
+        .first();
+      if (!workflow) {
+        skippedNoWorkflow++;
+        continue;
+      }
+
+      const existing = await ctx.db
+        .query("workflowEdges")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyId))
+        .first();
+
+      const patch = {
+        workflowId: workflow._id,
+        sourceNodeId: doc.sourceNodeId,
+        targetNodeId: doc.targetNodeId,
+        branchLabel: doc.branchLabel,
+      };
+
+      if (existing) {
+        await ctx.db.patch(existing._id, patch);
+        updated++;
+      } else {
+        await ctx.db.insert("workflowEdges", {
+          ...patch,
+          legacyId: doc.legacyId,
+        });
+        inserted++;
+      }
+    }
+
+    return {
+      inserted,
+      updated,
+      skippedNoWorkflow,
+      total: args.docs.length,
+    };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// NOTIFICATIONS ETL
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Helper voor het notifications-script: vind de super-admin user-id om
+ * v1 notifications met user_id=25 (Marvin) op te mappen naar v2.
+ */
+export const getSuperAdminUserId = query({
+  args: {},
+  handler: async (ctx) => {
+    const profile = await ctx.db
+      .query("userProfiles")
+      .filter((q) => q.eq(q.field("isSuperAdmin"), true))
+      .first();
+    return profile?.userId ?? null;
+  },
+});
+
+export const countMigratedNotifications = query({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("notifications")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
+      .collect();
+    return rows.filter((r) => r.legacyId !== undefined).length;
+  },
+});
+
+const notificationDocValidator = v.object({
+  legacyId: v.number(),
+  type: v.string(),
+  title: v.string(),
+  body: v.optional(v.string()),
+  actionUrl: v.optional(v.string()),
+  relatedEntityType: v.optional(v.string()),
+  relatedEntityId: v.optional(v.string()),
+  isRead: v.boolean(),
+});
+
+export const upsertNotificationsBatch = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    userId: v.id("users"),
+    docs: v.array(notificationDocValidator),
+  },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+
+    for (const doc of args.docs) {
+      const existing = await ctx.db
+        .query("notifications")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", doc.legacyId))
+        .first();
+
+      const patch = {
+        type: doc.type,
+        title: doc.title,
+        body: doc.body,
+        actionUrl: doc.actionUrl,
+        relatedEntityType: doc.relatedEntityType,
+        relatedEntityId: doc.relatedEntityId,
+        isRead: doc.isRead,
+      };
+
+      if (existing) {
+        await ctx.db.patch(existing._id, patch);
+        updated++;
+      } else {
+        await ctx.db.insert("notifications", {
+          ...patch,
+          workspaceId: args.workspaceId,
+          userId: args.userId,
+          legacyId: doc.legacyId,
+        });
+        inserted++;
+      }
+    }
+
+    return { inserted, updated, total: args.docs.length };
+  },
+});

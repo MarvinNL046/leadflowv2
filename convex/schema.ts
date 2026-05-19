@@ -95,8 +95,11 @@ export default defineSchema({
     relatedEntityType: v.optional(v.string()),
     relatedEntityId: v.optional(v.string()),
     isRead: v.boolean(),
+    // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
+    legacyId: v.optional(v.number()),
   }).index("by_user_unread", ["userId", "isRead"])
-    .index("by_workspace", ["workspaceId"]),
+    .index("by_workspace", ["workspaceId"])
+    .index("by_legacyId", ["legacyId"]),
 
   // ════════════════════════════════════════════════════════════════════
   // CRM CORE
@@ -178,16 +181,22 @@ export default defineSchema({
     closedReason: v.optional(v.string()),
     assignedToId: v.optional(v.id("users")),
     description: v.optional(v.string()),
+    // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
+    legacyId: v.optional(v.number()),
   }).index("by_workspace_stage", ["workspaceId", "stageId"])
     .index("by_contact", ["contactId"])
-    .index("by_assignedTo", ["assignedToId"]),
+    .index("by_assignedTo", ["assignedToId"])
+    .index("by_legacyId", ["legacyId"]),
 
   opportunityStageHistory: defineTable({
     opportunityId: v.id("opportunities"),
     fromStageId: v.optional(v.id("pipelineStages")),
     toStageId: v.id("pipelineStages"),
     changedById: v.optional(v.id("users")),
-  }).index("by_opportunity", ["opportunityId"]),
+    // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
+    legacyId: v.optional(v.number()),
+  }).index("by_opportunity", ["opportunityId"])
+    .index("by_legacyId", ["legacyId"]),
 
   notes: defineTable({
     workspaceId: v.id("workspaces"),
@@ -195,8 +204,11 @@ export default defineSchema({
     body: v.string(),
     createdById: v.optional(v.id("users")),
     isPinned: v.optional(v.boolean()),
+    // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
+    legacyId: v.optional(v.number()),
   }).index("by_contact", ["contactId"])
-    .index("by_workspace", ["workspaceId"]),
+    .index("by_workspace", ["workspaceId"])
+    .index("by_legacyId", ["legacyId"]),
 
   customFieldDefinitions: defineTable({
     workspaceId: v.id("workspaces"),
@@ -213,15 +225,21 @@ export default defineSchema({
     selectOptions: v.optional(v.array(v.string())),
     isRequired: v.boolean(),
     sortOrder: v.number(),
-  }).index("by_workspace_entity", ["workspaceId", "entityType"]),
+    // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
+    legacyId: v.optional(v.number()),
+  }).index("by_workspace_entity", ["workspaceId", "entityType"])
+    .index("by_legacyId", ["legacyId"]),
 
   customFieldValues: defineTable({
     definitionId: v.id("customFieldDefinitions"),
     entityType: v.union(v.literal("contact"), v.literal("opportunity")),
     entityId: v.string(),  // contact or opportunity id as string for cross-table use
     value: v.any(),
+    // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
+    legacyId: v.optional(v.number()),
   }).index("by_entity", ["entityType", "entityId"])
-    .index("by_definition", ["definitionId"]),
+    .index("by_definition", ["definitionId"])
+    .index("by_legacyId", ["legacyId"]),
 
   crmSettings: defineTable({
     workspaceId: v.id("workspaces"),
@@ -279,10 +297,13 @@ export default defineSchema({
     sentAt: v.optional(v.number()),
     deliveredAt: v.optional(v.number()),
     readAt: v.optional(v.number()),
+    // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
+    legacyId: v.optional(v.number()),
   }).index("by_contact_sent", ["contactId", "sentAt"])
     .index("by_workspace_channel_sent", ["workspaceId", "channel", "sentAt"])
     .index("by_external_id", ["externalMessageId"])
-    .index("by_thread_sent", ["threadId", "sentAt"]),
+    .index("by_thread_sent", ["threadId", "sentAt"])
+    .index("by_legacyId", ["legacyId"]),
 
   messageThreads: defineTable({
     workspaceId: v.id("workspaces"),
@@ -309,7 +330,10 @@ export default defineSchema({
     body: v.string(),      // HTML string
     description: v.optional(v.string()),
     isSystem: v.boolean(),
-  }).index("by_workspace", ["workspaceId"]),
+    // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
+    legacyId: v.optional(v.number()),
+  }).index("by_workspace", ["workspaceId"])
+    .index("by_legacyId", ["legacyId"]),
 
   emailConnections: defineTable({
     workspaceId: v.id("workspaces"),
@@ -426,14 +450,26 @@ export default defineSchema({
     .index("by_metaLeadgenId", ["metaLeadgenId"])
     .index("by_legacyId", ["legacyId"]),
 
-  // Lead-ingest routes — bepaalt per form-id welk workspace de lead krijgt
+  // Lead-ingest routes — bepaalt per form-id welk workspace de lead krijgt,
+  // plus default pipeline/stage/assignee/value voor de auto-aangemaakte
+  // opportunity. Match v1's lead_routes-feature.
   leadIngestRoutes: defineTable({
     orgId: v.id("orgs"),
     sourceType: v.union(v.literal("meta_form"), v.literal("api_key")),
     sourceIdentifier: v.string(),       // meta form-id of api-key
     targetWorkspaceId: v.id("workspaces"),
     defaultPipelineId: v.optional(v.id("pipelines")),
-  }).index("by_source", ["sourceType", "sourceIdentifier"]),
+    /** Specifieke startstage; anders eerste non-won/lost stage van pipeline. */
+    defaultStageId: v.optional(v.id("pipelineStages")),
+    /** Auto-assign opportunity aan deze user. */
+    assignToUserId: v.optional(v.id("users")),
+    /** Default opportunity-value in €. Voor marketplace-pricing later. */
+    defaultLeadValue: v.optional(v.number()),
+    /** Toggle om route tijdelijk uit te zetten zonder te verwijderen. */
+    isActive: v.optional(v.boolean()),
+  })
+    .index("by_source", ["sourceType", "sourceIdentifier"])
+    .index("by_org", ["orgId"]),
 
   // ════════════════════════════════════════════════════════════════════
   // WEBHOOK EVENTS (dedup + audit trail)
@@ -475,7 +511,10 @@ export default defineSchema({
     failedExecutions: v.number(),
     lastExecutedAt: v.optional(v.number()),
     lastEditedById: v.optional(v.id("users")),
-  }).index("by_workspace_status", ["workspaceId", "status"]),
+    // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
+    legacyId: v.optional(v.number()),
+  }).index("by_workspace_status", ["workspaceId", "status"])
+    .index("by_legacyId", ["legacyId"]),
 
   workflowNodes: defineTable({
     workflowId: v.id("workflows"),
@@ -491,14 +530,20 @@ export default defineSchema({
     positionY: v.number(),
     config: v.any(),
     label: v.optional(v.string()),
-  }).index("by_workflow", ["workflowId"]),
+    // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
+    legacyId: v.optional(v.number()),
+  }).index("by_workflow", ["workflowId"])
+    .index("by_legacyId", ["legacyId"]),
 
   workflowEdges: defineTable({
     workflowId: v.id("workflows"),
     sourceNodeId: v.string(),
     targetNodeId: v.string(),
     branchLabel: v.optional(v.string()),
-  }).index("by_workflow", ["workflowId"]),
+    // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
+    legacyId: v.optional(v.number()),
+  }).index("by_workflow", ["workflowId"])
+    .index("by_legacyId", ["legacyId"]),
 
   workflowExecutions: defineTable({
     workflowId: v.id("workflows"),
@@ -520,7 +565,8 @@ export default defineSchema({
     startedAt: v.number(),
     completedAt: v.optional(v.number()),
   }).index("by_workflow", ["workflowId"])
-    .index("by_status_paused", ["status", "pausedUntil"]),
+    .index("by_status_paused", ["status", "pausedUntil"])
+    .index("by_entity", ["entityType", "entityId"]),
 
   workflowExecutionLogs: defineTable({
     executionId: v.id("workflowExecutions"),

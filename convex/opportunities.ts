@@ -37,6 +37,49 @@ async function requireWorkspaceMembership(
 }
 
 /**
+ * Opportunities voor één contact, met stage-info inline. Voor de
+ * contact-detail page — sales wil zien welke deals/leads er bij dit
+ * contact horen en in welke stage ze staan.
+ */
+export const listByContact = query({
+  args: { contactId: v.id("contacts") },
+  handler: async (ctx, args) => {
+    const contact = await ctx.db.get(args.contactId);
+    if (!contact) return [];
+    await requireWorkspaceMembership(ctx, contact.workspaceId);
+
+    const opps = await ctx.db
+      .query("opportunities")
+      .withIndex("by_contact", (q) => q.eq("contactId", args.contactId))
+      .collect();
+
+    const enriched = await Promise.all(
+      opps.map(async (opp) => {
+        const stage = await ctx.db.get(opp.stageId);
+        return {
+          _id: opp._id,
+          title: opp.title,
+          value: opp.value,
+          currency: opp.currency,
+          closedAt: opp.closedAt,
+          stageName: stage?.name ?? "Onbekend",
+          stageColor: stage?.color,
+          stageIsWon: stage?.isWonStage ?? false,
+          stageIsLost: stage?.isLostStage ?? false,
+        };
+      }),
+    );
+    return enriched.sort((a, b) => {
+      // Open opps eerst, dan won/lost achteraan
+      const aOpen = !a.stageIsWon && !a.stageIsLost;
+      const bOpen = !b.stageIsWon && !b.stageIsLost;
+      if (aOpen !== bOpen) return aOpen ? -1 : 1;
+      return 0;
+    });
+  },
+});
+
+/**
  * Opportunities voor één pipeline, met contact-info inline voor de Kanban.
  * Geen aparte query per card → minder roundtrips. Limit 200 (groot board).
  */
