@@ -97,6 +97,50 @@ export const resetTestContact = mutation({
 });
 
 /**
+ * Admin-mutation (geen auth) om ALLE inbound messages binnen Staycool's
+ * default workspace als gelezen te markeren. Voor de eenmalige bootstrap
+ * direct na sync-all: 1750 gemigreerde messages markeren als gelezen
+ * zodat alleen nieuwe binnenkomende opvallen.
+ *
+ * Wordt verwijderd bij cutover-cleanup (samen met de rest van
+ * migration.ts).
+ */
+export const markAllMessagesReadAdmin = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const org = await ctx.db
+      .query("orgs")
+      .withIndex("by_slug", (q) => q.eq("slug", "staycool"))
+      .unique();
+    if (!org) return { error: "Staycool org niet gevonden" };
+
+    const workspace = await ctx.db
+      .query("workspaces")
+      .withIndex("by_org", (q) => q.eq("orgId", org._id))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    if (!workspace) return { error: "Geen default workspace" };
+
+    const rows = await ctx.db
+      .query("messages")
+      .withIndex("by_workspace_channel_sent", (q) =>
+        q.eq("workspaceId", workspace._id),
+      )
+      .collect();
+
+    let marked = 0;
+    const now = Date.now();
+    for (const m of rows) {
+      if (m.direction !== "inbound") continue;
+      if (m.readAt !== undefined) continue;
+      await ctx.db.patch(m._id, { readAt: now });
+      marked++;
+    }
+    return { marked, totalRows: rows.length };
+  },
+});
+
+/**
  * Wrapper rond resetTestContact die per email zoekt — handig voor
  * runtime via `npx convex run migration:resetTestContactByEmail`.
  */
