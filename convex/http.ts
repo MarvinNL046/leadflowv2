@@ -3,6 +3,7 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { verifyStateToken } from "./metaOauth";
+import { getSiteUrl } from "./lib/env";
 
 const http = httpRouter();
 
@@ -26,7 +27,7 @@ http.route({
   path: "/auth/meta/callback",
   method: "GET",
   handler: httpAction(async (ctx, request) => {
-    const siteUrl = process.env.SITE_URL ?? "http://localhost:5173";
+    const siteUrl = getSiteUrl(); // verplicht — geen localhost-fallback (faalt loud in prod)
     const appId = process.env.META_APP_ID;
     const appSecret = process.env.META_APP_SECRET;
     const stateSecret = process.env.META_OAUTH_STATE_SECRET;
