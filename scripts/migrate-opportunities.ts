@@ -31,16 +31,10 @@ if (!CONVEX_URL) {
   process.exit(1);
 }
 
-// V1 had een fijnmazigere flow (Nieuw / 1-2-3x Gebeld / Afspraak ingepland)
-// die in v2 wordt vereenvoudigd. Marvin's keuze (2026-05-19):
-// callCount op contact behoudt de x-Gebeld granulariteit.
-const STAGE_RENAME_MAP: Record<string, string> = {
-  "nieuw": "Nieuwe lead",
-  "1x gebeld": "Contact",
-  "2x gebeld": "Contact",
-  "3x gebeld": "Contact",
-  "afspraak ingepland": "Voorstel",
-};
+// v2 heeft nu exact dezelfde 7-staps belfunnel als v1 (Marvin's keuze 2026-06-03:
+// de 1x/2x/3x-Gebeld-granulariteit blijft een aparte kolom, niet samengevouwen).
+// Stage-namen zijn 1-op-1, dus geen rename meer nodig — name-match volstaat.
+const STAGE_RENAME_MAP: Record<string, string> = {};
 
 function mapStageName(v1Name: string): string {
   return STAGE_RENAME_MAP[v1Name.toLowerCase()] ?? v1Name;
