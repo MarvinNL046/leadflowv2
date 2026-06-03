@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { getSuperAdminEmails } from "./lib/env";
 
 /**
  * Haalt de app-level userProfile voor de huidig ingelogde gebruiker op,
@@ -27,10 +28,9 @@ import type { Id } from "./_generated/dataModel";
  * NIET `identity.subject`. identity.subject is composite
  * "<userId>|<sessionId>" string, niet de plain Id<"users">.
  */
-const SUPER_ADMIN_EMAILS = new Set([
-  "marvinsmit1988@gmail.com",
-  "info@staycoolairco.nl",
-]);
+// Super-admin e-mails uit env (SUPER_ADMIN_EMAILS, comma-gescheiden);
+// fallback op de bekende set zodat het nooit stilvalt.
+const SUPER_ADMIN_EMAILS = getSuperAdminEmails();
 
 const STAYCOOL_ORG_SLUG = "staycool";
 const STAYCOOL_ORG_NAME = "Staycool Airconditioning";
