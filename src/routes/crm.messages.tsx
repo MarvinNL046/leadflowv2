@@ -61,6 +61,16 @@ function MessagesShell({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
     ...(channel === 'all' ? {} : { channel }),
   })
   const markAllRead = useMutation(api.messaging.markAllRead)
+  const markConversationRead = useMutation(api.messaging.markConversationRead)
+
+  // Markeer een gesprek als gelezen zodra het geopend wordt → ongelezen-bolletje verdwijnt.
+  useEffect(() => {
+    if (selectedContactId) {
+      void markConversationRead({ workspaceId, contactId: selectedContactId }).catch(
+        () => {},
+      )
+    }
+  }, [selectedContactId, workspaceId, markConversationRead])
 
   const unreadCount =
     conversations?.reduce((sum, c) => sum + (c.unread ? 1 : 0), 0) ?? 0
@@ -146,8 +156,8 @@ function MessagesShell({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                 className="h-9 pl-8"
               />
             </div>
-            <div className="grid grid-cols-4 gap-1 rounded-md bg-zinc-100 p-0.5">
-              {(['all', 'email', 'sms', 'whatsapp'] as Channel[]).map((c) => (
+            <div className="grid grid-cols-3 gap-1 rounded-md bg-zinc-100 p-0.5">
+              {(['all', 'sms', 'whatsapp'] as Channel[]).map((c) => (
                 <ChannelFilterButton
                   key={c}
                   active={channel === c}
@@ -552,7 +562,36 @@ function ChatBubble({
             {message.subject}
           </p>
         )}
-        <p className="whitespace-pre-line">{message.body}</p>
+        {(() => {
+          const mediaUrl = (message as { mediaUrl?: string }).mediaUrl
+          const mediaType = (message as { mediaType?: string }).mediaType
+          if (mediaUrl && mediaType?.startsWith('image/')) {
+            return (
+              <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
+                <img
+                  src={mediaUrl}
+                  alt={message.body || 'afbeelding'}
+                  className="max-h-64 rounded-lg"
+                  loading="lazy"
+                />
+              </a>
+            )
+          }
+          if (mediaUrl) {
+            return (
+              <a
+                href={mediaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 underline"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                {message.body || 'Bijlage'}
+              </a>
+            )
+          }
+          return <p className="whitespace-pre-line">{message.body}</p>
+        })()}
       </div>
     </div>
   )

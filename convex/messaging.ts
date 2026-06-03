@@ -379,6 +379,43 @@ export const markAllRead = mutation({
 });
 
 /**
+ * Markeer alle inkomende ongelezen berichten van één contact als gelezen.
+ * Aangeroepen bij het openen van een gesprek (clear het ongelezen-bolletje).
+ */
+export const markConversationRead = mutation({
+  args: { workspaceId: v.id("workspaces"), contactId: v.id("contacts") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const workspace = await ctx.db.get(args.workspaceId);
+    if (!workspace) throw new Error("Workspace not found");
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) =>
+        q.eq("userId", userId).eq("orgId", workspace.orgId),
+      )
+      .first();
+    if (!membership) throw new Error("Not a member of this workspace");
+
+    const rows = await ctx.db
+      .query("messages")
+      .withIndex("by_contact_sent", (q) => q.eq("contactId", args.contactId))
+      .collect();
+
+    let marked = 0;
+    const now = Date.now();
+    for (const m of rows) {
+      if (m.workspaceId !== args.workspaceId) continue;
+      if (m.direction !== "inbound") continue;
+      if (m.readAt !== undefined) continue;
+      await ctx.db.patch(m._id, { readAt: now });
+      marked++;
+    }
+    return { marked };
+  },
+});
+
+/**
  * Update messages-row op externalMessageId match. Voor Resend
  * delivery/bounce events of toekomstige Voidfix delivery-receipts.
  * Silent skip als externalId niet gevonden (campaign-mails van buiten
