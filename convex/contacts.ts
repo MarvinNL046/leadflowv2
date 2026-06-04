@@ -163,24 +163,18 @@ export const listIncomingLeads = query({
       (c) => !c.outsideArea && c.deletedAt === undefined && !c.unreachable,
     );
 
-    // "Heeft actie nodig"-filter (spiegelt v1 getNewLeads): toon een lead
-    // alleen als (a) geen opportunities, (b) een follow-up die verlopen is,
-    // of (c) ALLE opps nog in de eerste stage (Nieuw) staan. Zo vallen
-    // gebelde (1x/2x/3x), afspraak-ingepland, gewonnen en verloren leads
-    // eruit — precies de leads die jij al hebt afgehandeld.
+    // "Nieuwe leads"-widget (zoals v1's "Nieuwe leads van je formulieren"):
+    // toon ALLEEN leads met een opp die nog volledig in de eerste stage
+    // (Nieuw) staat. Gebelde (1x/2x/3x), afspraak-ingepland, gewonnen,
+    // verloren én opp-loze geïmporteerde contacten vallen eruit. Dit is een
+    // NIEUWE-leads-lijst, geen follow-up-reminder (overdue terugbel-datums
+    // horen in de pipeline/lead-detail, niet hier).
     const isFirstStage = (name?: string) => {
       const n = (name ?? "").toLowerCase();
       return n.includes("nieuw") || n.includes("new") || n.includes("lead");
     };
     const checked = await Promise.all(
       followable.map(async (c) => {
-        if (
-          args.dueBefore != null &&
-          c.nextFollowUpAt != null &&
-          c.nextFollowUpAt <= args.dueBefore
-        ) {
-          return { c, keep: true };
-        }
         const opps = await ctx.db
           .query("opportunities")
           .withIndex("by_contact", (q) => q.eq("contactId", c._id))
