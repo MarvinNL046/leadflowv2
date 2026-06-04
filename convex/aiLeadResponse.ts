@@ -17,6 +17,21 @@ export const recentlyResponded = internalQuery({
   },
 });
 
+/** Aantal AI-berichten met status "sent" sinds `since` (begin van vandaag) —
+ * voor de dagcap-guardrail (anti-runaway in auto-modus). */
+export const countAutoSentToday = internalQuery({
+  args: { workspaceId: v.id("workspaces"), since: v.number() },
+  handler: async (ctx, { workspaceId, since }) => {
+    const sent = await ctx.db
+      .query("aiSuggestedResponses")
+      .withIndex("by_workspace_status", (q) =>
+        q.eq("workspaceId", workspaceId).eq("status", "sent"),
+      )
+      .collect();
+    return sent.filter((s) => s._creationTime >= since).length;
+  },
+});
+
 export const recordSuggestion = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
@@ -90,6 +105,21 @@ export const handleNewLead = internalAction({
           { contactId, workspaceId },
         );
         return;
+      }
+
+      // Dagcap (alleen auto): anti-runaway ceiling op AI-berichten per dag.
+      if (cfg.mode === "auto") {
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const sentToday = await ctx.runQuery(
+          internal.aiLeadResponse.countAutoSentToday,
+          { workspaceId, since: startOfDay.getTime() },
+        );
+        const cap = cfg.dailyCap ?? 200;
+        if (sentToday >= cap) {
+          console.warn(`[ai-agent] dagcap (${cap}) bereikt voor workspace ${workspaceId}, skip`);
+          return;
+        }
       }
 
       const channel: Channel | null = pickChannel(
