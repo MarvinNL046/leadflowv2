@@ -14,3 +14,4 @@ __unconfig*
 todos.json
 migration/data/
 client_secret_*.json
+.vercel

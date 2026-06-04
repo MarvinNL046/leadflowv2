@@ -2279,3 +2279,23 @@ export const getStageDistribution = internalQuery({
     return { total, stages: out };
   },
 });
+
+/** Herlink een provider-authAccount naar een andere user. Nodig omdat
+ * Convex Auth providers NIET automatisch op e-mail koppelt → een 2e login-
+ * methode (bv. Google) maakt een duplicate user los van de tenant-eigenaar.
+ * Repoint het account naar de originele user; daarna log-uit + opnieuw in. */
+export const relinkAuthAccount = internalMutation({
+  args: {
+    accountId: v.id("authAccounts"),
+    toUserId: v.id("users"),
+  },
+  handler: async (ctx, { accountId, toUserId }) => {
+    const acc = await ctx.db.get(accountId);
+    if (!acc) throw new Error("authAccount niet gevonden");
+    const target = await ctx.db.get(toUserId);
+    if (!target) throw new Error("doel-user niet gevonden");
+    const from = acc.userId;
+    await ctx.db.patch(accountId, { userId: toUserId });
+    return { accountId, provider: acc.provider, from, to: toUserId };
+  },
+});
