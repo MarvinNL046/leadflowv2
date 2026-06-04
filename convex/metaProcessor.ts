@@ -107,6 +107,12 @@ interface ContactFields {
 export const processMetaLead = internalAction({
   args: { rawId: v.id("metaLeadRaw") },
   handler: async (ctx, { rawId }) => {
+    // BEWUSTE KEUZE — niet "fixen" naar de per-page metaPages.accessToken:
+    // het lead-ophaalpad gebruikt de PERMANENTE system-user-token uit env
+    // (META_PAGE_ACCESS_TOKEN). Per-page tokens verlopen/breken bij her-auth
+    // → gemiste leads. De env-var is een aparte secret-store (Convex
+    // encrypted-at-rest, nooit client-side), dus buiten I1-scope (dat dekt
+    // de DB-velden metaConnections/metaPages.accessToken voor forms-sync).
     const accessToken = process.env.META_PAGE_ACCESS_TOKEN;
     if (!accessToken) {
       console.error("[meta-processor] META_PAGE_ACCESS_TOKEN niet gezet");
