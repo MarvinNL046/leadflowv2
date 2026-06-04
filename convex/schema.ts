@@ -258,6 +258,44 @@ export default defineSchema({
   }).index("by_workspace", ["workspaceId"]),
 
   // ════════════════════════════════════════════════════════════════════
+  // AI LEAD-RESPONSE AGENT
+  // ════════════════════════════════════════════════════════════════════
+
+  aiLeadResponseConfigs: defineTable({
+    workspaceId: v.id("workspaces"),
+    enabled: v.boolean(),
+    mode: v.union(v.literal("off"), v.literal("suggest"), v.literal("auto")),
+    channelOrder: v.array(
+      v.union(v.literal("whatsapp"), v.literal("sms"), v.literal("email")),
+    ),
+    bookingUrl: v.string(),
+    model: v.string(),
+    anthropicApiKeyEncrypted: v.optional(v.string()),
+    businessContext: v.optional(v.string()),
+    tone: v.optional(v.string()),
+    signature: v.optional(v.string()),
+    whatsappTemplateName: v.optional(v.string()),
+    quietHoursStart: v.optional(v.number()),
+    quietHoursEnd: v.optional(v.number()),
+    dailyCap: v.optional(v.number()),
+  }).index("by_workspace", ["workspaceId"]),
+
+  aiSuggestedResponses: defineTable({
+    workspaceId: v.id("workspaces"),
+    contactId: v.id("contacts"),
+    channel: v.union(v.literal("whatsapp"), v.literal("sms"), v.literal("email")),
+    body: v.string(),
+    model: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("sent"),
+      v.literal("dismissed"),
+      v.literal("failed"),
+    ),
+  }).index("by_contact", ["contactId"])
+    .index("by_workspace_status", ["workspaceId", "status"]),
+
+  // ════════════════════════════════════════════════════════════════════
   // UNIFIED MESSAGES (vervangt v1's email_log + email_messages +
   // email_threads + message_log)
   // ════════════════════════════════════════════════════════════════════
