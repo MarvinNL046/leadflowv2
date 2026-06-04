@@ -298,6 +298,19 @@ export const pendingForContact = query({
   handler: async (ctx, { contactId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
+    // Membership-check (voorkomt cross-workspace lekken van AI-concepten).
+    // Graceful null i.p.v. throw — dit is een per-card widget-query.
+    const contact = await ctx.db.get(contactId);
+    if (!contact) return null;
+    const workspace = await ctx.db.get(contact.workspaceId);
+    if (!workspace) return null;
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) =>
+        q.eq("userId", userId).eq("orgId", workspace.orgId),
+      )
+      .first();
+    if (!membership) return null;
     return ctx.db
       .query("aiSuggestedResponses")
       .withIndex("by_contact", (q) => q.eq("contactId", contactId))
