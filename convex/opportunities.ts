@@ -108,6 +108,7 @@ export const listForKanban = query({
             .eq("workspaceId", pipeline.workspaceId)
             .eq("stageId", stage._id),
         )
+        .order("desc") // nieuwste leads bovenaan (speed-to-lead)
         .take(200);
       allOpps.push(...rows);
     }
