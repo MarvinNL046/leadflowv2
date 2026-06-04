@@ -30,12 +30,20 @@ export const recentlyResponded = internalQuery({
       .query("aiSuggestedResponses")
       .withIndex("by_contact", (q) => q.eq("contactId", contactId))
       .collect();
-    return sug.some((s) => s._creationTime >= since && s.status !== "dismissed");
+    // "failed" telt NIET als dedup: een mislukte verzending (bv. Voidfix down)
+    // mag binnen het venster opnieuw geprobeerd worden — anders blijft de lead
+    // 24u zonder reactie hangen. Alleen "pending"/"sent" blokkeren een herhaling.
+    return sug.some(
+      (s) => s._creationTime >= since && s.status !== "dismissed" && s.status !== "failed",
+    );
   },
 });
 
 /** Aantal AI-berichten met status "sent" sinds `since` (begin van vandaag) —
- * voor de dagcap-guardrail (anti-runaway in auto-modus). */
+ * voor de dagcap-guardrail. Dit is een TOTAAL-plafond op AI-verzendingen per
+ * dag (bewust conservatief: telt ook handmatig goedgekeurde suggesties mee).
+ * De cap wordt alléén in auto-modus afgedwongen — anti-runaway. In suggest-modus
+ * is er geen runaway-risico (mens keurt elk bericht goed), dus geen cap. */
 export const countAutoSentToday = internalQuery({
   args: { workspaceId: v.id("workspaces"), since: v.number() },
   handler: async (ctx, { workspaceId, since }) => {

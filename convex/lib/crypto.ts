@@ -2,11 +2,12 @@
  * Symmetrische encryptie-at-rest voor secrets (Meta access-tokens etc.).
  *
  * Gebruikt de Web Crypto API (`crypto.subtle`) — die werkt in Convex' V8
- * default-runtime, dus GEEN `"use node"` nodig. Wel: `crypto.getRandomValues`
- * (voor de IV) is non-deterministisch, dus encryptie MAG ALLEEN in een
- * `action` / `httpAction` draaien, NIET in een query/mutation. Decryptie
- * gebruikt geen randomness en mag overal, maar we doen het in de actie vlak
- * voordat de token de deur uit gaat naar de Graph API.
+ * default-runtime, dus GEEN `"use node"` nodig. Convex levert seeded
+ * `crypto.getRandomValues` in álle function-types, dus zowel encryptie als
+ * decryptie werken in queries, mutations én actions (empirisch getest:
+ * encryptSecret in een mutation geeft een geldige `v1:`-blob). Decryptie
+ * gebeurt doorgaans in de actie vlak voordat de token de deur uit gaat naar
+ * de Graph API.
  *
  * Sleutel: `ENCRYPTION_KEY` env-var = 64 hex-chars (32 bytes / AES-256).
  *   genereer: `openssl rand -hex 32`
