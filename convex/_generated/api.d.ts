@@ -15,6 +15,7 @@ import type * as customFields from "../customFields.js";
 import type * as emailTemplates from "../emailTemplates.js";
 import type * as http from "../http.js";
 import type * as integrations from "../integrations.js";
+import type * as lib_crypto from "../lib/crypto.js";
 import type * as lib_env from "../lib/env.js";
 import type * as lib_phone from "../lib/phone.js";
 import type * as messaging from "../messaging.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   emailTemplates: typeof emailTemplates;
   http: typeof http;
   integrations: typeof integrations;
+  "lib/crypto": typeof lib_crypto;
   "lib/env": typeof lib_env;
   "lib/phone": typeof lib_phone;
   messaging: typeof messaging;
