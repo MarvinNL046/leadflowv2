@@ -185,7 +185,10 @@ export const listIncomingLeads = query({
           .query("opportunities")
           .withIndex("by_contact", (q) => q.eq("contactId", c._id))
           .collect();
-        if (opps.length === 0) return { c, keep: true };
+        // Opp-loze contacten = geïmporteerde contacten zonder deal, GEEN
+        // op-te-volgen lead. Niet tonen (anders floodt de bulk-import het
+        // dashboard). Echte Meta/webhook-leads krijgen altijd een opp.
+        if (opps.length === 0) return { c, keep: false };
         const stages = await Promise.all(
           opps.map((o) => ctx.db.get(o.stageId)),
         );
