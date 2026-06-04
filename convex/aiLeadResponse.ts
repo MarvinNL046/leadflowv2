@@ -2,7 +2,14 @@ import { v } from "convex/values";
 import { internalAction, internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { decryptSecret } from "./lib/crypto";
-import { pickChannel, isWithinQuietHours, buildPrompt, type Channel } from "./aiLeadResponse/helpers";
+import {
+  pickChannel,
+  isWithinQuietHours,
+  buildPrompt,
+  msSinceAmsterdamMidnight,
+  msUntilAmsterdamHour,
+  type Channel,
+} from "./aiLeadResponse/helpers";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -86,34 +93,44 @@ export const handleNewLead = internalAction({
       const lead = await ctx.runQuery(internal.aiLeadResponse.getLeadContext, { contactId });
       if (!lead) return;
 
-      // quiet-hours (Europe/Amsterdam uur)
-      const hour = Number(new Intl.DateTimeFormat("nl-NL", {
+      // Amsterdamse wandklok-onderdelen (Convex draait UTC → géén setHours).
+      // Hieruit: quiet-hours-check, defer-tijd én dagcap-vensterstart, alles
+      // in Amsterdamse tijd.
+      const amsParts = new Intl.DateTimeFormat("nl-NL", {
         hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
         hour12: false,
         timeZone: "Europe/Amsterdam",
-      }).format(new Date()));
+      }).formatToParts(new Date());
+      const amsPart = (t: string) =>
+        Number(amsParts.find((p) => p.type === t)?.value ?? 0);
+      const hour = amsPart("hour") % 24; // "24" → 0 (middernacht-randgeval)
+      const minute = amsPart("minute");
+      const second = amsPart("second");
       const qStart = cfg.quietHoursStart ?? 21;
       const qEnd = cfg.quietHoursEnd ?? 8;
       if (cfg.mode === "auto" && isWithinQuietHours(hour, qStart, qEnd)) {
-        // Uitstellen tot qEnd vandaag/morgen
-        const next = new Date();
-        next.setHours(qEnd, 0, 0, 0);
-        if (next.getTime() <= Date.now()) next.setDate(next.getDate() + 1);
+        // Uitstellen tot het eerstvolgende Amsterdamse qEnd:00.
+        // (Bekende minor edge: twee intakes voor hetzelfde contact tijdens
+        // quiet-hours kunnen beide uitgesteld worden → zeldzame dubbele send;
+        // auto staat default uit. Later af te dekken met een pending-record.)
         await ctx.scheduler.runAt(
-          next.getTime(),
+          Date.now() + msUntilAmsterdamHour(hour, minute, qEnd),
           internal.aiLeadResponse.handleNewLead,
           { contactId, workspaceId },
         );
         return;
       }
 
-      // Dagcap (alleen auto): anti-runaway ceiling op AI-berichten per dag.
+      // Dagcap (alleen auto): anti-runaway ceiling. Vensterstart =
+      // Amsterdamse middernacht (niet UTC).
       if (cfg.mode === "auto") {
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
+        const startOfDay =
+          Date.now() - msSinceAmsterdamMidnight(hour, minute, second);
         const sentToday = await ctx.runQuery(
           internal.aiLeadResponse.countAutoSentToday,
-          { workspaceId, since: startOfDay.getTime() },
+          { workspaceId, since: startOfDay },
         );
         const cap = cfg.dailyCap ?? 200;
         if (sentToday >= cap) {
@@ -147,15 +164,29 @@ export const handleNewLead = internalAction({
       if (!body) return;
 
       if (cfg.mode === "auto") {
-        await ctx.runAction(internal.messaging.sendInternal, { contactId, channel, body });
-        await ctx.runMutation(internal.aiLeadResponse.recordSuggestion, {
-          workspaceId,
-          contactId,
-          channel,
-          body,
-          model: cfg.model,
-          status: "sent",
-        });
+        try {
+          await ctx.runAction(internal.messaging.sendInternal, { contactId, channel, body });
+          await ctx.runMutation(internal.aiLeadResponse.recordSuggestion, {
+            workspaceId,
+            contactId,
+            channel,
+            body,
+            model: cfg.model,
+            status: "sent",
+          });
+        } catch (sendErr) {
+          // sendInternal re-throwt bij verzendfout → leg een failed-record
+          // vast zodat dedup een re-send voorkomt + het zichtbaar blijft.
+          console.error("[ai-agent] sendInternal faalde:", sendErr);
+          await ctx.runMutation(internal.aiLeadResponse.recordSuggestion, {
+            workspaceId,
+            contactId,
+            channel,
+            body,
+            model: cfg.model,
+            status: "failed",
+          });
+        }
       } else {
         await ctx.runMutation(internal.aiLeadResponse.recordSuggestion, {
           workspaceId,

@@ -1,5 +1,32 @@
 import { describe, it, expect } from "vitest";
-import { pickChannel, isWithinQuietHours, buildPrompt } from "./helpers";
+import {
+  pickChannel,
+  isWithinQuietHours,
+  buildPrompt,
+  msSinceAmsterdamMidnight,
+  msUntilAmsterdamHour,
+} from "./helpers";
+
+describe("msSinceAmsterdamMidnight", () => {
+  it("08:30:00 → 8.5u in ms", () => {
+    expect(msSinceAmsterdamMidnight(8, 30, 0)).toBe((8 * 3600 + 30 * 60) * 1000);
+  });
+  it("00:00:00 → 0", () => {
+    expect(msSinceAmsterdamMidnight(0, 0, 0)).toBe(0);
+  });
+});
+
+describe("msUntilAmsterdamHour", () => {
+  it("nu 23:00, target 8 → 9u", () => {
+    expect(msUntilAmsterdamHour(23, 0, 8)).toBe(9 * 3_600_000);
+  });
+  it("nu 7:30, target 8 → 30min", () => {
+    expect(msUntilAmsterdamHour(7, 30, 8)).toBe(30 * 60_000);
+  });
+  it("nu precies 8:00, target 8 → volgende dag (24u)", () => {
+    expect(msUntilAmsterdamHour(8, 0, 8)).toBe(24 * 3_600_000);
+  });
+});
 
 describe("pickChannel", () => {
   const contact = { phone: "+31612345678", email: "a@b.nl" };

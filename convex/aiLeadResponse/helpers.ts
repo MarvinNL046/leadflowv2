@@ -19,6 +19,25 @@ export function isWithinQuietHours(hour: number, start: number, end: number): bo
   return start < end ? hour >= start && hour < end : hour >= start || hour < end;
 }
 
+/**
+ * Tijd-helpers werken op de Amsterdamse wandklok-onderdelen (uit
+ * Intl.DateTimeFormat met timeZone Europe/Amsterdam) i.p.v. op de
+ * server-lokale tijd (Convex draait UTC → setHours zou scheef zijn).
+ * Ze berekenen een delta in wandklok-termen die je optelt bij de echte
+ * epoch (Date.now()). Een DST-overgang binnen het venster is een zeldzame
+ * ±1u-edge en acceptabel.
+ */
+export function msSinceAmsterdamMidnight(hour: number, minute: number, second: number): number {
+  return hour * 3_600_000 + minute * 60_000 + second * 1_000;
+}
+
+/** ms vanaf nu tot het eerstvolgende Amsterdamse `targetHour`:00. */
+export function msUntilAmsterdamHour(hour: number, minute: number, targetHour: number): number {
+  let hours = targetHour - hour;
+  if (hours <= 0) hours += 24;
+  return hours * 3_600_000 - minute * 60_000;
+}
+
 export function buildPrompt(opts: {
   businessContext?: string;
   tone?: string;
