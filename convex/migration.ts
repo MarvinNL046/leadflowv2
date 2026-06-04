@@ -2249,3 +2249,33 @@ export const clearWorkspaceMessages = internalAction({
     return { totalDeleted: total };
   },
 });
+
+/** Per-stage opp-telling voor de default pipeline — verificatie van de sync. */
+export const getStageDistribution = internalQuery({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, { workspaceId }) => {
+    const pipeline = await ctx.db
+      .query("pipelines")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    if (!pipeline) throw new Error("Geen default pipeline voor workspace");
+    const stages = await ctx.db
+      .query("pipelineStages")
+      .withIndex("by_pipeline_order", (q) => q.eq("pipelineId", pipeline._id))
+      .collect();
+    const out: Array<{ name: string; order: number; count: number }> = [];
+    let total = 0;
+    for (const s of stages.sort((a, b) => a.order - b.order)) {
+      const opps = await ctx.db
+        .query("opportunities")
+        .withIndex("by_workspace_stage", (q) =>
+          q.eq("workspaceId", workspaceId).eq("stageId", s._id),
+        )
+        .collect();
+      out.push({ name: s.name, order: s.order, count: opps.length });
+      total += opps.length;
+    }
+    return { total, stages: out };
+  },
+});
