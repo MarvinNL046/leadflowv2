@@ -15,23 +15,41 @@
 - [ ] Custom domain `app.wetryleadflow.com` in Vercel klaar (Cloudflare CNAME → Vercel target). v1 blijft op root `wetryleadflow.com` als 30d safety-net.
 - [ ] DNS-TTL voor cutover-domain verlaagd naar 5 min (zodat propagation snel gaat)
 
-### Convex prod env vars (set via dashboard of `npx convex env set`)
-- [ ] `META_APP_ID` (zelfde als v1 — we hergebruiken één Meta App, alleen redirect-URI verschuift)
+### Convex prod env vars (set via dashboard of `npx convex env set --prod`)
+**Meta:**
+- [ ] `META_APP_ID` (zelfde als v1 — één Meta App, alleen redirect-URI verschuift)
 - [ ] `META_APP_SECRET`
-- [ ] `META_VERIFY_TOKEN` — KIES NIEUW (anders luistert v1 nog mee op v1's verify-endpoint)
-- [ ] `VOIDFIX_API_KEY`
-- [ ] `RESEND_API_KEY` (voor outbound transactional email)
-- [ ] `SITE_URL` → prod-URL (gebruikt in OAuth-callback)
+- [ ] `META_WEBHOOK_VERIFY_TOKEN` — KIES NIEUW (anders luistert v1 nog mee op zijn verify-endpoint). LET OP: env-naam is `META_WEBHOOK_VERIFY_TOKEN`, niet `META_VERIFY_TOKEN`.
+- [ ] `META_OAUTH_STATE_SECRET` — HMAC-key voor OAuth-state (`openssl rand -hex 32`)
+- [ ] `META_PAGE_ACCESS_TOKEN` — de PERMANENTE system-user-token (NIET de tijdelijke user-token; gebruikt door processMetaLead om lead-detail op te halen — anders missen we leads)
+**Messaging / email:**
+- [ ] `VOIDFIX_API_KEY` + `VOIDFIX_API_SECRET` (SMS/WhatsApp outbound + inbound-webhook-signature)
+- [ ] `RESEND_API_KEY` + `RESEND_WEBHOOK_SECRET`
+**Crypto / auth / host:**
+- [ ] `ENCRYPTION_KEY` — NIEUW (I1): 64-hex via `openssl rand -hex 32`. Versleutelt Meta-tokens at-rest. ZONDER deze faalt de Meta-OAuth-callback (crypto.ts throwt).
 - [ ] `JWT_PRIVATE_KEY` + `JWKS` (al gegenereerd voor v2 dev — kopieer over)
+- [ ] `SITE_URL` → prod FRONTEND-domein, GEEN trailing slash (bv. `https://app.wetryleadflow.com`). Dit is de redirect-bestemming ná de OAuth-callback, NIET de callback-URL zelf (die staat op de `*.convex.site`-host — zie T-0:20).
+- [ ] `SUPER_ADMIN_EMAILS` → `marvinsmit1988@gmail.com,info@staycoolairco.nl`
+
+### Vercel frontend env vars (Project → Settings → Environment Variables, Production scope)
+- [ ] `VITE_CONVEX_URL` → `https://<prod-deployment>.convex.cloud`
+- [ ] `VITE_CONVEX_SITE_URL` → `https://<prod-deployment>.convex.site`
+- [ ] Nitro kiest op Vercel automatisch de `vercel`-preset (via de VERCEL-env); eventueel `NITRO_PRESET=vercel` als zekerheid.
 
 ### Code-readiness
-- [ ] `convex/migration.ts` ETL-mutations staan nog publiek (acceptabel tot cutover)
+- [x] `convex/migration.ts` ETL-functies zijn nu `internalMutation`/`internalQuery` (B1 — niet langer publiek bulk-write endpoint). Prod-sync draait daarom via `npx convex run --prod` (zie data-baseline), NIET via de convex/browser-scripts (die kunnen geen internal functies aanroepen).
+- [x] Meta-tokens worden encrypted-at-rest opgeslagen (I1, `convex/lib/crypto.ts`).
 - [ ] Geen pending v2-features die nog niet getest zijn
 - [ ] CI groen op main-branch
 
 ### Data-baseline (T-1 avond)
 - [ ] Snapshot van v1 Neon DB (Neon Console → branch maken als safety-net)
-- [ ] Full ETL-sync uitvoeren: `npx tsx scripts/sync-all.ts` (alle 14 scripts in volgorde, idempotent)
+- [ ] **LET OP (B1):** `scripts/sync-all.ts` + de `scripts/migrate-*.ts` + `migration/*.mjs` gebruiken convex/browser-clients en kunnen na de internalisatie GEEN migration-functies meer aanroepen. Prod-sync gaat via `npx convex run --prod` (admin mag internal functies aanroepen):
+  - [ ] 0. Deploy code naar prod: `npx convex deploy` + zet alle env-vars (zie boven, incl. `ENCRYPTION_KEY`)
+  - [ ] 1. Bootstrap tenant (zie Auth-bootstrap hieronder) → noteer prod-`workspaceId`
+  - [ ] 2. Seed pipeline+stages: `npx convex run migration:seedStaycoolPipeline '{}' --prod` (verifieer dat dit de 7-staps belfunnel oplevert; zo niet, pas seed aan vóór opps)
+  - [ ] 3. Export uit Neon: `NEON_DATABASE_URL=… node migration/export-from-neon.mjs` (ongewijzigd — pure pg-read)
+  - [ ] 4. Import in FK-volgorde — contacts → opportunities → messages — via `npx convex run --prod migration:upsert*Batch '{"workspaceId":"<PROD_WS>","docs":[…]}'` per chunk (idempotent op legacyId)
 - [ ] Verifieer record-counts in v2 (zie sectie 5 voor counts)
 
 ### Auth-bootstrap
@@ -50,9 +68,11 @@
 
 ### T-0:05 — Final delta-sync
 ```bash
-cd ~/claudeProjecten/leadflow-v2
-DRY_RUN=1 npx tsx scripts/sync-all.ts   # eerst dry-run voor zekerheid
-npx tsx scripts/sync-all.ts             # echte run
+cd ~/Projecten/leadflowv2
+# Her-export de laatste v1-state + her-import via npx convex run --prod
+# (zelfde stappen 3+4 als de data-baseline; idempotent op legacyId).
+NEON_DATABASE_URL=… node migration/export-from-neon.mjs
+# daarna per chunk: npx convex run --prod migration:upsert*Batch '{"workspaceId":"<PROD_WS>","docs":[…]}'
 ```
 Idempotent — bestaande rows worden gepatcht met laatste v1-state.
 
@@ -63,7 +83,8 @@ Idempotent — bestaande rows worden gepatcht met laatste v1-state.
 - [ ] `/crm/messages` toont WhatsApp/SMS history
 
 ### T-0:20 — Switchover
-- [ ] **Meta App**: Facebook for Developers → App → WhatsApp Webhook / Lead Ads → Callback URL wijzigen naar `https://<v2-prod-url>/auth/meta/callback` (en `/api/meta/webhook` voor leads)
+- [ ] **Meta App — OAuth redirect-URI**: bij "Valid OAuth Redirect URIs" de PROD-callback registreren op de Convex `*.convex.site`-host (NIET het frontend-domein): `https://<prod-deployment>.convex.site/auth/meta/callback`. Dit is de host die `convex/metaOauth.ts` + `convex/http.ts` opbouwen uit `CONVEX_SITE_URL`.
+- [ ] **Meta App — Lead Ads webhook**: callback-URL → `https://<prod-deployment>.convex.site/webhooks/meta` met de nieuwe `META_WEBHOOK_VERIFY_TOKEN` (pad is `/webhooks/meta`, niet `/api/meta/webhook`)
 - [ ] **Website lead-API**: in v2 settings nieuwe api-key genereren, oude v1-key in staycoolairco.nl contact-form vervangen
 - [ ] **DNS**: cutover-domain wijzigen naar Vercel v2 (of het zelfde domain via Vercel hosting overnemen)
 - [ ] **WhatsApp via Voidfix**: bij Voidfix dashboard webhook URL wijzigen naar v2 (als die op v1-URL pointed)
