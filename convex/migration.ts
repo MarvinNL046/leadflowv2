@@ -1,5 +1,10 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "./_generated/server";
+import {
+  internalAction,
+  internalMutation,
+  internalQuery,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 /**
@@ -2205,5 +2210,42 @@ export const cleanupNonFunnelOpps = internalMutation({
       }
     }
     return { movedLegacyIds: moved, deletedSeedOpps: deleted.length };
+  },
+});
+
+// ════════════════════════════════════════════════════════════════════
+// CLEAN-SLATE MESSAGES (cutover-keuze Marvin): prod start met lege
+// /messages; alleen NIEUWE binnenkomende berichten verschijnen. De
+// historische berichten blijven volledig in v1 bestaan (niets verloren).
+// ════════════════════════════════════════════════════════════════════
+export const deleteWorkspaceMessagesBatch = internalMutation({
+  args: { workspaceId: v.id("workspaces"), limit: v.number() },
+  handler: async (ctx, { workspaceId, limit }) => {
+    const batch = await ctx.db
+      .query("messages")
+      .withIndex("by_workspace_channel_sent", (q) =>
+        q.eq("workspaceId", workspaceId),
+      )
+      .take(limit);
+    for (const m of batch) await ctx.db.delete(m._id);
+    return batch.length;
+  },
+});
+
+/** Wist ALLE messages van de workspace (gebatcht, idempotent qua effect).
+ * Historie blijft in v1. Run: npx convex run migration:clearWorkspaceMessages */
+export const clearWorkspaceMessages = internalAction({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, { workspaceId }): Promise<{ totalDeleted: number }> => {
+    let total = 0;
+    for (;;) {
+      const n: number = await ctx.runMutation(
+        internal.migration.deleteWorkspaceMessagesBatch,
+        { workspaceId, limit: 500 },
+      );
+      total += n;
+      if (n < 500) break;
+    }
+    return { totalDeleted: total };
   },
 });
