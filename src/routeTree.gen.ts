@@ -24,6 +24,7 @@ import { Route as CrmSettingsTemplatesRouteImport } from './routes/crm.settings_
 import { Route as CrmSettingsPipelineRouteImport } from './routes/crm.settings_.pipeline'
 import { Route as CrmSettingsMetaRouteImport } from './routes/crm.settings_.meta'
 import { Route as CrmSettingsLeadFlowRouteImport } from './routes/crm.settings_.lead-flow'
+import { Route as CrmSettingsAiAgentRouteImport } from './routes/crm.settings_.ai-agent'
 import { Route as CrmContactsIdRouteImport } from './routes/crm.contacts_.$id'
 
 const LoginRoute = LoginRouteImport.update({
@@ -101,6 +102,11 @@ const CrmSettingsLeadFlowRoute = CrmSettingsLeadFlowRouteImport.update({
   path: '/settings/lead-flow',
   getParentRoute: () => CrmRoute,
 } as any)
+const CrmSettingsAiAgentRoute = CrmSettingsAiAgentRouteImport.update({
+  id: '/settings_/ai-agent',
+  path: '/settings/ai-agent',
+  getParentRoute: () => CrmRoute,
+} as any)
 const CrmContactsIdRoute = CrmContactsIdRouteImport.update({
   id: '/contacts_/$id',
   path: '/contacts/$id',
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/crm/': typeof CrmIndexRoute
   '/crm/contacts/$id': typeof CrmContactsIdRoute
+  '/crm/settings/ai-agent': typeof CrmSettingsAiAgentRoute
   '/crm/settings/lead-flow': typeof CrmSettingsLeadFlowRoute
   '/crm/settings/meta': typeof CrmSettingsMetaRoute
   '/crm/settings/pipeline': typeof CrmSettingsPipelineRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByTo {
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/crm': typeof CrmIndexRoute
   '/crm/contacts/$id': typeof CrmContactsIdRoute
+  '/crm/settings/ai-agent': typeof CrmSettingsAiAgentRoute
   '/crm/settings/lead-flow': typeof CrmSettingsLeadFlowRoute
   '/crm/settings/meta': typeof CrmSettingsMetaRoute
   '/crm/settings/pipeline': typeof CrmSettingsPipelineRoute
@@ -154,6 +162,7 @@ export interface FileRoutesById {
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/crm/': typeof CrmIndexRoute
   '/crm/contacts_/$id': typeof CrmContactsIdRoute
+  '/crm/settings_/ai-agent': typeof CrmSettingsAiAgentRoute
   '/crm/settings_/lead-flow': typeof CrmSettingsLeadFlowRoute
   '/crm/settings_/meta': typeof CrmSettingsMetaRoute
   '/crm/settings_/pipeline': typeof CrmSettingsPipelineRoute
@@ -174,6 +183,7 @@ export interface FileRouteTypes {
     | '/crm/workflows'
     | '/crm/'
     | '/crm/contacts/$id'
+    | '/crm/settings/ai-agent'
     | '/crm/settings/lead-flow'
     | '/crm/settings/meta'
     | '/crm/settings/pipeline'
@@ -191,6 +201,7 @@ export interface FileRouteTypes {
     | '/crm/workflows'
     | '/crm'
     | '/crm/contacts/$id'
+    | '/crm/settings/ai-agent'
     | '/crm/settings/lead-flow'
     | '/crm/settings/meta'
     | '/crm/settings/pipeline'
@@ -209,6 +220,7 @@ export interface FileRouteTypes {
     | '/crm/workflows'
     | '/crm/'
     | '/crm/contacts_/$id'
+    | '/crm/settings_/ai-agent'
     | '/crm/settings_/lead-flow'
     | '/crm/settings_/meta'
     | '/crm/settings_/pipeline'
@@ -330,6 +342,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmSettingsLeadFlowRouteImport
       parentRoute: typeof CrmRoute
     }
+    '/crm/settings_/ai-agent': {
+      id: '/crm/settings_/ai-agent'
+      path: '/settings/ai-agent'
+      fullPath: '/crm/settings/ai-agent'
+      preLoaderRoute: typeof CrmSettingsAiAgentRouteImport
+      parentRoute: typeof CrmRoute
+    }
     '/crm/contacts_/$id': {
       id: '/crm/contacts_/$id'
       path: '/contacts/$id'
@@ -348,6 +367,7 @@ interface CrmRouteChildren {
   CrmWorkflowsRoute: typeof CrmWorkflowsRoute
   CrmIndexRoute: typeof CrmIndexRoute
   CrmContactsIdRoute: typeof CrmContactsIdRoute
+  CrmSettingsAiAgentRoute: typeof CrmSettingsAiAgentRoute
   CrmSettingsLeadFlowRoute: typeof CrmSettingsLeadFlowRoute
   CrmSettingsMetaRoute: typeof CrmSettingsMetaRoute
   CrmSettingsPipelineRoute: typeof CrmSettingsPipelineRoute
@@ -364,6 +384,7 @@ const CrmRouteChildren: CrmRouteChildren = {
   CrmWorkflowsRoute: CrmWorkflowsRoute,
   CrmIndexRoute: CrmIndexRoute,
   CrmContactsIdRoute: CrmContactsIdRoute,
+  CrmSettingsAiAgentRoute: CrmSettingsAiAgentRoute,
   CrmSettingsLeadFlowRoute: CrmSettingsLeadFlowRoute,
   CrmSettingsMetaRoute: CrmSettingsMetaRoute,
   CrmSettingsPipelineRoute: CrmSettingsPipelineRoute,

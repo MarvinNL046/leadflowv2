@@ -1,6 +1,14 @@
 import { v } from "convex/values";
-import { internalAction, internalQuery, internalMutation } from "./_generated/server";
+import {
+  action,
+  internalAction,
+  internalQuery,
+  internalMutation,
+  type QueryCtx,
+} from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { decryptSecret } from "./lib/crypto";
 import {
   pickChannel,
@@ -202,6 +210,84 @@ export const handleNewLead = internalAction({
     }
   },
 });
+
+// ──────────────────────────────────────────────────────────────────────
+// PREVIEW (dry-run voor de settings-pagina)
+// ──────────────────────────────────────────────────────────────────────
+
+/** Interne helper — membership-check vanuit action-context via internalQuery. */
+export const checkMembership = internalQuery({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (
+    ctx: QueryCtx,
+    { workspaceId }: { workspaceId: Id<"workspaces"> },
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { ok: false, error: "Not authenticated" };
+    const workspace = await ctx.db.get(workspaceId);
+    if (!workspace) return { ok: false, error: "Workspace not found" };
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) =>
+        q.eq("userId", userId).eq("orgId", workspace.orgId),
+      )
+      .first();
+    if (!membership) return { ok: false, error: "Not a member of this workspace" };
+    return { ok: true };
+  },
+});
+
+/** Genereer een voorbeeld-bericht met een dummy-lead (Pascal Hendriks, Reuver).
+ *  Enkel aanroepen vanuit de publieke wrapper `previewMessage`. */
+export const generatePreview = internalAction({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (
+    ctx,
+    { workspaceId },
+  ): Promise<{ text: string | null; error?: string }> => {
+    const cfg = await ctx.runQuery(internal.aiAgentConfig.getConfigInternal, {
+      workspaceId,
+    });
+    if (!cfg?.anthropicApiKeyEncrypted)
+      return { text: null, error: "Geen Anthropic-key gezet" };
+    const apiKey = await decryptSecret(cfg.anthropicApiKeyEncrypted);
+    const { system, user } = buildPrompt({
+      businessContext: cfg.businessContext,
+      tone: cfg.tone,
+      signature: cfg.signature,
+      bookingUrl: cfg.bookingUrl,
+      contact: { firstName: "Pascal", lastName: "Hendriks", city: "Reuver" },
+      formAnswers: [
+        "voor welk type ruimte: hele woning",
+        "vermogen: weet ik niet, graag advies",
+      ],
+    });
+    const text = await callAnthropic(apiKey, cfg.model, system, user);
+    return { text };
+  },
+});
+
+/** Public wrapper — belt de client aan. Doet membership-guard via internalQuery,
+ *  dan delegeert naar `generatePreview`. */
+export const previewMessage = action({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (
+    ctx,
+    { workspaceId },
+  ): Promise<{ text: string | null; error?: string }> => {
+    const check = await ctx.runQuery(internal.aiLeadResponse.checkMembership, {
+      workspaceId,
+    });
+    if (!check.ok) throw new Error(check.error ?? "Unauthorized");
+    return ctx.runAction(internal.aiLeadResponse.generatePreview, {
+      workspaceId,
+    });
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// ANTHROPIC HELPER
+// ──────────────────────────────────────────────────────────────────────
 
 async function callAnthropic(
   apiKey: string,

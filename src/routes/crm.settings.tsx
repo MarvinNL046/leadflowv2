@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Kanban as KanbanIcon,
   Mail,
+  Bot,
 } from 'lucide-react'
 import {
   Card,
@@ -60,6 +61,14 @@ const SECTIONS: HubSection[] = [
           'Aanpassen wat verstuurd wordt bij Buiten werkgebied / Niet bereikt / Afspraak-reminder',
         icon: Mail,
         iconColor: 'bg-blue-100 text-blue-700',
+      },
+      {
+        to: '/crm/settings/ai-agent',
+        title: 'AI-agent',
+        description:
+          'Automatische eerste reactie op nieuwe leads (speed-to-lead)',
+        icon: Bot,
+        iconColor: 'bg-violet-100 text-violet-700',
       },
     ],
   },
