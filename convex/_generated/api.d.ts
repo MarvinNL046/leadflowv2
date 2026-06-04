@@ -11,8 +11,10 @@
 import type * as auth from "../auth.js";
 import type * as contacts from "../contacts.js";
 import type * as crmSettings from "../crmSettings.js";
+import type * as crons from "../crons.js";
 import type * as customFields from "../customFields.js";
 import type * as emailTemplates from "../emailTemplates.js";
+import type * as followups from "../followups.js";
 import type * as http from "../http.js";
 import type * as integrations from "../integrations.js";
 import type * as lib_crypto from "../lib/crypto.js";
@@ -41,8 +43,10 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   contacts: typeof contacts;
   crmSettings: typeof crmSettings;
+  crons: typeof crons;
   customFields: typeof customFields;
   emailTemplates: typeof emailTemplates;
+  followups: typeof followups;
   http: typeof http;
   integrations: typeof integrations;
   "lib/crypto": typeof lib_crypto;

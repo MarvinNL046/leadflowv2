@@ -151,7 +151,10 @@ export default defineSchema({
     .index("by_workspace_email", ["workspaceId", "email"])
     .index("by_workspace_phone", ["workspaceId", "phone"])
     .index("by_messengerPsid", ["messengerPsid"])
-    .index("by_legacyContactId", ["legacyContactId"]),
+    .index("by_legacyContactId", ["legacyContactId"])
+    // Voor de follow-up-cron: due-leads efficiënt vinden (range op
+    // nextFollowUpAt binnen workspace).
+    .index("by_workspace_nextFollowUp", ["workspaceId", "nextFollowUpAt"]),
 
   pipelines: defineTable({
     workspaceId: v.id("workspaces"),
