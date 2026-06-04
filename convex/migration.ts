@@ -2050,3 +2050,160 @@ export const upsertNotificationsBatch = internalMutation({
     return { inserted, updated, total: args.docs.length };
   },
 });
+
+// ════════════════════════════════════════════════════════════════════
+// PIPELINE-REBUILD (cutover-prep) — zet de default pipeline op de exacte
+// 7-staps v1-belfunnel. Idempotent: bestaande stage met dezelfde naam
+// wordt gepatcht (order/flags/color), ontbrekende wordt ingevoegd.
+// Verwijdert NIETS (oude stages met opps blijven staan tot na de re-sync;
+// daarna prunen via pruneEmptyPipelineStages).
+// ════════════════════════════════════════════════════════════════════
+const FUNNEL_7 = [
+  { name: "Nieuw", order: 0, color: "#3b82f6", isWonStage: false, isLostStage: false },
+  { name: "1x Gebeld", order: 1, color: "#6366f1", isWonStage: false, isLostStage: false },
+  { name: "2x Gebeld", order: 2, color: "#8b5cf6", isWonStage: false, isLostStage: false },
+  { name: "3x Gebeld", order: 3, color: "#a855f7", isWonStage: false, isLostStage: false },
+  { name: "Afspraak ingepland", order: 4, color: "#f59e0b", isWonStage: false, isLostStage: false },
+  { name: "Gewonnen", order: 5, color: "#22c55e", isWonStage: true, isLostStage: false },
+  { name: "Verloren", order: 6, color: "#ef4444", isWonStage: false, isLostStage: true },
+];
+
+export const rebuildStaycoolPipeline7Stage = internalMutation({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, { workspaceId }) => {
+    const pipeline = await ctx.db
+      .query("pipelines")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    if (!pipeline) throw new Error("Geen default pipeline voor workspace");
+
+    const existing = await ctx.db
+      .query("pipelineStages")
+      .withIndex("by_pipeline_order", (q) => q.eq("pipelineId", pipeline._id))
+      .collect();
+    const byName = new Map(existing.map((s) => [s.name, s]));
+
+    const stages: Record<string, Id<"pipelineStages">> = {};
+    for (const d of FUNNEL_7) {
+      const ex = byName.get(d.name);
+      if (ex) {
+        await ctx.db.patch(ex._id, {
+          order: d.order,
+          color: d.color,
+          isWonStage: d.isWonStage,
+          isLostStage: d.isLostStage,
+        });
+        stages[d.name] = ex._id;
+      } else {
+        stages[d.name] = await ctx.db.insert("pipelineStages", {
+          pipelineId: pipeline._id,
+          name: d.name,
+          order: d.order,
+          color: d.color,
+          isWonStage: d.isWonStage,
+          isLostStage: d.isLostStage,
+        });
+      }
+    }
+
+    const desired = new Set(FUNNEL_7.map((d) => d.name));
+    const leftover: Array<{ name: string; stageId: Id<"pipelineStages">; opps: number }> = [];
+    for (const s of existing) {
+      if (desired.has(s.name)) continue;
+      const opps = await ctx.db
+        .query("opportunities")
+        .withIndex("by_workspace_stage", (q) =>
+          q.eq("workspaceId", workspaceId).eq("stageId", s._id),
+        )
+        .collect();
+      leftover.push({ name: s.name, stageId: s._id, opps: opps.length });
+    }
+
+    return { pipelineId: pipeline._id, stages, leftover };
+  },
+});
+
+/** Verwijdert pipeline-stages die NIET in de 7-staps funnel zitten én 0 opps
+ * hebben. Draai NA de opp-re-sync (die opps her-mapt naar de 7 stages). */
+export const pruneEmptyPipelineStages = internalMutation({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, { workspaceId }) => {
+    const pipeline = await ctx.db
+      .query("pipelines")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    if (!pipeline) throw new Error("Geen default pipeline voor workspace");
+
+    const desired = new Set(FUNNEL_7.map((d) => d.name));
+    const stages = await ctx.db
+      .query("pipelineStages")
+      .withIndex("by_pipeline_order", (q) => q.eq("pipelineId", pipeline._id))
+      .collect();
+
+    const deleted: string[] = [];
+    const keptWithOpps: Array<{ name: string; opps: number }> = [];
+    for (const s of stages) {
+      if (desired.has(s.name)) continue;
+      const opps = await ctx.db
+        .query("opportunities")
+        .withIndex("by_workspace_stage", (q) =>
+          q.eq("workspaceId", workspaceId).eq("stageId", s._id),
+        )
+        .collect();
+      if (opps.length === 0) {
+        await ctx.db.delete(s._id);
+        deleted.push(s.name);
+      } else {
+        keptWithOpps.push({ name: s.name, opps: opps.length });
+      }
+    }
+    return { deleted, keptWithOpps };
+  },
+});
+
+/** Ruimt opps op die in een NIET-funnel-stage hangen (oude 5-staps rest):
+ * mét legacyId (echte v1-opp) → verplaats naar Nieuw; zónder legacyId
+ * (seed/test-opp) → verwijderen. Draai vóór pruneEmptyPipelineStages. */
+export const cleanupNonFunnelOpps = internalMutation({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, { workspaceId }) => {
+    const pipeline = await ctx.db
+      .query("pipelines")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    if (!pipeline) throw new Error("Geen default pipeline voor workspace");
+
+    const stages = await ctx.db
+      .query("pipelineStages")
+      .withIndex("by_pipeline_order", (q) => q.eq("pipelineId", pipeline._id))
+      .collect();
+    const funnel = new Set(FUNNEL_7.map((d) => d.name));
+    const nieuw = stages.find((s) => s.name === "Nieuw");
+    if (!nieuw) throw new Error("Stage 'Nieuw' ontbreekt — draai eerst rebuild");
+
+    const moved: number[] = [];
+    const deleted: string[] = [];
+    for (const s of stages) {
+      if (funnel.has(s.name)) continue;
+      const opps = await ctx.db
+        .query("opportunities")
+        .withIndex("by_workspace_stage", (q) =>
+          q.eq("workspaceId", workspaceId).eq("stageId", s._id),
+        )
+        .collect();
+      for (const o of opps) {
+        if (o.legacyId != null) {
+          await ctx.db.patch(o._id, { stageId: nieuw._id });
+          moved.push(o.legacyId);
+        } else {
+          await ctx.db.delete(o._id);
+          deleted.push(o._id);
+        }
+      }
+    }
+    return { movedLegacyIds: moved, deletedSeedOpps: deleted.length };
+  },
+});
