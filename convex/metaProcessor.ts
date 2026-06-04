@@ -475,15 +475,14 @@ export const upsertContactFromMetaLead = internalMutation({
       });
     }
 
-    // Workflow trigger ALLEEN bij nieuw contact (merge = bestaand contact,
-    // workflows zouden niet opnieuw moeten triggeren bij dedup-hit).
-    if (isNewContact) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.workflowEngine.triggerContactCreated,
-        { workspaceId: workspace._id, contactId },
-      );
-    }
+    // Workflow trigger bij ELKE submission (Marvin's keuze "wel triggeren") —
+    // ook bij een herhaalde inzending van een bestaand contact, zodat de
+    // speed-to-lead auto-reactie elke nieuwe aanvraag afgaat.
+    await ctx.scheduler.runAfter(
+      0,
+      internal.workflowEngine.triggerContactCreated,
+      { workspaceId: workspace._id, contactId },
+    );
 
     return { contactId };
   },

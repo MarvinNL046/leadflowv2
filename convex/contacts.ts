@@ -163,18 +163,29 @@ export const listIncomingLeads = query({
       (c) => !c.outsideArea && c.deletedAt === undefined && !c.unreachable,
     );
 
-    // "Nieuwe leads"-widget (zoals v1's "Nieuwe leads van je formulieren"):
-    // toon leads met minstens één opp nog in de eerste stage (Nieuw).
-    // Gebelde (1x/2x/3x), afspraak-ingepland, gewonnen,
-    // verloren én opp-loze geïmporteerde contacten vallen eruit. Dit is een
-    // NIEUWE-leads-lijst, geen follow-up-reminder (overdue terugbel-datums
-    // horen in de pipeline/lead-detail, niet hier).
+    // "Op te volgen"-lijst (zoals v1's getNewLeads). Toon een lead als:
+    //   (a) een follow-up VERLOPEN is (nextFollowUpAt <= dueBefore) — de
+    //       "1x gebeld → verdwijnt → komt na N dagen terug"-flow; interval =
+    //       crmSettings.defaultFollowUpDays, gezet door de call-acties, OF
+    //   (b) minstens één opp nog in de eerste stage (Nieuw) staat.
+    // Gebelde leads met een TOEKOMSTIGE follow-up verdwijnen tot ze due zijn;
+    // gewonnen/verloren/onbereikbaar (3x) en opp-loze imports vallen eruit.
     const isFirstStage = (name?: string) => {
       const n = (name ?? "").toLowerCase();
       return n.includes("nieuw") || n.includes("new") || n.includes("lead");
     };
     const checked = await Promise.all(
       followable.map(async (c) => {
+        // (a) Verlopen follow-up → resurface (ongeacht stage). dueBefore =
+        // einde-vandaag, meegegeven door de client. Onbereikbare (3x) leads
+        // hebben geen nextFollowUpAt + zijn al uit `followable` gefilterd.
+        if (
+          args.dueBefore != null &&
+          c.nextFollowUpAt != null &&
+          c.nextFollowUpAt <= args.dueBefore
+        ) {
+          return { c, keep: true };
+        }
         const opps = await ctx.db
           .query("opportunities")
           .withIndex("by_contact", (q) => q.eq("contactId", c._id))
