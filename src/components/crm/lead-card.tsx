@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
+import { useAction, useMutation, useQuery } from 'convex/react'
 import {
   Phone,
   PhoneOff,
@@ -18,14 +19,19 @@ import {
   UserPlus,
   CheckCircle2,
   AlertTriangle,
+  Bot,
+  Send,
+  X,
 } from 'lucide-react'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { cn } from '#/lib/utils.ts'
 import { getMetaFormLabel } from '#/lib/meta-forms.ts'
+import { humanizeConvexError } from '#/lib/errors.ts'
 import { AnsweredDialog } from './answered-dialog'
 import { LeadDialog, type DialogView } from './lead-dialog'
+import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 
 export interface IncomingLead {
@@ -58,6 +64,13 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
     null,
   )
   const busy = false
+
+  // AI suggest-modus: laad eventuele pending suggestie voor dit contact.
+  const pending = useQuery(api.aiLeadResponse.pendingForContact, {
+    contactId: lead._id as Id<'contacts'>,
+  })
+  const sendSuggestion = useAction(api.aiLeadResponse.sendSuggestion)
+  const dismissSuggestion = useMutation(api.aiLeadResponse.dismissSuggestion)
 
   const displayName =
     [lead.firstName, lead.lastName].filter(Boolean).join(' ') ||
@@ -217,6 +230,58 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
             )}
           </div>
         </div>
+
+        {/* AI suggest-modus: toon pending suggestie als concept */}
+        {pending && (
+          <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 p-3">
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-blue-700">
+              <Bot className="h-3.5 w-3.5" />
+              AI-concept ({pending.channel})
+            </div>
+            <p className="mb-2 whitespace-pre-wrap text-xs text-blue-900">
+              {pending.body}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                className="h-7 bg-blue-600 px-3 text-xs text-white hover:bg-blue-700"
+                onClick={async () => {
+                  try {
+                    await sendSuggestion({ suggestionId: pending._id })
+                    toast.success('AI-bericht verstuurd')
+                  } catch (err) {
+                    toast.error(
+                      humanizeConvexError(err, 'Versturen mislukt'),
+                    )
+                  }
+                }}
+              >
+                <Send className="mr-1 h-3 w-3" />
+                Verstuur
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 border-blue-200 px-3 text-xs text-blue-700 hover:bg-blue-100"
+                onClick={async () => {
+                  try {
+                    await dismissSuggestion({ suggestionId: pending._id })
+                    toast.success('AI-concept genegeerd')
+                  } catch (err) {
+                    toast.error(
+                      humanizeConvexError(err, 'Negeren mislukt'),
+                    )
+                  }
+                }}
+              >
+                <X className="mr-1 h-3 w-3" />
+                Negeer
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Action row — 5 acties + Copy */}
         <div className="mt-4 flex flex-wrap items-center gap-2">

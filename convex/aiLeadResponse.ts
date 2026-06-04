@@ -4,6 +4,8 @@ import {
   internalAction,
   internalQuery,
   internalMutation,
+  mutation,
+  query,
   type QueryCtx,
 } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -282,6 +284,113 @@ export const previewMessage = action({
     return ctx.runAction(internal.aiLeadResponse.generatePreview, {
       workspaceId,
     });
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// SUGGEST-MODUS: public query + interne helpers + send/dismiss
+// ──────────────────────────────────────────────────────────────────────
+
+/** Geeft de nieuwste pending suggestie terug voor een contact.
+ *  Wordt gepollt door de lead-card via useQuery. */
+export const pendingForContact = query({
+  args: { contactId: v.id("contacts") },
+  handler: async (ctx, { contactId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    return ctx.db
+      .query("aiSuggestedResponses")
+      .withIndex("by_contact", (q) => q.eq("contactId", contactId))
+      .filter((q) => q.eq(q.field("status"), "pending"))
+      .order("desc")
+      .first();
+  },
+});
+
+/** Interne helper — laadt een suggestie-record op ID. */
+export const getSuggestionInternal = internalQuery({
+  args: { suggestionId: v.id("aiSuggestedResponses") },
+  handler: async (ctx, { suggestionId }) => ctx.db.get(suggestionId),
+});
+
+/** Interne helper — patchet de status van een suggestie. */
+export const setSuggestionStatusInternal = internalMutation({
+  args: {
+    suggestionId: v.id("aiSuggestedResponses"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("sent"),
+      v.literal("dismissed"),
+      v.literal("failed"),
+    ),
+  },
+  handler: async (ctx, { suggestionId, status }) =>
+    ctx.db.patch(suggestionId, { status }),
+});
+
+/** Verstuurt een pending AI-suggestie via het opgeslagen kanaal.
+ *  Zet status op "sent"; bij fout op "failed" + re-throw voor UI-toast. */
+export const sendSuggestion = action({
+  args: { suggestionId: v.id("aiSuggestedResponses") },
+  handler: async (ctx, { suggestionId }) => {
+    const suggestion = await ctx.runQuery(
+      internal.aiLeadResponse.getSuggestionInternal,
+      { suggestionId },
+    );
+    if (!suggestion) throw new Error("Suggestie niet gevonden");
+    if (suggestion.status !== "pending")
+      throw new Error(
+        `Suggestie is al ${suggestion.status} — niet meer te versturen`,
+      );
+
+    // Membership-check via de bestaande internalQuery.
+    const check = await ctx.runQuery(internal.aiLeadResponse.checkMembership, {
+      workspaceId: suggestion.workspaceId,
+    });
+    if (!check.ok) throw new Error(check.error ?? "Unauthorized");
+
+    try {
+      await ctx.runAction(internal.messaging.sendInternal, {
+        contactId: suggestion.contactId,
+        channel: suggestion.channel,
+        body: suggestion.body,
+      });
+      await ctx.runMutation(
+        internal.aiLeadResponse.setSuggestionStatusInternal,
+        { suggestionId, status: "sent" },
+      );
+    } catch (err) {
+      await ctx.runMutation(
+        internal.aiLeadResponse.setSuggestionStatusInternal,
+        { suggestionId, status: "failed" },
+      );
+      throw err;
+    }
+  },
+});
+
+/** Verwerpt een pending AI-suggestie (slaat 'em over zonder te versturen). */
+export const dismissSuggestion = mutation({
+  args: { suggestionId: v.id("aiSuggestedResponses") },
+  handler: async (ctx, { suggestionId }) => {
+    const suggestion = await ctx.db.get(suggestionId);
+    if (!suggestion) throw new Error("Suggestie niet gevonden");
+
+    // Membership-check — hergebruik checkMembership-logica inline
+    // (mutations kunnen geen runQuery aanroepen; guard inline uitvoeren).
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const workspace = await ctx.db.get(suggestion.workspaceId);
+    if (!workspace) throw new Error("Workspace niet gevonden");
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) =>
+        q.eq("userId", userId).eq("orgId", workspace.orgId),
+      )
+      .first();
+    if (!membership) throw new Error("Geen toegang tot deze workspace");
+
+    await ctx.db.patch(suggestionId, { status: "dismissed" });
   },
 });
 
