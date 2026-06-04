@@ -107,7 +107,7 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const totalValue = opps.reduce((sum, o) => sum + (o.value ?? 0), 0)
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-w-0 flex-col space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-zinc-900">
@@ -145,7 +145,7 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
       </div>
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto pb-4">
           {stages.map((stage) => (
             <StageColumn
               key={stage._id}
@@ -204,7 +204,7 @@ function StageColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        'flex w-72 shrink-0 flex-col rounded-lg border border-zinc-200 bg-zinc-50/60 p-3',
+        'flex h-full w-72 shrink-0 flex-col rounded-lg border border-zinc-200 bg-zinc-50/60 p-3',
         isOver && 'border-blue-300 bg-blue-50/60',
       )}
     >
@@ -232,7 +232,7 @@ function StageColumn({
         )}
       </div>
 
-      <div className="space-y-2">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {opportunities.length === 0 ? (
           <p className="rounded-md border border-dashed border-zinc-300 py-6 text-center text-xs text-zinc-400">
             Sleep een opportunity hierheen
