@@ -164,8 +164,8 @@ export const listIncomingLeads = query({
     );
 
     // "Nieuwe leads"-widget (zoals v1's "Nieuwe leads van je formulieren"):
-    // toon ALLEEN leads met een opp die nog volledig in de eerste stage
-    // (Nieuw) staat. Gebelde (1x/2x/3x), afspraak-ingepland, gewonnen,
+    // toon leads met minstens één opp nog in de eerste stage (Nieuw).
+    // Gebelde (1x/2x/3x), afspraak-ingepland, gewonnen,
     // verloren én opp-loze geïmporteerde contacten vallen eruit. Dit is een
     // NIEUWE-leads-lijst, geen follow-up-reminder (overdue terugbel-datums
     // horen in de pipeline/lead-detail, niet hier).
@@ -186,10 +186,13 @@ export const listIncomingLeads = query({
         const stages = await Promise.all(
           opps.map((o) => ctx.db.get(o.stageId)),
         );
-        const allFirst = stages.every(
+        // Toon als MINSTENS ÉÉN opp nog in de eerste stage (Nieuw) staat —
+        // een contact kan meerdere opps hebben (elke submission = verse opp),
+        // dus een verse Nieuw-opp naast oude afgehandelde moet tóch tonen.
+        const anyFirst = stages.some(
           (s) => s != null && (s.order === 0 || isFirstStage(s.name)),
         );
-        return { c, keep: allFirst };
+        return { c, keep: anyFirst };
       }),
     );
     const contacts = checked

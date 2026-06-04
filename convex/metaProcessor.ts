@@ -396,13 +396,14 @@ export const upsertContactFromMetaLead = internalMutation({
       rawPayload: args.rawPayloadEnriched,
     });
 
-    // Opportunity aanmaken zodat lead in Kanban verschijnt (alleen bij
-    // nieuw contact; bij dedup-merge bestaat mogelijk al een opp).
+    // Opportunity aanmaken zodat lead in Kanban verschijnt. ELKE submission
+    // krijgt een verse opp — ook bij een bestaand/gededupt contact (Marvin's
+    // keuze: elke formulier-inzending = een nieuwe deal om op te volgen).
     //
     // Pipeline-resolutie volgt de route: route.defaultPipelineId →
     // workspace default pipeline. Stage: route.defaultStageId → eerste
     // non-won/lost stage. Assignee en value komen uit de route.
-    if (isNewContact) {
+    {
       let pipeline = route?.defaultPipelineId
         ? await ctx.db.get(route.defaultPipelineId)
         : null;
