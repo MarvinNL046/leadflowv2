@@ -565,7 +565,9 @@ function ChatBubble({
         {(() => {
           const mediaUrl = (message as { mediaUrl?: string }).mediaUrl
           const mediaType = (message as { mediaType?: string }).mediaType
-          if (mediaUrl && mediaType?.startsWith('image/')) {
+          const looksLikeImage =
+            mediaType?.startsWith('image/') || /image/i.test(message.body || '')
+          if (mediaUrl && looksLikeImage) {
             return (
               <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
                 <img
