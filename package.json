@@ -35,7 +35,7 @@
     "convex": "^1.40.0",
     "lucide-react": "^0.577.0",
     "next-themes": "^0.4.6",
-    "nitro": "npm:nitro-nightly@latest",
+    "nitro": "npm:nitro-nightly@3.0.1-20260512-093145-0498ce70",
     "posthog-js": "^1.358.1",
     "radix-ui": "^1.4.3",
     "react": "^19.2.0",

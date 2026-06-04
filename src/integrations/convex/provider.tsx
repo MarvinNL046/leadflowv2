@@ -3,7 +3,12 @@ import { ConvexQueryClient } from '@convex-dev/react-query'
 
 const CONVEX_URL = (import.meta as any).env.VITE_CONVEX_URL
 if (!CONVEX_URL) {
-  console.error('missing envar CONVEX_URL')
+  // Fail-loud: een prod-build zonder VITE_CONVEX_URL levert anders een stille,
+  // dode Convex-client op (alle queries falen zonder zichtbare oorzaak).
+  throw new Error(
+    'VITE_CONVEX_URL ontbreekt — zet deze in de Vercel project-env (Production scope) ' +
+      'op https://<prod-deployment>.convex.cloud',
+  )
 }
 const convexQueryClient = new ConvexQueryClient(CONVEX_URL)
 
