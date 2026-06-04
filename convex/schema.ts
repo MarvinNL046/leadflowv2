@@ -765,10 +765,13 @@ export default defineSchema({
   //
   // 3. `workflowExecutionLogs` idem — log retention policy nodig.
   //
-  // 4. ENCRYPTION: alle `accessToken` velden moeten encrypted opgeslagen.
-  //    Convex heeft geen native encryption-at-app-layer; gebruik externe
-  //    KMS-style key in process.env + crypto.createCipheriv pattern uit
-  //    v1's src/lib/crypto.ts. Convex storage zelf is encrypted-at-rest.
+  // 4. ENCRYPTION: `accessToken`-velden worden app-layer encrypted via
+  //    convex/lib/crypto.ts (AES-256-GCM, Web Crypto, ENCRYPTION_KEY env).
+  //    GEÏMPLEMENTEERD voor metaConnections.accessToken + metaPages.accessToken
+  //    (encrypt in http.ts OAuth-callback, decrypt in integrations.syncFormsForPage).
+  //    TODO bij activatie email-sync: pas hetzelfde toe op emailConnections
+  //    .accessToken/.refreshToken (nu nog ongebruikte tabel). Convex storage
+  //    zelf is óók encrypted-at-rest; dit is de extra app-layer.
   //
   // 5. MULTI-TENANT GUARD: elke query/mutation MOET workspaceId-check doen
   //    voor data-isolation. Convex heeft geen RLS — guard in handler.

@@ -11,6 +11,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
+import { decryptSecret } from "./lib/crypto";
 
 /**
  * Integrations layer — Meta (Facebook Lead Ads) + WhatsApp via Voidfix.
@@ -528,7 +529,12 @@ export const syncFormsForPage = action({
     );
     url.searchParams.set("fields", "id,name,questions,status,locale");
     url.searchParams.set("limit", "100");
-    url.searchParams.set("access_token", pageData.page.accessToken);
+    // Token-at-rest is encrypted (zie lib/crypto); decrypt vlak vóór de
+    // Graph-call. Legacy-tolerant: pre-encryptie tokens komen ongewijzigd terug.
+    url.searchParams.set(
+      "access_token",
+      await decryptSecret(pageData.page.accessToken),
+    );
 
     const errors: string[] = [];
     let synced = 0;

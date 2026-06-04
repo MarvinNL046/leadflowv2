@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { verifyStateToken } from "./metaOauth";
 import { getSiteUrl } from "./lib/env";
+import { encryptSecret } from "./lib/crypto";
 
 const http = httpRouter();
 
@@ -125,21 +126,26 @@ http.route({
         console.error("[meta-oauth] /me/accounts faalde:", pagesJson);
         return redirectToFrontend(siteUrl, "pages_fetch_failed");
       }
-      const pages = (pagesJson.data ?? [])
-        .filter((p): p is { id: string; name: string; access_token: string } =>
-          Boolean(p.access_token),
-        )
-        .map((p) => ({
-          pageId: p.id,
-          pageName: p.name,
-          accessToken: p.access_token,
-        }));
+      // 5) Encrypt tokens-at-rest vóór persist. Meta-tokens zijn long-lived
+      //    en zeer gevoelig; encrypt mag hier omdat httpAction in de
+      //    V8-runtime draait met crypto.subtle + getRandomValues.
+      const pages = await Promise.all(
+        (pagesJson.data ?? [])
+          .filter((p): p is { id: string; name: string; access_token: string } =>
+            Boolean(p.access_token),
+          )
+          .map(async (p) => ({
+            pageId: p.id,
+            pageName: p.name,
+            accessToken: await encryptSecret(p.access_token),
+          })),
+      );
 
-      // 5) Upsert via internal mutation
+      // 6) Upsert via internal mutation (tokens al versleuteld)
       await ctx.runMutation(internal.integrations.upsertMetaConnectionInternal, {
         orgId: payload.orgId,
         metaUserId: meJson.id,
-        accessToken: longLivedToken,
+        accessToken: await encryptSecret(longLivedToken),
         pages,
       });
 
