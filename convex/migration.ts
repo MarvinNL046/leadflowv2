@@ -1,9 +1,9 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
 /**
- * ⚠ ETL helpers — PUBLIEK tijdens migratie-fase, GEEN auth-check binnen.
+ * ⚠ ETL helpers — INTERNAL (internalMutation/internalQuery), GEEN publiek endpoint.
  *
  * Reden: scripts/migrate-contacts.ts moet bulk-upserts doen vanaf Node
  * zonder admin-key (Convex's deploy-key CLI is in nieuwere versie
@@ -27,7 +27,7 @@ import type { Id } from "./_generated/dataModel";
  * Bedoeld voor manual testing tijdens v2-development. Verwijder vóór
  * cutover-cleanup van migration.ts.
  */
-export const resetTestContact = mutation({
+export const resetTestContact = internalMutation({
   args: { contactId: v.id("contacts") },
   handler: async (ctx, args) => {
     const contact = await ctx.db.get(args.contactId);
@@ -105,7 +105,7 @@ export const resetTestContact = mutation({
  * Wordt verwijderd bij cutover-cleanup (samen met de rest van
  * migration.ts).
  */
-export const markAllMessagesReadAdmin = mutation({
+export const markAllMessagesReadAdmin = internalMutation({
   args: {},
   handler: async (ctx) => {
     const org = await ctx.db
@@ -144,7 +144,7 @@ export const markAllMessagesReadAdmin = mutation({
  * Wrapper rond resetTestContact die per email zoekt — handig voor
  * runtime via `npx convex run migration:resetTestContactByEmail`.
  */
-export const resetTestContactByEmail = mutation({
+export const resetTestContactByEmail = internalMutation({
   args: { email: v.string() },
   handler: async (ctx, args) => {
     const contact = await ctx.db
@@ -214,7 +214,7 @@ export const resetTestContactByEmail = mutation({
 });
 
 /** Vind het workspace-id voor Staycool (default workspace). */
-export const getStaycoolWorkspaceId = query({
+export const getStaycoolWorkspaceId = internalQuery({
   args: {},
   handler: async (ctx) => {
     const org = await ctx.db
@@ -245,7 +245,7 @@ const SEED_STAGES = [
   { name: "Verloren", color: "#f87171", isWonStage: false, isLostStage: true },
 ];
 
-export const seedStaycoolPipeline = mutation({
+export const seedStaycoolPipeline = internalMutation({
   args: {},
   handler: async (ctx) => {
     const org = await ctx.db
@@ -349,7 +349,7 @@ export const seedStaycoolPipeline = mutation({
  * Idempotent: skip als workflow met deze naam al bestaat.
  * Verwijder bij cleanup.
  */
-export const seedSnelleResponse = mutation({
+export const seedSnelleResponse = internalMutation({
   args: {
     delaySeconds: v.optional(v.number()),  // override voor test (default 180)
   },
@@ -468,7 +468,7 @@ export const seedSnelleResponse = mutation({
  * Auth-less wrapper rond contacts.mergeInto voor cleanup-scripts.
  * Verwijder bij productie-cleanup.
  */
-export const adminMergeContacts = mutation({
+export const adminMergeContacts = internalMutation({
   args: {
     loserId: v.id("contacts"),
     winnerId: v.id("contacts"),
@@ -589,7 +589,7 @@ export const adminMergeContacts = mutation({
  * undefined). Probeer phone-match met variants (met/zonder + prefix).
  * Wegwerp — verwijderen na productie-cleanup.
  */
-export const backfillInboundContactIds = mutation({
+export const backfillInboundContactIds = internalMutation({
   args: {},
   handler: async (ctx) => {
     const inboundMessages = await ctx.db
@@ -633,7 +633,7 @@ export const backfillInboundContactIds = mutation({
  * Update delay op de Snelle Response workflow. Voor test gebruiken we
  * 15s, voor productie 180s. Verwijder na cleanup van migration.ts.
  */
-export const updateSnelleResponseDelay = mutation({
+export const updateSnelleResponseDelay = internalMutation({
   args: { delaySeconds: v.number() },
   handler: async (ctx, args) => {
     const org = await ctx.db
@@ -678,7 +678,7 @@ export const updateSnelleResponseDelay = mutation({
  * leadgenId. Voor verifiëren van live webhook-tests. Verwijder bij
  * cleanup (samen met de rest van migration.ts).
  */
-export const debugLookupByLeadgenId = query({
+export const debugLookupByLeadgenId = internalQuery({
   args: { leadgenId: v.string() },
   handler: async (ctx, args) => {
     const raw = await ctx.db
@@ -727,7 +727,7 @@ export const debugLookupByLeadgenId = query({
 });
 
 /** Vind het org-id voor Staycool — nodig voor metaLeadRaw (FK naar orgs). */
-export const getStaycoolOrgId = query({
+export const getStaycoolOrgId = internalQuery({
   args: {},
   handler: async (ctx) => {
     const org = await ctx.db
@@ -739,7 +739,7 @@ export const getStaycoolOrgId = query({
 });
 
 /** Aantal al-gemigreerde contacts (via legacyContactId aanwezigheid). */
-export const countMigratedContacts = query({
+export const countMigratedContacts = internalQuery({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
     const rows = await ctx.db
@@ -785,7 +785,7 @@ const contactDocValidator = v.object({
  * Returnt teller {inserted, updated, skipped} zodat de Node-script
  * voortgang kan loggen.
  */
-export const upsertContactsBatch = mutation({
+export const upsertContactsBatch = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
     docs: v.array(contactDocValidator),
@@ -847,7 +847,7 @@ export const upsertContactsBatch = mutation({
 // LEAD ATTRIBUTION ETL
 // ──────────────────────────────────────────────────────────────────────
 
-export const countMigratedLeadAttributions = query({
+export const countMigratedLeadAttributions = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("leadAttribution").collect();
@@ -880,7 +880,7 @@ const leadAttributionDocValidator = v.object({
  * Skipt rows zonder match (returnt counter) i.p.v. te crashen — handig
  * als attribution-migratie per ongeluk vóór contacts-migratie loopt.
  */
-export const upsertLeadAttributionBatch = mutation({
+export const upsertLeadAttributionBatch = internalMutation({
   args: {
     docs: v.array(leadAttributionDocValidator),
   },
@@ -949,7 +949,7 @@ export const upsertLeadAttributionBatch = mutation({
 // META LEAD RAW ETL
 // ──────────────────────────────────────────────────────────────────────
 
-export const countMigratedMetaLeadRaws = query({
+export const countMigratedMetaLeadRaws = internalQuery({
   args: { orgId: v.id("orgs") },
   handler: async (ctx, args) => {
     // Klein volume (v1 = 352 rows totaal), full scan is acceptabel.
@@ -993,7 +993,7 @@ const metaLeadRawDocValidator = v.object({
  * resolven we via by_legacyContactId; opportunityId skippen we (geen
  * opportunities-migratie nog).
  */
-export const upsertMetaLeadRawBatch = mutation({
+export const upsertMetaLeadRawBatch = internalMutation({
   args: {
     orgId: v.id("orgs"),
     docs: v.array(metaLeadRawDocValidator),
@@ -1057,7 +1057,7 @@ export const upsertMetaLeadRawBatch = mutation({
 // NOTES ETL
 // ──────────────────────────────────────────────────────────────────────
 
-export const countMigratedNotes = query({
+export const countMigratedNotes = internalQuery({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
     const rows = await ctx.db
@@ -1080,7 +1080,7 @@ const noteDocValidator = v.object({
  * contactId geresolved via by_legacyContactId. createdById blijft
  * undefined — v1 users zijn niet 1-op-1 met Convex Auth users.
  */
-export const upsertNotesBatch = mutation({
+export const upsertNotesBatch = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
     docs: v.array(noteDocValidator),
@@ -1144,7 +1144,7 @@ export const upsertNotesBatch = mutation({
  * van de target workspace terug, met stage-names. Het script gebruikt
  * dat om v1 stage_id → v2 stageId te mappen op naam.
  */
-export const getStaycoolPipelineWithStages = query({
+export const getStaycoolPipelineWithStages = internalQuery({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
     const pipeline = await ctx.db
@@ -1172,7 +1172,7 @@ export const getStaycoolPipelineWithStages = query({
   },
 });
 
-export const countMigratedOpportunities = query({
+export const countMigratedOpportunities = internalQuery({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
     const rows = await ctx.db
@@ -1203,7 +1203,7 @@ const opportunityDocValidator = v.object({
  * directe Convex IDs door. assignedToId blijft undefined — v1 users
  * zijn niet 1-op-1 met Convex Auth.
  */
-export const upsertOpportunitiesBatch = mutation({
+export const upsertOpportunitiesBatch = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
     docs: v.array(opportunityDocValidator),
@@ -1269,7 +1269,7 @@ export const upsertOpportunitiesBatch = mutation({
 // OPPORTUNITY STAGE HISTORY ETL
 // ──────────────────────────────────────────────────────────────────────
 
-export const countMigratedStageHistory = query({
+export const countMigratedStageHistory = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("opportunityStageHistory").collect();
@@ -1289,7 +1289,7 @@ const stageHistoryDocValidator = v.object({
  * geresolved via by_legacyId op opportunities. Skip-counter voor rows
  * waarvan de opportunity nog niet bestaat (orphan).
  */
-export const upsertStageHistoryBatch = mutation({
+export const upsertStageHistoryBatch = internalMutation({
   args: { docs: v.array(stageHistoryDocValidator) },
   handler: async (ctx, args) => {
     let inserted = 0;
@@ -1342,7 +1342,7 @@ export const upsertStageHistoryBatch = mutation({
 // CUSTOM FIELD DEFINITIONS ETL
 // ──────────────────────────────────────────────────────────────────────
 
-export const countMigratedCustomFieldDefs = query({
+export const countMigratedCustomFieldDefs = internalQuery({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
     const rows = await ctx.db
@@ -1372,7 +1372,7 @@ const customFieldDefDocValidator = v.object({
   sortOrder: v.number(),
 });
 
-export const upsertCustomFieldDefsBatch = mutation({
+export const upsertCustomFieldDefsBatch = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
     docs: v.array(customFieldDefDocValidator),
@@ -1418,7 +1418,7 @@ export const upsertCustomFieldDefsBatch = mutation({
 // CUSTOM FIELD VALUES ETL
 // ──────────────────────────────────────────────────────────────────────
 
-export const countMigratedCustomFieldValues = query({
+export const countMigratedCustomFieldValues = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("customFieldValues").collect();
@@ -1443,7 +1443,7 @@ const customFieldValueDocValidator = v.object({
  * Skipt rows met onresolved FK. entityId wordt opgeslagen als string
  * (per v2 schema, voor cross-table use).
  */
-export const upsertCustomFieldValuesBatch = mutation({
+export const upsertCustomFieldValuesBatch = internalMutation({
   args: { docs: v.array(customFieldValueDocValidator) },
   handler: async (ctx, args) => {
     let inserted = 0;
@@ -1520,7 +1520,7 @@ export const upsertCustomFieldValuesBatch = mutation({
 // MESSAGE LOG ETL (v1 message_log → v2 messages, channel=sms/wa/messenger)
 // ──────────────────────────────────────────────────────────────────────
 
-export const countMigratedMessageLog = query({
+export const countMigratedMessageLog = internalQuery({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
     // Bounded: filter op channel != email + legacyId aanwezig.
@@ -1585,7 +1585,7 @@ const messageLogDocValidator = v.object({
  * in messages — rows met workspace_id=null in v1 worden door het script
  * geskipt (SQL filter). contact_id via legacyContactId lookup, optional.
  */
-export const upsertMessageLogBatch = mutation({
+export const upsertMessageLogBatch = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
     docs: v.array(messageLogDocValidator),
@@ -1653,7 +1653,7 @@ export const upsertMessageLogBatch = mutation({
 // EMAIL TEMPLATES ETL
 // ──────────────────────────────────────────────────────────────────────
 
-export const countMigratedEmailTemplates = query({
+export const countMigratedEmailTemplates = internalQuery({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
     const rows = await ctx.db
@@ -1673,7 +1673,7 @@ const emailTemplateDocValidator = v.object({
   isSystem: v.boolean(),
 });
 
-export const upsertEmailTemplatesBatch = mutation({
+export const upsertEmailTemplatesBatch = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
     docs: v.array(emailTemplateDocValidator),
@@ -1717,7 +1717,7 @@ export const upsertEmailTemplatesBatch = mutation({
 // WORKFLOWS ETL
 // ──────────────────────────────────────────────────────────────────────
 
-export const countMigratedWorkflows = query({
+export const countMigratedWorkflows = internalQuery({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
     // Bounded set: filter op workspaceId, dan check legacyId aanwezigheid
@@ -1769,7 +1769,7 @@ const workflowDocValidator = v.object({
   lastExecutedAt: v.optional(v.number()),
 });
 
-export const upsertWorkflowsBatch = mutation({
+export const upsertWorkflowsBatch = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
     docs: v.array(workflowDocValidator),
@@ -1817,7 +1817,7 @@ export const upsertWorkflowsBatch = mutation({
 // WORKFLOW NODES ETL
 // ──────────────────────────────────────────────────────────────────────
 
-export const countMigratedWorkflowNodes = query({
+export const countMigratedWorkflowNodes = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("workflowNodes").collect();
@@ -1842,7 +1842,7 @@ const workflowNodeDocValidator = v.object({
   label: v.optional(v.string()),
 });
 
-export const upsertWorkflowNodesBatch = mutation({
+export const upsertWorkflowNodesBatch = internalMutation({
   args: { docs: v.array(workflowNodeDocValidator) },
   handler: async (ctx, args) => {
     let inserted = 0;
@@ -1900,7 +1900,7 @@ export const upsertWorkflowNodesBatch = mutation({
 // WORKFLOW EDGES ETL
 // ──────────────────────────────────────────────────────────────────────
 
-export const countMigratedWorkflowEdges = query({
+export const countMigratedWorkflowEdges = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("workflowEdges").collect();
@@ -1916,7 +1916,7 @@ const workflowEdgeDocValidator = v.object({
   branchLabel: v.optional(v.string()),
 });
 
-export const upsertWorkflowEdgesBatch = mutation({
+export const upsertWorkflowEdgesBatch = internalMutation({
   args: { docs: v.array(workflowEdgeDocValidator) },
   handler: async (ctx, args) => {
     let inserted = 0;
@@ -1974,7 +1974,7 @@ export const upsertWorkflowEdgesBatch = mutation({
  * Helper voor het notifications-script: vind de super-admin user-id om
  * v1 notifications met user_id=25 (Marvin) op te mappen naar v2.
  */
-export const getSuperAdminUserId = query({
+export const getSuperAdminUserId = internalQuery({
   args: {},
   handler: async (ctx) => {
     const profile = await ctx.db
@@ -1985,7 +1985,7 @@ export const getSuperAdminUserId = query({
   },
 });
 
-export const countMigratedNotifications = query({
+export const countMigratedNotifications = internalQuery({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
     const rows = await ctx.db
@@ -2007,7 +2007,7 @@ const notificationDocValidator = v.object({
   isRead: v.boolean(),
 });
 
-export const upsertNotificationsBatch = mutation({
+export const upsertNotificationsBatch = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
     userId: v.id("users"),
