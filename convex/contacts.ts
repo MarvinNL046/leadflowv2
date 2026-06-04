@@ -139,31 +139,65 @@ export const listIncomingLeads = query({
   args: {
     workspaceId: v.id("workspaces"),
     limit: v.optional(v.number()),
+    // Einde-van-vandaag timestamp (client; stabiel per dag → geen refetch-thrash).
+    // Een lead met een follow-up die <= dit ligt telt als "actie nodig".
+    dueBefore: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     await requireWorkspaceMembership(ctx, args.workspaceId);
 
     const limit = Math.min(args.limit ?? 200, 500);
 
+    // Kandidaten: recente contacten (nieuwste eerst). Bounded window —
+    // nieuwe/op-te-volgen leads zijn recent; oude stale leads horen in de
+    // pipeline, niet op het speed-to-lead-dashboard.
     const rawContacts = await ctx.db
       .query("contacts")
       .withIndex("by_workspace_created", (q) =>
         q.eq("workspaceId", args.workspaceId),
       )
       .order("desc")
-      .take(limit * 2);  // overshoot zodat na filter nog ~limit overblijft
+      .take(400);
 
-    // Filter: skip leads die niet (meer) opgevolgd moeten worden:
-    //   - outside-area (Limburg-only)
-    //   - soft-deleted
-    //   - unreachable (3x niet bereikt)
-    const contacts = rawContacts
-      .filter(
-        (c) =>
-          !c.outsideArea &&
-          c.deletedAt === undefined &&
-          !c.unreachable,
-      )
+    const followable = rawContacts.filter(
+      (c) => !c.outsideArea && c.deletedAt === undefined && !c.unreachable,
+    );
+
+    // "Heeft actie nodig"-filter (spiegelt v1 getNewLeads): toon een lead
+    // alleen als (a) geen opportunities, (b) een follow-up die verlopen is,
+    // of (c) ALLE opps nog in de eerste stage (Nieuw) staan. Zo vallen
+    // gebelde (1x/2x/3x), afspraak-ingepland, gewonnen en verloren leads
+    // eruit — precies de leads die jij al hebt afgehandeld.
+    const isFirstStage = (name?: string) => {
+      const n = (name ?? "").toLowerCase();
+      return n.includes("nieuw") || n.includes("new") || n.includes("lead");
+    };
+    const checked = await Promise.all(
+      followable.map(async (c) => {
+        if (
+          args.dueBefore != null &&
+          c.nextFollowUpAt != null &&
+          c.nextFollowUpAt <= args.dueBefore
+        ) {
+          return { c, keep: true };
+        }
+        const opps = await ctx.db
+          .query("opportunities")
+          .withIndex("by_contact", (q) => q.eq("contactId", c._id))
+          .collect();
+        if (opps.length === 0) return { c, keep: true };
+        const stages = await Promise.all(
+          opps.map((o) => ctx.db.get(o.stageId)),
+        );
+        const allFirst = stages.every(
+          (s) => s != null && (s.order === 0 || isFirstStage(s.name)),
+        );
+        return { c, keep: allFirst };
+      }),
+    );
+    const contacts = checked
+      .filter((x) => x.keep)
+      .map((x) => x.c)
       .slice(0, limit);
 
     // Per contact: laad attribution + latest note in parallel

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { Phone, ChevronDown } from 'lucide-react'
@@ -20,9 +20,17 @@ function CrmDashboard() {
   const tenant = tenants?.find((t) => t.workspace !== null) ?? null
   const workspaceId = tenant?.workspace?.id
 
+  // Einde-van-vandaag, stabiel per mount → een verlopen follow-up telt mee
+  // zonder dat de query-arg elke render verandert (geen refetch-thrash).
+  const dueBefore = useMemo(() => {
+    const d = new Date()
+    d.setHours(23, 59, 59, 999)
+    return d.getTime()
+  }, [])
+
   const leads = useQuery(
     api.contacts.listIncomingLeads,
-    workspaceId ? { workspaceId, limit: 200 } : 'skip',
+    workspaceId ? { workspaceId, limit: 200, dueBefore } : 'skip',
   )
 
   return (
