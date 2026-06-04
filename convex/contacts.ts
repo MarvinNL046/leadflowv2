@@ -143,7 +143,7 @@ export const listIncomingLeads = query({
   handler: async (ctx, args) => {
     await requireWorkspaceMembership(ctx, args.workspaceId);
 
-    const limit = Math.min(args.limit ?? 50, 200);
+    const limit = Math.min(args.limit ?? 200, 500);
 
     const rawContacts = await ctx.db
       .query("contacts")

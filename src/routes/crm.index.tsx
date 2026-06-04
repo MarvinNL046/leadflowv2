@@ -22,7 +22,7 @@ function CrmDashboard() {
 
   const leads = useQuery(
     api.contacts.listIncomingLeads,
-    workspaceId ? { workspaceId, limit: 50 } : 'skip',
+    workspaceId ? { workspaceId, limit: 200 } : 'skip',
   )
 
   return (
