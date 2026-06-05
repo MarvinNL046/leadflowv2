@@ -22,10 +22,17 @@ import {
   Bot,
   Send,
   X,
+  ChevronDown,
 } from 'lucide-react'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu.tsx'
 import { cn } from '#/lib/utils.ts'
 import { getMetaFormLabel } from '#/lib/meta-forms.ts'
 import { humanizeConvexError } from '#/lib/errors.ts'
@@ -63,7 +70,6 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
   const [quickActionView, setQuickActionView] = useState<DialogView | null>(
     null,
   )
-  const busy = false
 
   // AI suggest-modus: laad eventuele pending suggestie voor dit contact.
   const pending = useQuery(api.aiLeadResponse.pendingForContact, {
@@ -283,73 +289,49 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
           </div>
         )}
 
-        {/* Action row — 5 acties + Copy */}
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {/* Bel — opent LeadDialog op main view. Daarin staat het
-              telefoonnummer prominent als tel:-link (één klik = bellen)
-              plus de 4 vervolg-acties voor na het gesprek. */}
+        {/* Action row — primaire Bel + uitkomst-menu + copy */}
+        <div className="mt-4 flex items-center gap-2">
+          {/* Bel — opent LeadDialog 'main' (tel:-link prominent + vervolg-acties). */}
           <Button
             type="button"
             onClick={() => openQuickAction('main')}
             disabled={!lead.phone}
             title={lead.phone ? `Bel ${lead.phone}` : 'Geen telefoonnummer'}
-            className="flex-1 min-w-[100px] bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 disabled:opacity-50"
+            className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 disabled:opacity-50"
           >
             <Phone className="h-4 w-4" />
             Bel
           </Button>
 
-          {/* Opgenomen → AnsweredDialog */}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setAnsweredOpen(true)}
-            disabled={!!busy}
-            title="Heeft opgenomen"
-            className="border-violet-200 text-violet-700 hover:bg-violet-50 hover:text-violet-800"
-          >
-            <CheckCircle2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Opgenomen</span>
-          </Button>
-
-          {/* Niet bereikt → opent LeadDialog op not_answered sub-view */}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => openQuickAction('not_answered')}
-            disabled={!!busy}
-            title="Niet bereikt — open preview met optionele email/SMS"
-            className="border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
-          >
-            <PhoneMissed className="h-4 w-4" />
-            <span className="hidden sm:inline">Niet bereikt</span>
-          </Button>
-
-          {/* Ongeldig nummer → opent LeadDialog op invalid_number sub-view */}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => openQuickAction('invalid_number')}
-            disabled={!!busy}
-            title="Ongeldig telefoonnummer — open preview met optionele email"
-            className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
-          >
-            <AlertTriangle className="h-4 w-4" />
-            <span className="hidden sm:inline">Ongeldig</span>
-          </Button>
-
-          {/* Buiten gebied → opent LeadDialog op outside_area sub-view */}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => openQuickAction('outside_area')}
-            disabled={!!busy}
-            title="Buiten werkgebied — open preview met optionele email"
-            className="border-orange-200 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
-          >
-            <MapPinOff className="h-4 w-4" />
-            <span className="hidden sm:inline">Buiten gebied</span>
-          </Button>
+          {/* Uitkomst markeren — neutraal menu met de 4 dispositions. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" className="shrink-0">
+                Uitkomst markeren
+                <ChevronDown className="h-4 w-4 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onSelect={() => setAnsweredOpen(true)}>
+                <CheckCircle2 className="text-emerald-600" />
+                Opgenomen
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => openQuickAction('not_answered')}>
+                <PhoneMissed />
+                Niet bereikt
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => openQuickAction('invalid_number')}
+              >
+                <AlertTriangle />
+                Ongeldig nummer
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => openQuickAction('outside_area')}>
+                <MapPinOff />
+                Buiten gebied
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Copy */}
           <Button
