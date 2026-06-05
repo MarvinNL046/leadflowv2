@@ -629,6 +629,104 @@ http.route({
   }),
 });
 
+// ══════════════════════════════════════════════════════════════════════
+// WEBSITE-FORM LEAD INGEST — staycoolairco.nl forms → v2 CRM
+// Browser-form (cross-origin) → CORS nodig. Auth = WEBSITE_API_KEY via
+// X-API-Key-header of ?secret=. NB de key is client-side (public) — dit is
+// een lichte anti-misbruik-gate, geen sterk secret.
+// ══════════════════════════════════════════════════════════════════════
+const LEADS_CORS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, X-API-Key",
+};
+
+http.route({
+  path: "/webhooks/leads",
+  method: "OPTIONS",
+  handler: httpAction(
+    async () => new Response(null, { status: 204, headers: LEADS_CORS }),
+  ),
+});
+
+http.route({
+  path: "/webhooks/leads",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const cors = (body: unknown, status: number) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json", ...LEADS_CORS },
+      });
+
+    const expected = process.env.WEBSITE_API_KEY;
+    if (!expected) return cors({ error: "Server misconfigured" }, 500);
+
+    const key =
+      request.headers.get("x-api-key") ||
+      new URL(request.url).searchParams.get("secret");
+    if (!key || !timingSafeStringEqual(key, expected)) {
+      console.warn("[website-leads] invalid api key");
+      return cors({ error: "Invalid API key" }, 401);
+    }
+
+    let payload: {
+      firstName?: string;
+      lastName?: string;
+      name?: string;
+      email?: string;
+      phone?: string;
+      message?: string;
+      source?: string;
+      city?: string;
+      customFields?: { city?: string; woonplaats?: string };
+    };
+    try {
+      payload = JSON.parse(await request.text());
+    } catch {
+      return cors({ error: "Invalid JSON" }, 400);
+    }
+
+    // Naam: firstName/lastName, of splits een los `name`-veld.
+    let firstName = payload.firstName;
+    let lastName = payload.lastName;
+    if (!firstName && !lastName && payload.name) {
+      const parts = payload.name.trim().split(/\s+/);
+      firstName = parts[0];
+      lastName = parts.slice(1).join(" ") || undefined;
+    }
+    const city =
+      payload.city ??
+      payload.customFields?.city ??
+      payload.customFields?.woonplaats;
+
+    if (!payload.email && !payload.phone) {
+      return cors({ error: "email of phone vereist" }, 400);
+    }
+
+    const workspaceId = await ctx.runQuery(
+      internal.messaging.getStaycoolWorkspaceIdInternal,
+      {},
+    );
+    if (!workspaceId) return cors({ error: "Workspace not provisioned" }, 500);
+
+    const { contactId } = await ctx.runMutation(
+      internal.websiteLeads.ingestWebsiteLead,
+      {
+        workspaceId,
+        firstName,
+        lastName,
+        email: payload.email,
+        phone: payload.phone,
+        city,
+        message: payload.message,
+        source: payload.source ?? "website",
+      },
+    );
+    return cors({ received: true, contactId }, 200);
+  }),
+});
+
 // ──────────────────────────────────────────────────────────────────────
 // Shared HMAC helper voor SMS/WA (Meta gebruikt eigen wrapper)
 // ──────────────────────────────────────────────────────────────────────
