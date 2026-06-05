@@ -37,7 +37,7 @@ import { normalizeEmail, normalizePhone } from "./lib/phone";
  *                                 anders per-workspace via whatsappWebConfig)
  */
 
-const VOIDFIX_SMS_URL = "https://sms.voidfix.com/api/external/send-message";
+const VOIDFIX_SMS_URL = "https://sms.voidfix.com/services/send.php";
 const VOIDFIX_WA_URL = "https://wa.voidfix.com/api/external/send-message";
 const VOIDFIX_WA_SESSIONS_URL = "https://wa.voidfix.com/api/external/sessions";
 const RESEND_URL = "https://api.resend.com/emails";
@@ -855,31 +855,41 @@ async function sendViaVoidfixSms(args: {
   to: string;
   message: string;
 }): Promise<string> {
-  const apiKey = process.env.VOIDFIX_API_KEY;
-  const deviceId = process.env.VOIDFIX_SMS_DEVICE_ID;
-  if (!apiKey) throw new Error("VOIDFIX_API_KEY niet geconfigureerd");
-  if (!deviceId)
-    throw new Error("VOIDFIX_SMS_DEVICE_ID niet geconfigureerd");
+  // SMS-gateway = sms.voidfix.com/services/send.php (form-urlencoded POST).
+  // Eigen API-key (VOIDFIX_SMS_API_SECRET), als `key`-formveld — NIET de
+  // WhatsApp X-API-Key. Veldnamen per v1's werkende client: key/number/
+  // message/devices/type/prioritize. Response: { success, data: { messages:[{ID}] } }.
+  const key = process.env.VOIDFIX_SMS_API_SECRET;
+  const devices = process.env.VOIDFIX_SMS_DEVICE_ID;
+  if (!key) throw new Error("VOIDFIX_SMS_API_SECRET niet geconfigureerd");
+  if (!devices) throw new Error("VOIDFIX_SMS_DEVICE_ID niet geconfigureerd");
+
+  const form = new URLSearchParams();
+  form.set("key", key);
+  form.set("number", args.to);
+  form.set("message", args.message);
+  form.set("devices", devices);
+  form.set("type", "sms");
+  form.set("prioritize", "0");
 
   const res = await fetch(VOIDFIX_SMS_URL, {
     method: "POST",
-    headers: {
-      "X-API-Key": apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      deviceId,
-      to: args.to,
-      message: args.message,
-      sim: 1,
-    }),
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form.toString(),
   });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Voidfix SMS ${res.status}: ${text.slice(0, 200)}`);
   }
-  const data = (await res.json()) as { messageId?: string; id?: string };
-  return data.messageId ?? data.id ?? "";
+  const json = (await res.json()) as {
+    success?: boolean;
+    error?: { message?: string };
+    data?: { messages?: Array<{ ID?: string }> };
+  };
+  if (!json.success) {
+    throw new Error(`Voidfix SMS: ${json.error?.message ?? "onbekende fout"}`);
+  }
+  return json.data?.messages?.[0]?.ID ?? "";
 }
 
 /** Zoekt de actuele verbonden (WORKING) WhatsApp-sessie op bij Voidfix.
