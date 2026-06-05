@@ -592,11 +592,12 @@ http.route({
           read: "read",
           failed: "failed",
         };
-        const ns = statusMap[payload.status.toLowerCase()];
+        // status kan een getal of string zijn → defensief naar string.
+        const ns = statusMap[String(payload.status).toLowerCase()];
         if (ns) {
           await ctx.runMutation(
             internal.messaging.updateStatusByExternalId,
-            { externalMessageId: payload.messageId, newStatus: ns },
+            { externalMessageId: String(payload.messageId), newStatus: ns },
           );
         }
       }

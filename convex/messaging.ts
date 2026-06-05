@@ -884,12 +884,14 @@ async function sendViaVoidfixSms(args: {
   const json = (await res.json()) as {
     success?: boolean;
     error?: { message?: string };
-    data?: { messages?: Array<{ ID?: string }> };
+    data?: { messages?: Array<{ ID?: string | number }> };
   };
   if (!json.success) {
     throw new Error(`Voidfix SMS: ${json.error?.message ?? "onbekende fout"}`);
   }
-  return json.data?.messages?.[0]?.ID ?? "";
+  // Voidfix geeft ID als getal terug → markSent verwacht string.
+  const id = json.data?.messages?.[0]?.ID;
+  return id != null ? String(id) : "";
 }
 
 /** Zoekt de actuele verbonden (WORKING) WhatsApp-sessie op bij Voidfix.
