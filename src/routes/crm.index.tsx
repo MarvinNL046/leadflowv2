@@ -6,6 +6,7 @@ import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
+import { cn } from '#/lib/utils.ts'
 import { LeadCard, type IncomingLead } from '../components/crm/lead-card'
 import { api } from '../../convex/_generated/api'
 
@@ -13,7 +14,7 @@ export const Route = createFileRoute('/crm/')({ component: CrmDashboard })
 
 const LEADS_PER_PAGE = 5
 
-type Tab = 'all' | 'follow_up' | 'new'
+type Tab = 'all' | 'follow_up' | 'new' | 'concepten'
 
 function CrmDashboard() {
   const tenants = useQuery(api.userProfiles.myTenants)
@@ -31,6 +32,12 @@ function CrmDashboard() {
   const leads = useQuery(
     api.contacts.listIncomingLeads,
     workspaceId ? { workspaceId, limit: 200, dueBefore } : 'skip',
+  )
+
+  // Contact-IDs met een wachtend AI-concept → voedt de Concepten-tab.
+  const pendingIds = useQuery(
+    api.aiLeadResponse.pendingConceptContactIds,
+    workspaceId ? { workspaceId } : 'skip',
   )
 
   return (
@@ -58,26 +65,41 @@ function CrmDashboard() {
       ) : leads.length === 0 ? (
         <EmptyState />
       ) : (
-        <LeadsList leads={leads as IncomingLead[]} />
+        <LeadsList
+          leads={leads as IncomingLead[]}
+          pendingIds={pendingIds ?? []}
+        />
       )}
     </div>
   )
 }
 
-function LeadsList({ leads }: { leads: IncomingLead[] }) {
+function LeadsList({
+  leads,
+  pendingIds,
+}: {
+  leads: IncomingLead[]
+  pendingIds: string[]
+}) {
   const [tab, setTab] = useState<Tab>('all')
   const [visibleCount, setVisibleCount] = useState(LEADS_PER_PAGE)
 
-  const now = Date.now()
-
-  // Drie buckets — niet mutually exclusive (lead kan in meerdere zitten)
+  // Buckets — niet mutually exclusive (lead kan in meerdere zitten)
   const newOnly = leads.filter((l) => l.callCount === 0)
   const followUp = leads.filter(
     (l) => l.callCount > 0 && l.callCount < 3, // bel-pogingen gedaan, niet uitgeput
   )
+  const pendingSet = new Set(pendingIds)
+  const conceptLeads = leads.filter((l) => pendingSet.has(l._id))
 
   const filtered =
-    tab === 'follow_up' ? followUp : tab === 'new' ? newOnly : leads
+    tab === 'concepten'
+      ? conceptLeads
+      : tab === 'follow_up'
+        ? followUp
+        : tab === 'new'
+          ? newOnly
+          : leads
 
   const visible = filtered.slice(0, visibleCount)
   const hasMore = filtered.length > visibleCount
@@ -85,7 +107,7 @@ function LeadsList({ leads }: { leads: IncomingLead[] }) {
   return (
     <div className="space-y-3">
       {/* Tabs */}
-      <div className="grid grid-cols-3 gap-1 rounded-lg bg-zinc-100 p-1">
+      <div className="grid grid-cols-4 gap-1 rounded-lg bg-zinc-100 p-1">
         <TabButton
           active={tab === 'all'}
           onClick={() => {
@@ -120,6 +142,24 @@ function LeadsList({ leads }: { leads: IncomingLead[] }) {
           Nieuw
           <Badge variant="secondary" className="ml-1 bg-white">
             {newOnly.length}
+          </Badge>
+        </TabButton>
+        <TabButton
+          active={tab === 'concepten'}
+          onClick={() => {
+            setTab('concepten')
+            setVisibleCount(LEADS_PER_PAGE)
+          }}
+        >
+          Concepten
+          <Badge
+            variant="secondary"
+            className={cn(
+              'ml-1',
+              pendingIds.length > 0 ? 'bg-blue-600 text-white' : 'bg-white',
+            )}
+          >
+            {pendingIds.length}
           </Badge>
         </TabButton>
       </div>
