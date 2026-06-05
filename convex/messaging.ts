@@ -39,6 +39,7 @@ import { normalizeEmail, normalizePhone } from "./lib/phone";
 
 const VOIDFIX_SMS_URL = "https://sms.voidfix.com/api/external/send-message";
 const VOIDFIX_WA_URL = "https://wa.voidfix.com/api/external/send-message";
+const VOIDFIX_WA_SESSIONS_URL = "https://wa.voidfix.com/api/external/sessions";
 const RESEND_URL = "https://api.resend.com/emails";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -881,15 +882,47 @@ async function sendViaVoidfixSms(args: {
   return data.messageId ?? data.id ?? "";
 }
 
+/** Zoekt de actuele verbonden (WORKING) WhatsApp-sessie op bij Voidfix.
+ *  Voorkeur voor de in env gehinte sessie (VOIDFIX_WA_SESSION_ID) als die
+ *  verbonden is; anders de eerste verbonden sessie. Zo breekt uitgaand niet
+ *  meer bij elke QR-(her)koppeling — die maakt telkens een nieuwe sessionId.
+ *  (Eén extra GET /sessions per verzending; acceptabel bij dit volume.) */
+async function resolveWorkingWaSession(apiKey: string): Promise<string> {
+  const hinted = process.env.VOIDFIX_WA_SESSION_ID;
+  let sessions: Array<{
+    sessionId: string;
+    status?: string;
+    isConnected?: boolean;
+  }> = [];
+  try {
+    const res = await fetch(VOIDFIX_WA_SESSIONS_URL, {
+      headers: { "X-API-Key": apiKey },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { data?: typeof sessions };
+      sessions = data.data ?? [];
+    }
+  } catch {
+    // Lijst onbereikbaar → val hieronder terug op de env-hint.
+  }
+  const working = sessions.filter(
+    (s) => s.isConnected === true && s.status === "WORKING",
+  );
+  const preferred = working.find((s) => s.sessionId === hinted) ?? working[0];
+  if (preferred) return preferred.sessionId;
+  if (hinted) return hinted; // fallback: env-hint (lijst onbereikbaar)
+  throw new Error(
+    "Geen verbonden WhatsApp-sessie bij Voidfix (scan de QR-code opnieuw)",
+  );
+}
+
 async function sendViaVoidfixWa(args: {
   to: string;
   message: string;
 }): Promise<string> {
   const apiKey = process.env.VOIDFIX_API_KEY;
-  const sessionId = process.env.VOIDFIX_WA_SESSION_ID;
   if (!apiKey) throw new Error("VOIDFIX_API_KEY niet geconfigureerd");
-  if (!sessionId)
-    throw new Error("VOIDFIX_WA_SESSION_ID niet geconfigureerd");
+  const sessionId = await resolveWorkingWaSession(apiKey);
 
   const res = await fetch(VOIDFIX_WA_URL, {
     method: "POST",

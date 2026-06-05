@@ -468,11 +468,22 @@ http.route({
     const secret = process.env.VOIDFIX_API_SECRET;
     if (!secret) return jsonResponse({ error: "Server misconfigured" }, 500);
 
-    const signature = request.headers.get("x-sg-signature");
     const rawBody = await request.text();
-    if (!signature || !(await isValidHmacSignature(rawBody, signature, secret))) {
-      console.warn("[voidfix-sms-webhook] invalid signature");
-      return jsonResponse({ error: "Invalid signature" }, 401);
+    // Auth: óf een geldige HMAC-signature (x-sg-signature), óf het gedeelde
+    // secret via ?secret= / x-webhook-secret. Voidfix biedt bij webhooks alleen
+    // een URL-veld, dus de query-param is de praktische weg — consistent met de
+    // WA-webhook hieronder.
+    const signature = request.headers.get("x-sg-signature");
+    const headerSecret =
+      request.headers.get("x-webhook-secret") ||
+      new URL(request.url).searchParams.get("secret");
+    const hmacOk =
+      !!signature && (await isValidHmacSignature(rawBody, signature, secret));
+    const secretOk =
+      !!headerSecret && timingSafeStringEqual(headerSecret, secret);
+    if (!hmacOk && !secretOk) {
+      console.warn("[voidfix-sms-webhook] invalid auth");
+      return jsonResponse({ error: "Invalid auth" }, 401);
     }
 
     let payload: VoidfixSmsEvent;
