@@ -7,7 +7,9 @@ import {
   Zap,
   Settings,
 } from 'lucide-react'
+import { useQuery } from 'convex/react'
 import { cn } from '#/lib/utils.ts'
+import { api } from '../../../convex/_generated/api'
 
 interface NavItem {
   to: string
@@ -47,6 +49,15 @@ export function SidebarContent({
 }) {
   const { location } = useRouterState()
 
+  // Globale "concepten wachten"-teller — zichtbaar vanaf elke CRM-pagina.
+  const tenants = useQuery(api.userProfiles.myTenants)
+  const workspaceId = tenants?.find((t) => t.workspace !== null)?.workspace?.id
+  const pendingIds = useQuery(
+    api.aiLeadResponse.pendingConceptContactIds,
+    workspaceId ? { workspaceId } : 'skip',
+  )
+  const pendingCount = pendingIds?.length ?? 0
+
   return (
     <>
       {/* Brand */}
@@ -85,6 +96,11 @@ export function SidebarContent({
             >
               <Icon className="h-4 w-4" />
               {item.label}
+              {item.to === '/crm' && pendingCount > 0 && (
+                <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white">
+                  {pendingCount}
+                </span>
+              )}
             </Link>
           )
         })}
