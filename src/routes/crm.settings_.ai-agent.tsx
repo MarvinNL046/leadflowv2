@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useAction } from 'convex/react'
 import { toast } from 'sonner'
-import { ArrowLeft, Bot, Save, RotateCcw, Zap } from 'lucide-react'
+import { ArrowLeft, Bot, Save, RotateCcw, Zap, Workflow } from 'lucide-react'
 import {
   Card,
   CardContent,
@@ -13,7 +13,6 @@ import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
-import { Switch } from '#/components/ui/switch.tsx'
 import {
   Select,
   SelectContent,
@@ -29,24 +28,13 @@ export const Route = createFileRoute('/crm/settings_/ai-agent')({
   component: AiAgentSettingsPage,
 })
 
-type ChannelOption = 'whatsapp' | 'sms' | 'email'
-
-const CHANNEL_LABELS: Record<ChannelOption, string> = {
-  whatsapp: 'WhatsApp',
-  sms: 'SMS',
-  email: 'E-mail',
-}
-
+// AI-instellingen = de KERN (key/context/toon/model + guardrails), workspace-breed.
+// WANNEER/WAAR de AI reageert wordt per "AI-reactie"-node in een Workflow gezet.
 const DEFAULTS = {
-  enabled: false,
-  mode: 'suggest' as 'off' | 'suggest' | 'auto',
-  channelOrder: ['sms', 'email'] as ChannelOption[],
-  bookingUrl: 'https://afspraken.staycoolairco.nl/',
   model: 'claude-sonnet-4-6',
   tone: 'vriendelijk, professioneel, kort, Nederlands',
   signature: 'Met vriendelijke groet, StayCool Airconditioning',
   businessContext: '',
-  whatsappTemplateName: '',
   quietHoursStart: 21,
   quietHoursEnd: 8,
   dailyCap: 200,
@@ -74,14 +62,9 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const config = useQuery(api.aiAgentConfig.get, { workspaceId })
   const update = useMutation(api.aiAgentConfig.update)
   const doPreview = useAction(api.aiLeadResponse.previewMessage)
+  const createStarter = useMutation(api.workflows.createAiFirstResponseWorkflow)
 
-  // Form state
-  const [enabled, setEnabled] = useState(DEFAULTS.enabled)
-  const [mode, setMode] = useState<'off' | 'suggest' | 'auto'>(DEFAULTS.mode)
-  const [channelOrder, setChannelOrder] = useState<ChannelOption[]>(
-    DEFAULTS.channelOrder,
-  )
-  const [bookingUrl, setBookingUrl] = useState(DEFAULTS.bookingUrl)
+  // Form state — alleen de kern (key/context/toon/model + guardrails)
   const [model, setModel] = useState(DEFAULTS.model)
   const [anthropicApiKey, setAnthropicApiKey] = useState('')
   const [businessContext, setBusinessContext] = useState(
@@ -89,15 +72,13 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   )
   const [tone, setTone] = useState(DEFAULTS.tone)
   const [signature, setSignature] = useState(DEFAULTS.signature)
-  const [whatsappTemplateName, setWhatsappTemplateName] = useState(
-    DEFAULTS.whatsappTemplateName,
-  )
   const [quietHoursStart, setQuietHoursStart] = useState(
     DEFAULTS.quietHoursStart,
   )
   const [quietHoursEnd, setQuietHoursEnd] = useState(DEFAULTS.quietHoursEnd)
   const [dailyCap, setDailyCap] = useState(DEFAULTS.dailyCap)
   const [saving, setSaving] = useState(false)
+  const [creatingStarter, setCreatingStarter] = useState(false)
 
   // Preview state
   const [previewing, setPreviewing] = useState(false)
@@ -107,27 +88,14 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   // Sync form with loaded config
   useEffect(() => {
     if (!config) return
-    setEnabled(config.enabled)
-    setMode(config.mode)
-    setChannelOrder(config.channelOrder as ChannelOption[])
-    setBookingUrl(config.bookingUrl)
     setModel(config.model)
     setBusinessContext(config.businessContext ?? '')
     setTone(config.tone ?? DEFAULTS.tone)
     setSignature(config.signature ?? DEFAULTS.signature)
-    setWhatsappTemplateName(config.whatsappTemplateName ?? '')
     setQuietHoursStart(config.quietHoursStart ?? DEFAULTS.quietHoursStart)
     setQuietHoursEnd(config.quietHoursEnd ?? DEFAULTS.quietHoursEnd)
     setDailyCap(config.dailyCap ?? DEFAULTS.dailyCap)
   }, [config])
-
-  function setChannelAt(index: number, value: ChannelOption) {
-    setChannelOrder((prev) => {
-      const next = [...prev] as ChannelOption[]
-      next[index] = value
-      return next
-    })
-  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -136,26 +104,34 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
     try {
       await update({
         workspaceId,
-        enabled,
-        mode,
-        channelOrder,
-        bookingUrl,
         model,
         businessContext: businessContext || undefined,
         tone: tone || undefined,
         signature: signature || undefined,
-        whatsappTemplateName: whatsappTemplateName || undefined,
         quietHoursStart,
         quietHoursEnd,
         dailyCap,
         ...(anthropicApiKey ? { anthropicApiKey } : {}),
       })
       setAnthropicApiKey('')
-      toast.success('Instellingen opgeslagen')
+      toast.success('AI-instellingen opgeslagen')
     } catch (err) {
       toast.error(humanizeConvexError(err, 'Opslaan mislukt'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleCreateStarter() {
+    if (creatingStarter) return
+    setCreatingStarter(true)
+    try {
+      await createStarter({ workspaceId })
+      toast.success('Workflow "AI eerste reactie op nieuwe lead" aangemaakt')
+    } catch (err) {
+      toast.error(humanizeConvexError(err, 'Aanmaken mislukt'))
+    } finally {
+      setCreatingStarter(false)
     }
   }
 
@@ -182,8 +158,6 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
     return <Skeleton className="h-64 w-full" />
   }
 
-  const channelOptions: ChannelOption[] = ['whatsapp', 'sms', 'email']
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -200,105 +174,50 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
             <Bot className="h-4.5 w-4.5 text-violet-700" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-zinc-900">AI-agent</h1>
+            <h1 className="text-xl font-semibold text-zinc-900">
+              AI-instellingen
+            </h1>
             <p className="text-xs text-zinc-500">
-              Automatische eerste reactie op nieuwe leads (speed-to-lead)
+              De kern: API-key, context, toon en guardrails. <em>Wanneer</em> de
+              AI reageert stel je in via een AI-reactie-node in een Workflow.
             </p>
           </div>
         </div>
       </div>
 
+      {/* Aan de slag — starter-workflow */}
+      <Card className="border-violet-200 bg-violet-50/40">
+        <CardHeader>
+          <CardTitle className="text-base">Aan de slag</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-zinc-600">
+            Maak in één klik een kant-en-klare workflow die bij elke nieuwe lead
+            een concept-antwoord genereert. Daarna stel je hieronder je
+            Anthropic-key in.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              onClick={handleCreateStarter}
+              disabled={creatingStarter}
+            >
+              <Zap className="h-4 w-4" />
+              {creatingStarter
+                ? 'Aanmaken…'
+                : "Maak 'AI eerste reactie'-workflow"}
+            </Button>
+            <Button asChild type="button" variant="outline">
+              <Link to="/crm/workflows">
+                <Workflow className="h-4 w-4" />
+                Naar Workflows
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <form onSubmit={handleSave} className="space-y-4">
-        {/* Aan/uit + modus */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Activatie</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Agent ingeschakeld</Label>
-                <p className="text-xs text-zinc-500">
-                  Schakel de automatische lead-reactie aan of uit.
-                </p>
-              </div>
-              <Switch
-                checked={enabled}
-                onCheckedChange={setEnabled}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="mode">Modus</Label>
-              <Select value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
-                <SelectTrigger id="mode" className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="off">Uit</SelectItem>
-                  <SelectItem value="suggest">Concept (handmatig goedkeuren)</SelectItem>
-                  <SelectItem value="auto">Automatisch versturen</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-zinc-500">
-                <strong>Concept:</strong> AI maakt een draft die jij goedkeurt.{' '}
-                <strong>Automatisch:</strong> bericht gaat direct — let op quiet-hours + dagcap.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Kanaalvolgorde */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Kanaalvolgorde</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-xs text-zinc-500">
-              Eerste kanaal met geldig contactgegeven wint. WhatsApp vereist
-              een template-naam.
-            </p>
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span className="w-6 text-center text-sm font-medium text-zinc-400">
-                  {i + 1}
-                </span>
-                <Select
-                  value={channelOrder[i] ?? channelOptions[i]}
-                  onValueChange={(v) => setChannelAt(i, v as ChannelOption)}
-                >
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {channelOptions.map((ch) => (
-                      <SelectItem key={ch} value={ch}>
-                        {CHANNEL_LABELS[ch]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
-
-            <div className="space-y-1.5 pt-2">
-              <Label htmlFor="whatsappTemplateName">
-                WhatsApp template-naam
-              </Label>
-              <Input
-                id="whatsappTemplateName"
-                value={whatsappTemplateName}
-                onChange={(e) => setWhatsappTemplateName(e.target.value)}
-                placeholder="bv. welkom_airco_nl"
-                className="max-w-xs"
-              />
-              <p className="text-xs text-zinc-500">
-                Verplicht als WhatsApp in de kanaalvolgorde staat.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Anthropic + model */}
         <Card>
           <CardHeader>
@@ -349,20 +268,9 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
         {/* Promptinstellingen */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Bericht-instelling</CardTitle>
+            <CardTitle className="text-base">Stem &amp; context</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="bookingUrl">Afspraak-URL</Label>
-              <Input
-                id="bookingUrl"
-                value={bookingUrl}
-                onChange={(e) => setBookingUrl(e.target.value)}
-                placeholder="https://afspraken.staycoolairco.nl/"
-                className="max-w-sm"
-              />
-            </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="businessContext">Bedrijfscontext</Label>
               <textarea
@@ -463,8 +371,9 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
               </div>
             </div>
             <p className="text-xs text-zinc-500">
-              Quiet-hours en dagcap gelden alleen in auto-modus. Berichten
-              buiten het stille venster worden uitgesteld (niet overgeslagen).
+              Quiet-hours en dagcap gelden alleen voor AI-nodes in auto-modus.
+              Berichten buiten het stille venster worden uitgesteld (niet
+              overgeslagen).
             </p>
           </CardContent>
         </Card>
@@ -476,8 +385,8 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-xs text-zinc-500">
-              Genereert een voorbeeld-bericht met dummy-lead Pascal Hendriks
-              uit Reuver. Vereist een ingestelde Anthropic-key.
+              Genereert een voorbeeld-bericht met dummy-lead Pascal Hendriks uit
+              Reuver. Vereist een ingestelde Anthropic-key.
             </p>
             <Button
               type="button"
@@ -513,16 +422,13 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
             variant="ghost"
             onClick={() => {
               if (!config) return
-              setEnabled(config.enabled)
-              setMode(config.mode)
-              setChannelOrder(config.channelOrder as ChannelOption[])
-              setBookingUrl(config.bookingUrl)
               setModel(config.model)
               setBusinessContext(config.businessContext ?? '')
               setTone(config.tone ?? DEFAULTS.tone)
               setSignature(config.signature ?? DEFAULTS.signature)
-              setWhatsappTemplateName(config.whatsappTemplateName ?? '')
-              setQuietHoursStart(config.quietHoursStart ?? DEFAULTS.quietHoursStart)
+              setQuietHoursStart(
+                config.quietHoursStart ?? DEFAULTS.quietHoursStart,
+              )
               setQuietHoursEnd(config.quietHoursEnd ?? DEFAULTS.quietHoursEnd)
               setDailyCap(config.dailyCap ?? DEFAULTS.dailyCap)
               setAnthropicApiKey('')

@@ -64,9 +64,9 @@ const SECTIONS: HubSection[] = [
       },
       {
         to: '/crm/settings/ai-agent',
-        title: 'AI-agent',
+        title: 'AI-instellingen',
         description:
-          'Automatische eerste reactie op nieuwe leads (speed-to-lead)',
+          'API-key, context, toon en guardrails voor de AI-reactie-nodes',
         icon: Bot,
         iconColor: 'bg-violet-100 text-violet-700',
       },
