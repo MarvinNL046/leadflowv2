@@ -483,14 +483,8 @@ export const upsertContactFromMetaLead = internalMutation({
       internal.workflowEngine.triggerContactCreated,
       { workspaceId: workspace._id, contactId },
     );
-
-    // AI lead-response agent (speed-to-lead eerste touch). Eigen schedule,
-    // los van de workflow-engine. No-op als de agent uit staat (default).
-    await ctx.scheduler.runAfter(
-      0,
-      internal.aiLeadResponse.handleNewLead,
-      { contactId, workspaceId: workspace._id },
-    );
+    // De AI-reactie loopt nu via de workflow-engine (AI-reactie-node), niet
+    // meer via een aparte schedule — zie convex/aiLeadResponse.runAiResponse.
 
     return { contactId };
   },
