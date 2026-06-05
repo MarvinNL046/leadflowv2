@@ -282,6 +282,17 @@ const linearNodeValidator = v.union(
     subType: v.literal("send_whatsapp"),
     body: v.string(),
   }),
+  v.object({
+    type: v.literal("action"),
+    subType: v.literal("ai_respond"),
+    mode: v.union(v.literal("suggest"), v.literal("auto")),
+    channelOrder: v.array(
+      v.union(v.literal("whatsapp"), v.literal("sms"), v.literal("email")),
+    ),
+    bookingUrl: v.string(),
+    whatsappTemplateName: v.optional(v.string()),
+    goal: v.optional(v.string()),
+  }),
 );
 
 const triggerTypeValidator = v.union(
@@ -361,6 +372,15 @@ export const createLinear = mutation({
       } else if (n.subType === "send_whatsapp") {
         label = "WhatsApp";
         config = { body: n.body };
+      } else if (n.subType === "ai_respond") {
+        label = "AI-reactie";
+        config = {
+          mode: n.mode,
+          channelOrder: n.channelOrder,
+          bookingUrl: n.bookingUrl,
+          whatsappTemplateName: n.whatsappTemplateName,
+          goal: n.goal,
+        };
       }
 
       await ctx.db.insert("workflowNodes", {
@@ -474,6 +494,15 @@ export const replaceContent = mutation({
       } else if (n.subType === "send_whatsapp") {
         label = "WhatsApp";
         config = { body: n.body };
+      } else if (n.subType === "ai_respond") {
+        label = "AI-reactie";
+        config = {
+          mode: n.mode,
+          channelOrder: n.channelOrder,
+          bookingUrl: n.bookingUrl,
+          whatsappTemplateName: n.whatsappTemplateName,
+          goal: n.goal,
+        };
       }
 
       await ctx.db.insert("workflowNodes", {
@@ -546,5 +575,57 @@ export const setStatus = mutation({
     if (!wf) throw new Error("Workflow niet gevonden");
     await requireWorkspaceMembership(ctx, wf.workspaceId);
     await ctx.db.patch(args.workflowId, { status: args.status });
+  },
+});
+
+/** Maakt kant-en-klaar een "AI eerste reactie op nieuwe lead"-workflow:
+ *  trigger contact_created → AI-reactie-node (suggest). Eén klik vanuit
+ *  AI-instellingen, zodat je niet from-scratch hoeft te bouwen. */
+export const createAiFirstResponseWorkflow = mutation({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, { workspaceId }) => {
+    await requireWorkspaceMembership(ctx, workspaceId);
+    const workflowId = await ctx.db.insert("workflows", {
+      workspaceId,
+      name: "AI eerste reactie op nieuwe lead",
+      description:
+        "Genereert automatisch een concept-antwoord bij elke nieuwe lead.",
+      status: "active",
+      triggerConfig: [{ type: "contact_created", nodeId: "trigger-1" }],
+      version: 1,
+      totalExecutions: 0,
+      successfulExecutions: 0,
+      failedExecutions: 0,
+    });
+    await ctx.db.insert("workflowNodes", {
+      workflowId,
+      nodeId: "trigger-1",
+      type: "trigger",
+      subType: "contact_created",
+      positionX: 0,
+      positionY: 0,
+      config: {},
+      label: "Nieuwe lead",
+    });
+    await ctx.db.insert("workflowNodes", {
+      workflowId,
+      nodeId: "node-1",
+      type: "action",
+      subType: "ai_respond",
+      positionX: 200,
+      positionY: 0,
+      config: {
+        mode: "suggest",
+        channelOrder: ["sms", "email"],
+        bookingUrl: "https://afspraken.staycoolairco.nl/",
+      },
+      label: "AI-reactie",
+    });
+    await ctx.db.insert("workflowEdges", {
+      workflowId,
+      sourceNodeId: "trigger-1",
+      targetNodeId: "node-1",
+    });
+    return { workflowId };
   },
 });
