@@ -182,6 +182,14 @@ function EditWorkflowDialogLoader({
     | { type: 'action'; subType: 'send_email'; subject: string; body: string }
     | { type: 'action'; subType: 'send_sms'; body: string }
     | { type: 'action'; subType: 'send_whatsapp'; body: string }
+    | {
+        type: 'action'
+        subType: 'ai_respond'
+        mode: 'suggest' | 'auto'
+        channelOrder: Array<'whatsapp' | 'sms' | 'email'>
+        bookingUrl: string
+        goal?: string
+      }
   const builderNodes: BuilderNode[] = nodes
     .filter((n) => n.type !== 'trigger')
     .sort((a, b) => a.nodeId.localeCompare(b.nodeId))
@@ -206,6 +214,20 @@ function EditWorkflowDialogLoader({
           type: 'action',
           subType: 'send_sms',
           body: String(config?.body ?? ''),
+        }
+      }
+      if (n.subType === 'ai_respond') {
+        return {
+          type: 'action',
+          subType: 'ai_respond',
+          mode: config?.mode === 'auto' ? 'auto' : 'suggest',
+          channelOrder: Array.isArray(config?.channelOrder)
+            ? (config.channelOrder as Array<'whatsapp' | 'sms' | 'email'>)
+            : ['sms', 'email'],
+          bookingUrl: String(
+            config?.bookingUrl ?? 'https://afspraken.staycoolairco.nl/',
+          ),
+          goal: typeof config?.goal === 'string' ? config.goal : undefined,
         }
       }
       return {
