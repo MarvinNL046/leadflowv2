@@ -18,6 +18,7 @@ import {
   buildPrompt,
   msSinceAmsterdamMidnight,
   msUntilAmsterdamHour,
+  resolveAiNodeConfig,
   type Channel,
 } from "./aiLeadResponse/helpers";
 
@@ -218,6 +219,146 @@ export const handleNewLead = internalAction({
     } catch (err) {
       console.error("[ai-agent] handleNewLead faalde:", err);
     }
+  },
+});
+
+/** Herbruikbare AI-reactie-orchestratie, aangeroepen door de workflow-engine
+ *  (ai_respond-node). mode/kanaal/bookingUrl/goal komen uit de node-config;
+ *  key/context/toon/model + guardrails (quiet-hours/dagcap) workspace-breed uit
+ *  aiLeadResponseConfigs. Quiet-hours-defer (auto) her-schedulet zichzelf. */
+export const runAiResponse = internalAction({
+  args: {
+    contactId: v.id("contacts"),
+    workspaceId: v.id("workspaces"),
+    nodeConfig: v.any(),
+  },
+  handler: async (
+    ctx,
+    { contactId, workspaceId, nodeConfig },
+  ): Promise<{
+    status: "suggested" | "sent" | "failed" | "deferred" | "skipped";
+    reason?: string;
+  }> => {
+    const node = resolveAiNodeConfig(nodeConfig);
+    const cfg = await ctx.runQuery(internal.aiAgentConfig.getConfigInternal, {
+      workspaceId,
+    });
+    if (!cfg) return { status: "skipped", reason: "geen AI-instellingen" };
+    if (!cfg.anthropicApiKeyEncrypted)
+      return { status: "skipped", reason: "geen Anthropic-key" };
+
+    const dup = await ctx.runQuery(internal.aiLeadResponse.recentlyResponded, {
+      contactId,
+      since: Date.now() - DAY_MS,
+    });
+    if (dup) return { status: "skipped", reason: "recent al gereageerd" };
+
+    const lead = await ctx.runQuery(internal.aiLeadResponse.getLeadContext, {
+      contactId,
+    });
+    if (!lead) return { status: "skipped", reason: "lead niet gevonden" };
+
+    // Amsterdamse wandklok (Convex draait UTC → géén setHours).
+    const amsParts = new Intl.DateTimeFormat("nl-NL", {
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+      hour12: false,
+      timeZone: "Europe/Amsterdam",
+    }).formatToParts(new Date());
+    const amsPart = (t: string) =>
+      Number(amsParts.find((p) => p.type === t)?.value ?? 0);
+    const hour = amsPart("hour") % 24;
+    const minute = amsPart("minute");
+    const second = amsPart("second");
+    const qStart = cfg.quietHoursStart ?? 21;
+    const qEnd = cfg.quietHoursEnd ?? 8;
+
+    if (node.mode === "auto" && isWithinQuietHours(hour, qStart, qEnd)) {
+      await ctx.scheduler.runAt(
+        Date.now() + msUntilAmsterdamHour(hour, minute, qEnd),
+        internal.aiLeadResponse.runAiResponse,
+        { contactId, workspaceId, nodeConfig },
+      );
+      return { status: "deferred", reason: "quiet hours" };
+    }
+
+    if (node.mode === "auto") {
+      const startOfDay =
+        Date.now() - msSinceAmsterdamMidnight(hour, minute, second);
+      const sentToday = await ctx.runQuery(
+        internal.aiLeadResponse.countAutoSentToday,
+        { workspaceId, since: startOfDay },
+      );
+      const cap = cfg.dailyCap ?? 200;
+      if (sentToday >= cap)
+        return { status: "skipped", reason: `dagcap ${cap} bereikt` };
+    }
+
+    const channel: Channel | null = pickChannel(
+      node.channelOrder,
+      { phone: lead.phone, email: lead.email },
+      node.whatsappTemplateName ?? null,
+    );
+    if (!channel)
+      return { status: "skipped", reason: "geen kanaal beschikbaar" };
+
+    const apiKey = await decryptSecret(cfg.anthropicApiKeyEncrypted);
+    const { system, user } = buildPrompt({
+      businessContext: cfg.businessContext,
+      tone: cfg.tone,
+      signature: cfg.signature,
+      bookingUrl: node.bookingUrl,
+      goal: node.goal,
+      contact: {
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        city: lead.city,
+      },
+      formAnswers: lead.formAnswers,
+    });
+
+    const body = await callAnthropic(apiKey, cfg.model, system, user);
+    if (!body) return { status: "skipped", reason: "geen AI-output" };
+
+    if (node.mode === "auto") {
+      try {
+        await ctx.runAction(internal.messaging.sendInternal, {
+          contactId,
+          channel,
+          body,
+        });
+        await ctx.runMutation(internal.aiLeadResponse.recordSuggestion, {
+          workspaceId,
+          contactId,
+          channel,
+          body,
+          model: cfg.model,
+          status: "sent",
+        });
+        return { status: "sent" };
+      } catch (sendErr) {
+        console.error("[ai-node] sendInternal faalde:", sendErr);
+        await ctx.runMutation(internal.aiLeadResponse.recordSuggestion, {
+          workspaceId,
+          contactId,
+          channel,
+          body,
+          model: cfg.model,
+          status: "failed",
+        });
+        return { status: "failed", reason: "verzenden mislukt" };
+      }
+    }
+    await ctx.runMutation(internal.aiLeadResponse.recordSuggestion, {
+      workspaceId,
+      contactId,
+      channel,
+      body,
+      model: cfg.model,
+      status: "pending",
+    });
+    return { status: "suggested" };
   },
 });
 
