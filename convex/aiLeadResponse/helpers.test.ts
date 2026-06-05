@@ -5,7 +5,36 @@ import {
   buildPrompt,
   msSinceAmsterdamMidnight,
   msUntilAmsterdamHour,
+  resolveAiNodeConfig,
 } from "./helpers";
+
+describe("resolveAiNodeConfig", () => {
+  it("vult veilige defaults bij lege config", () => {
+    const c = resolveAiNodeConfig({});
+    expect(c.mode).toBe("suggest");
+    expect(c.channelOrder).toEqual(["sms", "email"]);
+    expect(c.bookingUrl).toContain("afspraken.staycoolairco.nl");
+  });
+  it("respecteert opgegeven node-config", () => {
+    const c = resolveAiNodeConfig({
+      mode: "auto",
+      channelOrder: ["whatsapp", "sms"],
+      bookingUrl: "https://x.nl/",
+      goal: "kort opvolgen",
+    });
+    expect(c.mode).toBe("auto");
+    expect(c.channelOrder).toEqual(["whatsapp", "sms"]);
+    expect(c.goal).toBe("kort opvolgen");
+  });
+  it("valt terug op suggest bij onbekende mode", () => {
+    expect(resolveAiNodeConfig({ mode: "xxx" }).mode).toBe("suggest");
+  });
+  it("negeert onbekende kanalen", () => {
+    expect(resolveAiNodeConfig({ channelOrder: ["fax", "sms"] }).channelOrder).toEqual([
+      "sms",
+    ]);
+  });
+});
 
 describe("msSinceAmsterdamMidnight", () => {
   it("08:30:00 → 8.5u in ms", () => {

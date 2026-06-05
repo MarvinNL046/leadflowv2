@@ -43,6 +43,7 @@ export function buildPrompt(opts: {
   tone?: string;
   signature?: string;
   bookingUrl: string;
+  goal?: string;
   contact: { firstName?: string; lastName?: string; city?: string };
   formAnswers: string[];
 }): { system: string; user: string } {
@@ -53,6 +54,7 @@ export function buildPrompt(opts: {
     "Schrijf het EERSTE reactiebericht op een nieuwe lead.",
     "Verwelkom de lead, bevestig kort hun aanvraag, en nodig uit om zelf een",
     `vrijblijvende afspraak in te plannen via deze link: ${opts.bookingUrl}`,
+    opts.goal ? `Extra doel/instructie: ${opts.goal}` : "",
     "Regels: GEEN prijzen noemen. Maximaal ~120 woorden. Geen opsommingstekens.",
     opts.signature ? `Sluit af met: ${opts.signature}` : "",
   ].filter(Boolean).join("\n");
@@ -62,4 +64,37 @@ export function buildPrompt(opts: {
     opts.formAnswers.length ? `Aanvraag-details:\n- ${opts.formAnswers.join("\n- ")}` : "",
   ].filter(Boolean).join("\n");
   return { system, user };
+}
+
+export interface AiNodeConfig {
+  mode: "suggest" | "auto";
+  channelOrder: Channel[];
+  bookingUrl: string;
+  whatsappTemplateName?: string;
+  goal?: string;
+}
+
+/** Normaliseert de vrije workflow-node-config (config: v.any) naar een veilige
+ *  AiNodeConfig met defaults. mode/kanaal/doel komen van de node; key/toon/model
+ *  + guardrails komen workspace-breed uit aiLeadResponseConfigs. */
+export function resolveAiNodeConfig(raw: unknown): AiNodeConfig {
+  const c = (raw ?? {}) as Record<string, unknown>;
+  const order = Array.isArray(c.channelOrder)
+    ? (c.channelOrder as Channel[]).filter((x) =>
+        ["whatsapp", "sms", "email"].includes(x),
+      )
+    : [];
+  return {
+    mode: c.mode === "auto" ? "auto" : "suggest",
+    channelOrder: order.length ? order : ["sms", "email"],
+    bookingUrl:
+      typeof c.bookingUrl === "string" && c.bookingUrl
+        ? c.bookingUrl
+        : "https://afspraken.staycoolairco.nl/",
+    whatsappTemplateName:
+      typeof c.whatsappTemplateName === "string"
+        ? c.whatsappTemplateName
+        : undefined,
+    goal: typeof c.goal === "string" && c.goal ? c.goal : undefined,
+  };
 }
