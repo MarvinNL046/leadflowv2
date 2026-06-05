@@ -328,6 +328,35 @@ export const pendingForContact = query({
   },
 });
 
+/** Alle contact-IDs met een wachtend AI-concept (status "pending") in deze
+ *  workspace. Voedt de "Concepten"-tab + sidebar-badge. Membership-checked;
+ *  geeft graceful [] bij niet-ingelogd/geen lidmaatschap (mag de UI nooit
+ *  laten crashen). NB: in de praktijk ⊆ incoming leads (concepten ontstaan
+ *  bij lead-intake), dus de count matcht de zichtbare kaarten. */
+export const pendingConceptContactIds = query({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, { workspaceId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const workspace = await ctx.db.get(workspaceId);
+    if (!workspace) return [];
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) =>
+        q.eq("userId", userId).eq("orgId", workspace.orgId),
+      )
+      .first();
+    if (!membership) return [];
+    const rows = await ctx.db
+      .query("aiSuggestedResponses")
+      .withIndex("by_workspace_status", (q) =>
+        q.eq("workspaceId", workspaceId).eq("status", "pending"),
+      )
+      .collect();
+    return [...new Set(rows.map((r) => r.contactId as string))];
+  },
+});
+
 /** Interne helper — laadt een suggestie-record op ID. */
 export const getSuggestionInternal = internalQuery({
   args: { suggestionId: v.id("aiSuggestedResponses") },
