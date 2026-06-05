@@ -9,6 +9,7 @@ import {
   MessageCircle,
   Clock,
   Zap,
+  Bot,
 } from 'lucide-react'
 import {
   Dialog,
@@ -56,6 +57,14 @@ type BuilderNode =
     }
   | { type: 'action'; subType: 'send_sms'; body: string }
   | { type: 'action'; subType: 'send_whatsapp'; body: string }
+  | {
+      type: 'action'
+      subType: 'ai_respond'
+      mode: 'suggest' | 'auto'
+      channelOrder: Array<'whatsapp' | 'sms' | 'email'>
+      bookingUrl: string
+      goal?: string
+    }
 
 const TRIGGER_OPTIONS: Array<{ value: TriggerType; label: string; desc: string }> = [
   {
@@ -120,6 +129,17 @@ const NODE_TEMPLATES: Record<
       type: 'action',
       subType: 'send_whatsapp',
       body: 'Hoi {{contact.firstName}}! 👋',
+    }),
+  },
+  ai: {
+    label: 'AI-reactie',
+    icon: Bot,
+    make: () => ({
+      type: 'action',
+      subType: 'ai_respond',
+      mode: 'suggest',
+      channelOrder: ['sms', 'email'],
+      bookingUrl: 'https://afspraken.staycoolairco.nl/',
     }),
   },
 }
@@ -370,7 +390,9 @@ function NodeRow({
         ? NODE_TEMPLATES.email
         : node.subType === 'send_sms'
           ? NODE_TEMPLATES.sms
-          : NODE_TEMPLATES.whatsapp
+          : node.subType === 'ai_respond'
+            ? NODE_TEMPLATES.ai
+            : NODE_TEMPLATES.whatsapp
   const Icon = meta.icon
 
   return (
@@ -459,6 +481,47 @@ function NodeRow({
             showCharCount={node.subType === 'send_sms'}
           />
         )}
+
+      {node.type === 'action' && node.subType === 'ai_respond' && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Label className="shrink-0 text-xs text-zinc-500">Modus</Label>
+            <select
+              value={node.mode}
+              onChange={(e) =>
+                onChange({
+                  ...node,
+                  mode: e.target.value as 'suggest' | 'auto',
+                } as BuilderNode)
+              }
+              className="h-8 rounded-md border border-zinc-200 px-2 text-sm"
+            >
+              <option value="suggest">Concept (mens keurt goed)</option>
+              <option value="auto">Automatisch versturen</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-zinc-500">Boekingslink</Label>
+            <Input
+              value={node.bookingUrl}
+              onChange={(e) =>
+                onChange({ ...node, bookingUrl: e.target.value } as BuilderNode)
+              }
+              className="h-8"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-zinc-500">
+              Extra doel/instructie (optioneel)
+            </Label>
+            <NodeBodyTextarea
+              value={node.goal ?? ''}
+              onChange={(v) => onChange({ ...node, goal: v } as BuilderNode)}
+              rows={2}
+            />
+          </div>
+        </div>
+      )}
     </li>
   )
 }
