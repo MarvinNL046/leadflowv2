@@ -367,6 +367,32 @@ export const runNode = internalAction({
 
         const sub = node.subType ?? "";
         const config = node.config as Record<string, unknown>;
+
+        // AI-reactie-node: delegeer naar de herbruikbare orchestratie.
+        if (sub === "ai_respond") {
+          const result = await ctx.runAction(
+            internal.aiLeadResponse.runAiResponse,
+            {
+              contactId: contact._id,
+              workspaceId: execution.workspaceId,
+              nodeConfig: node.config,
+            },
+          );
+          await ctx.runMutation(internal.workflowEngine.logNode, {
+            executionId: args.executionId,
+            nodeId: node.nodeId,
+            nodeType: node.type,
+            status: result.status === "failed" ? "failed" : "success",
+            output: result,
+            durationMs: Date.now() - startMs,
+          });
+          await ctx.runMutation(internal.workflowEngine.dispatchNextNodes, {
+            executionId: args.executionId,
+            fromNodeId: node.nodeId,
+          });
+          return;
+        }
+
         const channel =
           sub === "send_email"
             ? "email"
