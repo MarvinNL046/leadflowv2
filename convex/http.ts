@@ -486,60 +486,59 @@ http.route({
       return jsonResponse({ error: "Invalid auth" }, 401);
     }
 
-    let payload: VoidfixSmsEvent;
+    // Voidfix SMS POST't form-urlencoded met een `messages`-JSON-array.
+    // Elk item: { ID, number (afzender), message (tekst), status:
+    // "Received" | "Sent" | "Delivered" | "Failed", ... }. (Fallback: los JSON.)
+    let messages: VoidfixSmsMessage[];
     try {
-      payload = JSON.parse(rawBody);
+      const raw = new URLSearchParams(rawBody).get("messages");
+      const parsed = JSON.parse(raw ?? rawBody);
+      messages = Array.isArray(parsed) ? parsed : [parsed];
     } catch {
-      return jsonResponse({ error: "Invalid JSON" }, 400);
+      return jsonResponse({ error: "Invalid payload" }, 400);
     }
 
-    // Voidfix events: "Received" (inbound) of "Sent"/"Delivered"/"Failed"
-    if (payload.status === "Received" && payload.from && payload.body) {
-      // MVP: lookup Staycool workspace direct (single-tenant inbound)
-      const workspaceId = await ctx.runQuery(
-        internal.metaIngest.getStaycoolOrgIdInternal,
-        {},
-      );
-      if (!workspaceId) {
-        return jsonResponse({ error: "Org not provisioned" }, 500);
-      }
-      // Voor MVP: we hebben org-id maar messages.workspaceId nodig.
-      // Resolve default workspace voor deze org via helper. Eenvoudig:
-      // gebruik bestaande getStaycoolWorkspaceId via internal.
-      const wsId = await ctx.runQuery(
-        internal.messaging.getStaycoolWorkspaceIdInternal,
-        {},
-      );
-      if (!wsId) {
-        return jsonResponse({ error: "Workspace not provisioned" }, 500);
-      }
-      await ctx.runMutation(internal.messaging.recordInbound, {
-        workspaceId: wsId,
-        channel: "sms",
-        from: payload.from,
-        body: payload.body,
-        externalMessageId: payload.messageId,
-      });
-      return jsonResponse({ received: true, type: "inbound" }, 200);
-    }
-
-    // Delivery-receipt
     const statusMap: Record<
       string,
       "delivered" | "failed" | "bounced" | "read" | null
-    > = {
-      Sent: null,
-      Delivered: "delivered",
-      Failed: "failed",
-    };
-    const newStatus = statusMap[payload.status ?? ""];
-    if (newStatus && payload.messageId) {
-      await ctx.runMutation(internal.messaging.updateStatusByExternalId, {
-        externalMessageId: payload.messageId,
-        newStatus,
-      });
+    > = { Sent: null, Delivered: "delivered", Failed: "failed" };
+
+    // Workspace eenmalig resolven (single-tenant inbound).
+    const wsId = await ctx.runQuery(
+      internal.messaging.getStaycoolWorkspaceIdInternal,
+      {},
+    );
+    let inbound = 0;
+    for (const m of messages) {
+      const from = m.number ?? m.from;
+      const body = m.message ?? m.body;
+      const extId = m.ID != null ? String(m.ID) : (m.messageId ?? undefined);
+      if (m.status === "Received" && from && body) {
+        if (!wsId) {
+          return jsonResponse({ error: "Workspace not provisioned" }, 500);
+        }
+        await ctx.runMutation(internal.messaging.recordInbound, {
+          workspaceId: wsId,
+          channel: "sms",
+          from,
+          body,
+          externalMessageId: extId,
+        });
+        inbound++;
+      } else {
+        const ns = statusMap[m.status ?? ""];
+        if (ns && extId) {
+          await ctx.runMutation(internal.messaging.updateStatusByExternalId, {
+            externalMessageId: extId,
+            newStatus: ns,
+          });
+        }
+      }
     }
-    return jsonResponse({ received: true, status: payload.status }, 200);
+    return jsonResponse(
+      { received: true, inbound, total: messages.length },
+      200,
+    );
   }),
 });
 
@@ -732,8 +731,12 @@ interface ResendEvent {
   };
 }
 
-interface VoidfixSmsEvent {
-  status?: string;
+interface VoidfixSmsMessage {
+  ID?: number;
+  number?: string; // afzender (inbound) / ontvanger
+  message?: string; // tekst
+  status?: string; // "Received" | "Sent" | "Delivered" | "Failed"
+  // legacy/fallback veldnamen
   messageId?: string;
   from?: string;
   body?: string;
