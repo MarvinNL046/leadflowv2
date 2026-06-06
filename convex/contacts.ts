@@ -159,7 +159,40 @@ export const listIncomingLeads = query({
       .order("desc")
       .take(400);
 
-    const followable = rawContacts.filter(
+    // Resurface óók OUDERE contacten met een verse opp in de eerste stage —
+    // bv. een re-submission (website-form/Meta) op een bestaand contact:
+    // dedup → oud contact, maar wél een nieuwe Nieuw-opp. Zonder deze
+    // uitbreiding vallen die buiten het "400 nieuwste contacten"-venster.
+    const recentIds = new Set(rawContacts.map((c) => c._id));
+    const pipelines = await ctx.db
+      .query("pipelines")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
+      .collect();
+    const firstStageContactIds = new Set<Id<"contacts">>();
+    for (const p of pipelines) {
+      const stages = await ctx.db
+        .query("pipelineStages")
+        .withIndex("by_pipeline_order", (q) => q.eq("pipelineId", p._id))
+        .collect();
+      const first = stages.find((s) => !s.isWonStage && !s.isLostStage);
+      if (!first) continue;
+      const opps = await ctx.db
+        .query("opportunities")
+        .withIndex("by_workspace_stage", (q) =>
+          q.eq("workspaceId", args.workspaceId).eq("stageId", first._id),
+        )
+        .collect();
+      for (const o of opps) firstStageContactIds.add(o.contactId);
+    }
+    const extraContacts = (
+      await Promise.all(
+        [...firstStageContactIds]
+          .filter((id) => !recentIds.has(id))
+          .map((id) => ctx.db.get(id)),
+      )
+    ).filter((c): c is Doc<"contacts"> => c != null);
+
+    const followable = [...rawContacts, ...extraContacts].filter(
       (c) => !c.outsideArea && c.deletedAt === undefined && !c.unreachable,
     );
 
@@ -206,14 +239,13 @@ export const listIncomingLeads = query({
         return { c, keep: anyFirst };
       }),
     );
-    const contacts = checked
-      .filter((x) => x.keep)
-      .map((x) => x.c)
-      .slice(0, limit);
+    // Enrich ALLE keepers (niet pre-slicen — anders valt een verse
+    // re-submission op een oud contact weg vóór de sort).
+    const keepers = checked.filter((x) => x.keep).map((x) => x.c);
 
     // Per contact: laad attribution + latest note in parallel
     const enriched = await Promise.all(
-      contacts.map(async (c) => {
+      keepers.map(async (c) => {
         const attribution = await ctx.db
           .query("leadAttribution")
           .withIndex("by_contact", (q) => q.eq("contactId", c._id))
@@ -236,7 +268,11 @@ export const listIncomingLeads = query({
       }),
     );
 
-    return enriched;
+    // Nieuwste lead-activiteit eerst (attribution-recency, niet contact-leeftijd),
+    // dán pas de limit — zodat re-submissions op oude contacten bovenaan komen.
+    return enriched
+      .sort((a, b) => b.leadCreatedAt - a.leadCreatedAt)
+      .slice(0, limit);
   },
 });
 
