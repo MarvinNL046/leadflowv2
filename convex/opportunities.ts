@@ -8,6 +8,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
+import { computePipelineStats } from "./pipelineStats";
 
 /**
  * Opportunities = deals/sales-kansen, één-op-één gekoppeld aan een contact
@@ -138,6 +139,40 @@ export const listForKanban = query({
     );
 
     return { pipeline, stages, opportunities: enriched };
+  },
+});
+
+/**
+ * Aggregaten voor de kanban-stats-balk: aantallen + win-rate over ÁLLE opps
+ * van de pipeline (geen 200-cap zoals listForKanban). Geen €-waarde (value is
+ * een uniforme placeholder).
+ */
+export const pipelineStats = query({
+  args: { pipelineId: v.id("pipelines") },
+  handler: async (ctx, args) => {
+    const pipeline = await ctx.db.get(args.pipelineId);
+    if (!pipeline) throw new Error("Pipeline not found");
+    await requireWorkspaceMembership(ctx, pipeline.workspaceId);
+
+    const stages = await ctx.db
+      .query("pipelineStages")
+      .withIndex("by_pipeline_order", (q) =>
+        q.eq("pipelineId", args.pipelineId),
+      )
+      .collect();
+
+    const opps: Array<{ stageId: string }> = [];
+    for (const stage of stages) {
+      const rows = await ctx.db
+        .query("opportunities")
+        .withIndex("by_workspace_stage", (q) =>
+          q.eq("workspaceId", pipeline.workspaceId).eq("stageId", stage._id),
+        )
+        .collect();
+      for (const r of rows) opps.push({ stageId: r.stageId });
+    }
+
+    return computePipelineStats(stages, opps);
   },
 });
 
