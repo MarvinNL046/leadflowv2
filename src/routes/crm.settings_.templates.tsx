@@ -43,6 +43,13 @@ function TemplatesPage() {
 
 function TemplatesEditor({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const templates = useQuery(api.emailTemplates.list, { workspaceId })
+  const crmSettings = useQuery(api.crmSettings.get, { workspaceId })
+  const companyName = crmSettings?.companyName ?? ''
+  const updateSettings = useMutation(api.crmSettings.update)
+  const [companyDraft, setCompanyDraft] = useState('')
+  useEffect(() => {
+    if (crmSettings) setCompanyDraft(crmSettings.companyName ?? '')
+  }, [crmSettings])
 
   if (templates === undefined) return <Skeleton className="h-96 w-full" />
   if (templates.length === 0) {
@@ -89,6 +96,47 @@ function TemplatesEditor({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-base">Bedrijfsgegevens</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1.5">
+          <Label htmlFor="company-name">
+            Bedrijfsnaam (voor {'{{company}}'} in e-mails)
+          </Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="company-name"
+              value={companyDraft}
+              placeholder={companyName || 'Bedrijfsnaam'}
+              onChange={(e) => setCompanyDraft(e.target.value)}
+              className="max-w-sm"
+            />
+            <Button
+              type="button"
+              size="sm"
+              disabled={companyDraft.trim() === companyName}
+              onClick={async () => {
+                try {
+                  await updateSettings({
+                    workspaceId,
+                    companyName: companyDraft.trim(),
+                  })
+                  toast.success('Bedrijfsnaam opgeslagen')
+                } catch (err) {
+                  toast.error(humanizeConvexError(err, 'Opslaan mislukt'))
+                }
+              }}
+            >
+              Opslaan
+            </Button>
+          </div>
+          <p className="text-xs text-zinc-500">
+            Leeg = automatisch de organisatie-naam.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base">Beschikbare variabelen</CardTitle>
         </CardHeader>
         <CardContent>
@@ -99,19 +147,25 @@ function TemplatesEditor({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
             <VarRow code="contact.email" desc="Email-adres" />
             <VarRow code="contact.phone" desc="Telefoonnummer" />
             <VarRow code="contact.city" desc="Plaats" />
-            <VarRow code="company" desc="Staycool Airconditioning (fixed)" />
+            <VarRow code="company" desc="Je bedrijfsnaam (instelbaar hieronder)" />
           </div>
         </CardContent>
       </Card>
 
       {templates.map((tpl) => (
-        <TemplateEditor key={tpl._id} template={tpl} />
+        <TemplateEditor key={tpl._id} template={tpl} companyName={companyName} />
       ))}
     </div>
   )
 }
 
-function TemplateEditor({ template }: { template: Doc<'emailTemplates'> }) {
+function TemplateEditor({
+  template,
+  companyName,
+}: {
+  template: Doc<'emailTemplates'>
+  companyName: string
+}) {
   const update = useMutation(api.emailTemplates.update)
   const [subject, setSubject] = useState(template.subject)
   const [body, setBody] = useState(template.body)
@@ -126,14 +180,17 @@ function TemplateEditor({ template }: { template: Doc<'emailTemplates'> }) {
   const isDirty = subject !== template.subject || body !== template.body
 
   // Sample vars voor live preview
-  const sampleVars = leadTemplateVars({
-    firstName: 'Jan',
-    lastName: 'De Boer',
-    email: 'jan@example.nl',
-    phone: '+31612345678',
-    city: 'Maastricht',
-    company: null,
-  })
+  const sampleVars = leadTemplateVars(
+    {
+      firstName: 'Jan',
+      lastName: 'De Boer',
+      email: 'jan@example.nl',
+      phone: '+31612345678',
+      city: 'Maastricht',
+      company: null,
+    },
+    companyName,
+  )
 
   const previewSubject = renderTemplate(subject, sampleVars)
   const previewBody = renderTemplate(body, sampleVars)

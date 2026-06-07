@@ -41,14 +41,17 @@ export function htmlToPlainText(html: string): string {
 }
 
 /** Bouw context-vars voor template-rendering uit een lead. */
-export function leadTemplateVars(lead: {
-  firstName: string | null | undefined
-  lastName: string | null | undefined
-  email: string | null | undefined
-  phone: string | null | undefined
-  city: string | null | undefined
-  company: string | null | undefined
-}): Record<string, unknown> {
+export function leadTemplateVars(
+  lead: {
+    firstName: string | null | undefined
+    lastName: string | null | undefined
+    email: string | null | undefined
+    phone: string | null | undefined
+    city: string | null | undefined
+    company: string | null | undefined
+  },
+  company: string,
+): Record<string, unknown> {
   return {
     contact: {
       firstName: lead.firstName ?? '',
@@ -58,7 +61,7 @@ export function leadTemplateVars(lead: {
       phone: lead.phone ?? '',
       city: lead.city ?? '',
     },
-    company: 'Staycool Airconditioning',
+    company,
   }
 }
 
@@ -78,15 +81,19 @@ export function renderTemplateForChannel(
     company?: string | null
   },
   channel: 'email' | 'sms' | 'whatsapp',
+  company: string,
 ): { body: string; subject?: string } {
-  const vars = leadTemplateVars({
-    firstName: contact.firstName,
-    lastName: contact.lastName,
-    email: contact.email,
-    phone: contact.phone,
-    city: contact.city,
-    company: contact.company,
-  })
+  const vars = leadTemplateVars(
+    {
+      firstName: contact.firstName,
+      lastName: contact.lastName,
+      email: contact.email,
+      phone: contact.phone,
+      city: contact.city,
+      company: contact.company,
+    },
+    company,
+  )
   const body = htmlToPlainText(renderTemplate(template.body, vars))
   if (channel === 'email') {
     return { body, subject: renderTemplate(template.subject, vars) }

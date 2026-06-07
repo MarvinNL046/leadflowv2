@@ -680,6 +680,10 @@ function ReplyForm({
   const templates = useQuery(api.emailTemplates.list, {
     workspaceId: contact.workspaceId,
   })
+  const crmSettingsForCompany = useQuery(api.crmSettings.get, {
+    workspaceId: contact.workspaceId,
+  })
+  const companyName = crmSettingsForCompany?.companyName ?? ''
   const [channel, setChannel] = useState<'email' | 'sms' | 'whatsapp'>(() => {
     // Default = laatste channel waar contact iets in heeft? Voor MVP:
     // whatsapp als phone aanwezig, anders email
@@ -724,7 +728,7 @@ function ReplyForm({
   }
 
   function applyTemplate(tpl: Doc<'emailTemplates'>) {
-    const rendered = renderTemplateForChannel(tpl, contact, channel)
+    const rendered = renderTemplateForChannel(tpl, contact, channel, companyName)
     setBody(rendered.body)
     if (rendered.subject !== undefined) setSubject(rendered.subject)
   }

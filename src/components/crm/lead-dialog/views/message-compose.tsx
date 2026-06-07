@@ -54,6 +54,8 @@ export function MessageComposeView({
     workspaceId,
     name: templateName,
   })
+  const crmSettings = useQuery(api.crmSettings.get, { workspaceId })
+  const companyName = crmSettings?.companyName ?? ''
 
   const [channel, setChannel] = useState<Channel>(
     forcedChannel ?? (lead.email ? 'email' : 'sms'),
@@ -63,14 +65,17 @@ export function MessageComposeView({
 
   useEffect(() => {
     if (template) {
-      const vars = leadTemplateVars({
-        firstName: lead.firstName,
-        lastName: lead.lastName,
-        email: lead.email,
-        phone: lead.phone,
-        city: lead.city,
-        company: lead.company,
-      })
+      const vars = leadTemplateVars(
+        {
+          firstName: lead.firstName,
+          lastName: lead.lastName,
+          email: lead.email,
+          phone: lead.phone,
+          city: lead.city,
+          company: lead.company,
+        },
+        companyName,
+      )
       setSubject(renderTemplate(template.subject, vars))
       const rendered = renderTemplate(template.body, vars)
       setBody(channel === 'sms' ? htmlToPlainText(rendered) : rendered)
@@ -84,6 +89,7 @@ export function MessageComposeView({
     lead.phone,
     lead.city,
     lead.company,
+    companyName,
   ])
 
   const recipient = channel === 'email' ? lead.email : lead.phone

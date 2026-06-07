@@ -19,6 +19,7 @@ describe('renderTemplateForChannel', () => {
       },
       contact,
       'email',
+      'Acme BV',
     )
     expect(r.subject).toBe('Hoi Jan')
     expect(r.body).toBe('Beste Jan Jansen')
@@ -29,6 +30,7 @@ describe('renderTemplateForChannel', () => {
       { subject: 'Onderwerp', body: '<p>Hallo {{contact.firstName}}</p>' },
       contact,
       'sms',
+      'Acme BV',
     )
     expect(r.subject).toBeUndefined()
     expect(r.body).toBe('Hallo Jan')
@@ -39,6 +41,7 @@ describe('renderTemplateForChannel', () => {
       { subject: 'X', body: 'Test' },
       contact,
       'whatsapp',
+      'Acme BV',
     )
     expect(r.subject).toBeUndefined()
     expect(r.body).toBe('Test')
@@ -59,18 +62,20 @@ describe('renderTemplateForChannel', () => {
         company: null,
       },
       'sms',
+      'Acme BV',
     )
     expect(r.body).toBe('Naam: [] Stad: [] X: []')
     expect(r.body).not.toContain('undefined')
   })
 
-  it('company: hardcoded "Staycool Airconditioning" (niet uit contact-veld)', () => {
+  it('company: gebruikt de doorgegeven bedrijfsnaam (niet uit contact-veld)', () => {
     const r = renderTemplateForChannel(
       { subject: 'S', body: 'Bedrijf: {{company}}' },
       contact,
       'email',
+      'Acme BV',
     )
-    expect(r.body).toBe('Bedrijf: Staycool Airconditioning')
+    expect(r.body).toBe('Bedrijf: Acme BV')
   })
 
   it('subject behoudt HTML, body wordt gestript (bewuste asymmetrie)', () => {
@@ -78,6 +83,7 @@ describe('renderTemplateForChannel', () => {
       { subject: 'Hoi <b>{{contact.firstName}}</b>', body: '<p>Test</p>' },
       contact,
       'email',
+      'Acme BV',
     )
     expect(r.subject).toBe('Hoi <b>Jan</b>')
     expect(r.body).toBe('Test')
