@@ -172,6 +172,9 @@ export default defineSchema({
     color: v.optional(v.string()),
     isWonStage: v.boolean(),
     isLostStage: v.boolean(),
+    // true = follow-up-cron zet opps in deze stage NIET auto terug naar Nieuw
+    // (bv. "Afspraak Ingepland"). Leeg/false = huidig gedrag.
+    noResurface: v.optional(v.boolean()),
   }).index("by_pipeline_order", ["pipelineId", "order"]),
 
   opportunities: defineTable({
