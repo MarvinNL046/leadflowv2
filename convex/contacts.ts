@@ -1207,3 +1207,105 @@ export const create = mutation({
     return { contact, isDuplicate: false as const };
   },
 });
+
+/**
+ * Bulk-import van contacten (CSV). Dedup tegen DB + binnen de batch (email→
+ * phone). Elk nieuw contact krijgt leadAttribution source "manual". GEEN
+ * opportunity, GEEN triggerContactCreated — bulk-import mag de speed-to-lead-
+ * workflow/AI NIET massaal afvuren. Client batcht per 100; max 500/call.
+ */
+export const importContacts = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    contacts: v.array(
+      v.object({
+        firstName: v.optional(v.string()),
+        lastName: v.optional(v.string()),
+        email: v.optional(v.string()),
+        phone: v.optional(v.string()),
+        company: v.optional(v.string()),
+        city: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    await requireWorkspaceMembership(ctx, args.workspaceId);
+    if (args.contacts.length > 500) {
+      throw new Error("Maximaal 500 contacten per batch");
+    }
+
+    let imported = 0;
+    let skipped = 0;
+    const seenEmail = new Set<string>();
+    const seenPhone = new Set<string>();
+
+    for (const c of args.contacts) {
+      const hasIdentifier = [c.firstName, c.lastName, c.email, c.phone].some(
+        (v) => typeof v === "string" && v.trim().length > 0,
+      );
+      if (!hasIdentifier) {
+        skipped++;
+        continue;
+      }
+      const normalizedEmail = normalizeEmail(c.email);
+      const normalizedPhone = normalizePhone(c.phone);
+
+      if (normalizedEmail && seenEmail.has(normalizedEmail)) {
+        skipped++;
+        continue;
+      }
+      if (normalizedPhone && seenPhone.has(normalizedPhone)) {
+        skipped++;
+        continue;
+      }
+
+      let dup = false;
+      if (normalizedEmail) {
+        const e = await ctx.db
+          .query("contacts")
+          .withIndex("by_workspace_email", (q) =>
+            q.eq("workspaceId", args.workspaceId).eq("email", normalizedEmail),
+          )
+          .filter((q) => q.eq(q.field("deletedAt"), undefined))
+          .first();
+        if (e) dup = true;
+      }
+      if (!dup && normalizedPhone) {
+        const p = await ctx.db
+          .query("contacts")
+          .withIndex("by_workspace_phone", (q) =>
+            q.eq("workspaceId", args.workspaceId).eq("phone", normalizedPhone),
+          )
+          .filter((q) => q.eq(q.field("deletedAt"), undefined))
+          .first();
+        if (p) dup = true;
+      }
+      if (dup) {
+        skipped++;
+        continue;
+      }
+
+      if (normalizedEmail) seenEmail.add(normalizedEmail);
+      if (normalizedPhone) seenPhone.add(normalizedPhone);
+
+      const contactId = await ctx.db.insert("contacts", {
+        workspaceId: args.workspaceId,
+        firstName: c.firstName?.trim() || undefined,
+        lastName: c.lastName?.trim() || undefined,
+        email: normalizedEmail,
+        phone: normalizedPhone,
+        company: c.company?.trim() || undefined,
+        city: c.city?.trim() || undefined,
+        callCount: 0,
+      });
+      await ctx.db.insert("leadAttribution", {
+        contactId,
+        workspaceId: args.workspaceId,
+        source: "manual",
+      });
+      imported++;
+    }
+
+    return { imported, skipped };
+  },
+});
