@@ -524,3 +524,34 @@ export const setStageNoResurface = mutation({
     return null;
   },
 });
+
+/**
+ * Zet (of wis) het per-stage retry-interval. days = null → wis (terug naar de
+ * workspace-default). Alleen voor actieve stages (Gewonnen/Verloren hebben geen
+ * follow-up-retry). Spiegelt setStageNoResurface.
+ */
+export const setStageFollowUpDays = mutation({
+  args: {
+    stageId: v.id("pipelineStages"),
+    days: v.union(v.number(), v.null()),
+  },
+  handler: async (ctx, args) => {
+    const stage = await ctx.db.get(args.stageId);
+    if (!stage) throw new Error("Stage niet gevonden");
+    const pipeline = await ctx.db.get(stage.pipelineId);
+    if (!pipeline) throw new Error("Pipeline niet gevonden");
+    await requireWorkspaceMembership(ctx, pipeline.workspaceId);
+    if (stage.isWonStage || stage.isLostStage) {
+      throw new Error(
+        "Follow-up-interval geldt alleen voor actieve stages (niet Gewonnen/Verloren)",
+      );
+    }
+    if (args.days !== null && (args.days < 1 || args.days > 60)) {
+      throw new Error("Follow-up dagen moet tussen 1 en 60 zijn");
+    }
+    await ctx.db.patch(args.stageId, {
+      followUpDays: args.days ?? undefined,
+    });
+    return null;
+  },
+});
