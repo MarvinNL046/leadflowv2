@@ -13,6 +13,7 @@ import { normalizeEmail, normalizePhone } from "./lib/phone";
 import { getEffectiveSettings } from "./crmSettings";
 import { isWithinDashboardWindow } from "./dashboardWindow";
 import { pickFirstActiveStage } from "./pipelinesLogic";
+import { resolveFollowUpDays } from "./followUpInterval";
 import {
   renderTemplate,
   htmlToPlainText,
@@ -718,12 +719,31 @@ export const recordCallNoAnswer = mutation({
       lastCallAt: Date.now(),
       lastCallResult: "not_answered",
     };
+    let followUpDays = settings.defaultFollowUpDays;
     if (isFinalStrike) {
       patch.unreachable = true;
       patch.nextFollowUpAt = undefined;  // geen follow-up meer
     } else {
-      patch.nextFollowUpAt =
-        Date.now() + settings.defaultFollowUpDays * 24 * 60 * 60 * 1000;
+      // Per-stage retry-interval: de verst-gevorderde open opp bepaalt de dagen.
+      // (Aggregeert globaal over alle open opps als het contact er meerdere heeft.)
+      const opps = await ctx.db
+        .query("opportunities")
+        .withIndex("by_contact", (q) => q.eq("contactId", args.contactId))
+        .collect();
+      const openStages = (
+        await Promise.all(
+          opps.map(async (o) => {
+            const s = await ctx.db.get(o.stageId);
+            if (!s || s.isWonStage || s.isLostStage) return [];
+            return [{ order: s.order, followUpDays: s.followUpDays }];
+          }),
+        )
+      ).flat();
+      followUpDays = resolveFollowUpDays(
+        openStages,
+        settings.defaultFollowUpDays,
+      );
+      patch.nextFollowUpAt = Date.now() + followUpDays * 24 * 60 * 60 * 1000;
     }
     await ctx.db.patch(args.contactId, patch);
 
@@ -811,7 +831,7 @@ export const recordCallNoAnswer = mutation({
       contactId: args.contactId,
       body: isFinalStrike
         ? `❌ Niet bereikt (poging ${newCount} — ${settings.maxCallAttempts}-strike-rule). Lead gemarkeerd als onbereikbaar.`
-        : `📞 Niet bereikt (poging ${newCount}). Volgende belpoging over ${settings.defaultFollowUpDays} dagen.`,
+        : `📞 Niet bereikt (poging ${newCount}). Volgende belpoging over ${followUpDays} dagen.`,
       createdById: userId,
     });
   },
