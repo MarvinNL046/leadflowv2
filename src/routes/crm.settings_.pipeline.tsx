@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation } from 'convex/react'
 import { toast } from 'sonner'
@@ -74,6 +74,9 @@ function PipelineEditor({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const setStageNoResurface = useMutation(
     api.pipelines.setStageNoResurface,
   )
+  const setStageFollowUpDays = useMutation(api.pipelines.setStageFollowUpDays)
+  const settings = useQuery(api.crmSettings.get, { workspaceId })
+  const defaultFollowUpDays = settings?.defaultFollowUpDays ?? 2
 
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState(PRESET_COLORS[0])
@@ -231,6 +234,19 @@ function PipelineEditor({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                   toast.error(humanizeConvexError(err, 'Wijzigen mislukt'))
                 }
               }}
+              defaultFollowUpDays={defaultFollowUpDays}
+              onFollowUpDays={async (days) => {
+                try {
+                  await setStageFollowUpDays({ stageId: stage._id, days })
+                  toast.success(
+                    days === null
+                      ? 'Terug naar standaard-interval'
+                      : 'Follow-up-interval bijgewerkt',
+                  )
+                } catch (err) {
+                  toast.error(humanizeConvexError(err, 'Wijzigen mislukt'))
+                }
+              }}
               onDelete={async () => {
                 try {
                   await deleteStage({ stageId: stage._id })
@@ -290,6 +306,8 @@ function StageRow({
   onColor,
   onRole,
   onNoResurface,
+  onFollowUpDays,
+  defaultFollowUpDays,
   onDelete,
 }: {
   stage: Doc<'pipelineStages'>
@@ -301,6 +319,8 @@ function StageRow({
   onColor: (color: string) => Promise<void>
   onRole: (role: 'normal' | 'won' | 'lost') => Promise<void>
   onNoResurface: (value: boolean) => Promise<void>
+  onFollowUpDays: (days: number | null) => Promise<void>
+  defaultFollowUpDays: number
   onDelete: () => Promise<void>
 }) {
   const role: 'normal' | 'won' | 'lost' = stage.isWonStage
@@ -368,6 +388,14 @@ function StageRow({
         </button>
       )}
 
+      {role === 'normal' && (
+        <FollowUpDaysField
+          value={stage.followUpDays}
+          defaultDays={defaultFollowUpDays}
+          onChange={onFollowUpDays}
+        />
+      )}
+
       <Button
         type="button"
         variant="ghost"
@@ -378,6 +406,56 @@ function StageRow({
       >
         <Trash2 className="h-4 w-4" />
       </Button>
+    </div>
+  )
+}
+
+function FollowUpDaysField({
+  value,
+  defaultDays,
+  onChange,
+}: {
+  value: number | undefined
+  defaultDays: number
+  onChange: (days: number | null) => Promise<void>
+}) {
+  const [local, setLocal] = useState(value != null ? String(value) : '')
+  useEffect(() => {
+    setLocal(value != null ? String(value) : '')
+  }, [value])
+
+  async function commit() {
+    const trimmed = local.trim()
+    if (trimmed === '') {
+      if (value != null) await onChange(null)
+      return
+    }
+    const n = Number(trimmed)
+    if (!Number.isInteger(n) || n < 1 || n > 60) {
+      setLocal(value != null ? String(value) : '')
+      return
+    }
+    if (n !== value) await onChange(n)
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="number"
+        min={1}
+        max={60}
+        value={local}
+        placeholder={String(defaultDays)}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={() => void commit()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+        }}
+        className="w-16 rounded-md border border-zinc-200 px-2 py-1 text-xs"
+        title="Dagen tot volgende belpoging voor leads in deze stage (leeg = workspace-standaard)"
+        aria-label="Follow-up-interval (dagen) voor deze stage"
+      />
+      <span className="text-xs text-zinc-400">d</span>
     </div>
   )
 }
