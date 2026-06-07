@@ -2299,3 +2299,38 @@ export const relinkAuthAccount = internalMutation({
     return { accountId, provider: acc.provider, from, to: toUserId };
   },
 });
+
+/**
+ * Eenmalige backfill: zet leadAttribution.workspaceId vanuit het gekoppelde
+ * contact. Batched (max 500/call) + idempotent. Run herhaald tot processed===0.
+ * Rijen met een onvindbaar contact worden geteld als skipped (blijven over;
+ * verwaarloosbaar — de "tot processed===0"-loop stopt zodra alleen orphans resten).
+ */
+export const backfillLeadAttributionWorkspace = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const batch = await ctx.db
+      .query("leadAttribution")
+      .filter((q) => q.eq(q.field("workspaceId"), undefined))
+      .take(500);
+
+    let processed = 0;
+    let skipped = 0;
+    for (const row of batch) {
+      const contact = await ctx.db.get(row.contactId);
+      if (!contact) {
+        skipped++;
+        continue;
+      }
+      await ctx.db.patch(row._id, { workspaceId: contact.workspaceId });
+      processed++;
+    }
+
+    const rest = await ctx.db
+      .query("leadAttribution")
+      .filter((q) => q.eq(q.field("workspaceId"), undefined))
+      .take(1);
+
+    return { processed, skipped, remaining: rest.length };
+  },
+});
