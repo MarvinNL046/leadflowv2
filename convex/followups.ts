@@ -1,6 +1,7 @@
 import { internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { shouldResurfaceOpp } from "./followupLogic";
+import { pickFirstActiveStage } from "./pipelinesLogic";
 
 /**
  * Follow-up-cron (port van v1's processFollowUps). Een lead waarvan de
@@ -40,7 +41,7 @@ export const processDueFollowups = internalMutation({
         .query("pipelineStages")
         .withIndex("by_pipeline_order", (q) => q.eq("pipelineId", pipeline._id))
         .collect();
-      const firstStage = [...stages].sort((a, b) => a.order - b.order)[0];
+      const firstStage = pickFirstActiveStage(stages);
       if (!firstStage) continue;
       const closedStageIds = new Set<Id<"pipelineStages">>(
         stages.filter((s) => s.isWonStage || s.isLostStage).map((s) => s._id),
