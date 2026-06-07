@@ -14,6 +14,8 @@ import {
   ExternalLink,
   ArrowLeft,
   CheckCheck,
+  Archive,
+  ArchiveRestore,
 } from 'lucide-react'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
@@ -52,6 +54,7 @@ function MessagesPage() {
 function MessagesShell({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const [channel, setChannel] = useState<Channel>('all')
   const [search, setSearch] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
   const [selectedContactId, setSelectedContactId] =
     useState<Id<'contacts'> | null>(null)
   const [markingAllRead, setMarkingAllRead] = useState(false)
@@ -59,9 +62,28 @@ function MessagesShell({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const conversations = useQuery(api.messaging.listConversations, {
     workspaceId,
     ...(channel === 'all' ? {} : { channel }),
+    ...(showArchived ? { includeArchived: true } : {}),
   })
+  const unreadCounts = useQuery(api.messaging.inboxUnreadCounts, { workspaceId })
   const markAllRead = useMutation(api.messaging.markAllRead)
   const markConversationRead = useMutation(api.messaging.markConversationRead)
+  const archiveConversation = useMutation(api.messaging.archiveConversation)
+  const unarchiveConversation = useMutation(api.messaging.unarchiveConversation)
+
+  async function handleArchive(contactId: Id<'contacts'>, archived: boolean) {
+    try {
+      if (archived) {
+        await unarchiveConversation({ contactId })
+        toast.success('Gesprek teruggezet')
+      } else {
+        await archiveConversation({ contactId })
+        toast.success('Gesprek gearchiveerd')
+        if (selectedContactId === contactId) setSelectedContactId(null)
+      }
+    } catch (err) {
+      toast.error(humanizeConvexError(err, 'Archiveren mislukt'))
+    }
+  }
 
   // Markeer een gesprek als gelezen zodra het geopend wordt → ongelezen-bolletje verdwijnt.
   useEffect(() => {
@@ -156,16 +178,30 @@ function MessagesShell({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                 className="h-9 pl-8"
               />
             </div>
-            <div className="grid grid-cols-3 gap-1 rounded-md bg-zinc-100 p-0.5">
-              {(['all', 'sms', 'whatsapp'] as Channel[]).map((c) => (
+            <div className="grid grid-cols-4 gap-1 rounded-md bg-zinc-100 p-0.5">
+              {(['all', 'sms', 'whatsapp', 'email'] as Channel[]).map((c) => (
                 <ChannelFilterButton
                   key={c}
                   active={channel === c}
                   channel={c}
+                  unread={
+                    c === 'all'
+                      ? (unreadCounts?.total ?? 0)
+                      : (unreadCounts?.[c] ?? 0)
+                  }
                   onClick={() => setChannel(c)}
                 />
               ))}
             </div>
+            <button
+              type="button"
+              onClick={() => setShowArchived((s) => !s)}
+              className="px-1 text-left text-xs text-zinc-500 hover:text-zinc-800"
+            >
+              {showArchived
+                ? '← Terug naar actieve gesprekken'
+                : 'Toon gearchiveerde gesprekken'}
+            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -187,6 +223,7 @@ function MessagesShell({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                     conv={c}
                     active={selectedContactId === c.contactId}
                     onClick={() => setSelectedContactId(c.contactId)}
+                    onArchive={() => handleArchive(c.contactId, c.archived)}
                   />
                 ))}
               </ul>
@@ -222,10 +259,12 @@ function MessagesShell({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
 function ChannelFilterButton({
   active,
   channel,
+  unread,
   onClick,
 }: {
   active: boolean
   channel: Channel
+  unread: number
   onClick: () => void
 }) {
   const Icon =
@@ -257,6 +296,11 @@ function ChannelFilterButton({
     >
       <Icon className="h-3 w-3" />
       {label}
+      {unread > 0 && (
+        <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 text-[10px] font-semibold text-white">
+          {unread}
+        </span>
+      )}
     </button>
   )
 }
@@ -265,6 +309,7 @@ function ConversationRow({
   conv,
   active,
   onClick,
+  onArchive,
 }: {
   conv: {
     contactId: Id<'contacts'>
@@ -276,9 +321,11 @@ function ConversationRow({
     lastActivity: number
     totalCount: number
     unread: boolean
+    archived: boolean
   }
   active: boolean
   onClick: () => void
+  onArchive: () => void
 }) {
   const initials = (conv.contactName || '?').slice(0, 2).toUpperCase()
   const preview =
@@ -299,13 +346,14 @@ function ConversationRow({
         : MessageCircle
 
   return (
-    <li>
+    <li className="group relative">
       <button
         type="button"
         onClick={onClick}
         className={cn(
           'flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-zinc-50',
           active && 'bg-violet-50/60',
+          conv.archived && 'opacity-60',
         )}
       >
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-500 text-xs font-medium text-white">
@@ -332,6 +380,18 @@ function ConversationRow({
             )}
           </div>
         </div>
+      </button>
+      <button
+        type="button"
+        onClick={onArchive}
+        title={conv.archived ? 'Terugzetten uit archief' : 'Gesprek archiveren'}
+        className="absolute right-2 top-2 hidden rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700 group-hover:block"
+      >
+        {conv.archived ? (
+          <ArchiveRestore className="h-3.5 w-3.5" />
+        ) : (
+          <Archive className="h-3.5 w-3.5" />
+        )}
       </button>
     </li>
   )

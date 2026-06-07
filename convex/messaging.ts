@@ -765,6 +765,7 @@ export const listConversations = query({
           lastActivity: m.sentAt ?? m._creationTime,
           totalCount: agg.count,
           unread: m.direction === "inbound" && m.readAt === undefined,
+          archived: c.messagesArchivedAt != null,
         };
       }),
     );
