@@ -12,6 +12,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { normalizeEmail, normalizePhone } from "./lib/phone";
 import { getEffectiveSettings } from "./crmSettings";
 import { isWithinDashboardWindow } from "./dashboardWindow";
+import { pickFirstActiveStage } from "./pipelinesLogic";
 import {
   renderTemplate,
   htmlToPlainText,
@@ -290,13 +291,15 @@ export const listIncomingLeads = query({
       .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
       .collect();
     const firstStageContactIds = new Set<Id<"contacts">>();
+    const firstStageIds = new Set<Id<"pipelineStages">>();
     for (const p of pipelines) {
       const stages = await ctx.db
         .query("pipelineStages")
         .withIndex("by_pipeline_order", (q) => q.eq("pipelineId", p._id))
         .collect();
-      const first = stages.find((s) => !s.isWonStage && !s.isLostStage);
+      const first = pickFirstActiveStage(stages);
       if (!first) continue;
+      firstStageIds.add(first._id);
       const opps = await ctx.db
         .query("opportunities")
         .withIndex("by_workspace_stage", (q) =>
@@ -324,10 +327,6 @@ export const listIncomingLeads = query({
     //   (b) minstens één opp nog in de eerste stage (Nieuw) staat.
     // Gebelde leads met een TOEKOMSTIGE follow-up verdwijnen tot ze due zijn;
     // gewonnen/verloren/onbereikbaar (3x) en opp-loze imports vallen eruit.
-    const isFirstStage = (name?: string) => {
-      const n = (name ?? "").toLowerCase();
-      return n.includes("nieuw") || n.includes("new") || n.includes("lead");
-    };
     const checked = await Promise.all(
       followable.map(async (c) => {
         // (a) Verlopen follow-up → resurface (ongeacht stage). dueBefore =
@@ -349,15 +348,12 @@ export const listIncomingLeads = query({
         // dashboard). Echte Meta/webhook-leads krijgen altijd een opp.
         if (opps.length === 0)
           return { c, keep: false, dueFollowup: false };
-        const stages = await Promise.all(
-          opps.map((o) => ctx.db.get(o.stageId)),
-        );
-        // Toon als MINSTENS ÉÉN opp nog in de eerste stage (Nieuw) staat —
-        // een contact kan meerdere opps hebben (elke submission = verse opp),
-        // dus een verse Nieuw-opp naast oude afgehandelde moet tóch tonen.
-        const anyFirst = stages.some(
-          (s) => s != null && (s.order === 0 || isFirstStage(s.name)),
-        );
+        // Toon als MINSTENS ÉÉN opp in de eerste actieve stage staat —
+        // single-sourced via firstStageIds (zie pickFirstActiveStage in de
+        // resurface-loop). Een contact kan meerdere opps hebben (elke submission
+        // = verse opp), dus een verse eerste-stage-opp naast oude afgehandelde
+        // moet tóch tonen.
+        const anyFirst = opps.some((o) => firstStageIds.has(o.stageId));
         return { c, keep: anyFirst, dueFollowup: false };
       }),
     );
