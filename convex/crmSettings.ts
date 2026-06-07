@@ -181,8 +181,10 @@ export const update = mutation({
       patch.sendEmailOnUnreachable = args.sendEmailOnUnreachable;
     if (args.dashboardWindowDays !== undefined)
       patch.dashboardWindowDays = args.dashboardWindowDays;
+    // Leeg → wis (undefined) zodat get/getEffectiveSettings terugvalt op de
+    // org-naam (?? werkt niet op een lege string).
     if (args.companyName !== undefined)
-      patch.companyName = args.companyName.trim();
+      patch.companyName = args.companyName.trim() || undefined;
 
     if (existing) {
       await ctx.db.patch(existing._id, patch);
