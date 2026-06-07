@@ -261,6 +261,12 @@ export default defineSchema({
     maxCallAttempts: v.optional(v.number()),
     /** Dagen vóór follow_up_due trigger vuurt na "Niet bereikt" (default 2). */
     followUpReminderDays: v.optional(v.number()),
+    /** Terugbel-knoppen in de lead-dialog (leeg = standaardlijst). */
+    callbackPresets: v.optional(
+      v.array(v.object({ days: v.number(), label: v.string() })),
+    ),
+    /** Safety-net dagen voor "klant belt zelf terug" (default 7). */
+    customerCallbackDays: v.optional(v.number()),
   }).index("by_workspace", ["workspaceId"]),
 
   // ════════════════════════════════════════════════════════════════════
