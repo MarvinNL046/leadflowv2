@@ -26,6 +26,7 @@ import { humanizeConvexError } from '#/lib/errors.ts'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
 import { InlineEditText } from '../components/crm/inline-edit-text'
+import { CreatePipelineForm } from '../components/crm/create-pipeline-form'
 
 export const Route = createFileRoute('/crm/settings_/pipeline')({
   component: PipelineSettingsPage,
@@ -82,10 +83,12 @@ function PipelineEditor({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   if (data === null) {
     return (
       <Card>
-        <CardContent className="p-6">
-          <p className="text-sm text-amber-700">
-            Nog geen pipeline aangemaakt voor deze workspace.
+        <CardContent className="flex flex-col gap-3 p-6">
+          <p className="text-sm text-zinc-600">
+            Nog geen pipeline aangemaakt voor deze workspace. Maak er een aan —
+            je krijgt 5 standaard-stages die je daarna kunt aanpassen.
           </p>
+          <CreatePipelineForm workspaceId={workspaceId} />
         </CardContent>
       </Card>
     )

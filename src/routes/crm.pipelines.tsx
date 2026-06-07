@@ -21,6 +21,7 @@ import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
 import { NewOpportunityDialog } from '../components/crm/new-opportunity-dialog'
 import { InlineEditText } from '../components/crm/inline-edit-text'
+import { CreatePipelineForm } from '../components/crm/create-pipeline-form'
 
 export const Route = createFileRoute('/crm/pipelines')({
   component: PipelinesPage,
@@ -74,9 +75,10 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
             Geen pipeline aangemaakt
           </h2>
           <p className="max-w-md text-center text-sm text-zinc-500">
-            Vraag een admin om de Sales pipeline te seeden via
-            scripts/seed-pipeline.ts.
+            Maak je eerste pipeline aan om leads in een kanban te beheren. Je
+            krijgt 5 standaard-stages die je daarna kunt aanpassen.
           </p>
+          <CreatePipelineForm workspaceId={workspaceId} />
         </CardContent>
       </Card>
     )
