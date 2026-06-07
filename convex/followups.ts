@@ -1,5 +1,6 @@
 import { internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { shouldResurfaceOpp } from "./followupLogic";
 
 /**
  * Follow-up-cron (port van v1's processFollowUps). Een lead waarvan de
@@ -44,6 +45,12 @@ export const processDueFollowups = internalMutation({
       const closedStageIds = new Set<Id<"pipelineStages">>(
         stages.filter((s) => s.isWonStage || s.isLostStage).map((s) => s._id),
       );
+      // Stages met "vasthouden": opps hier worden NIET teruggezet naar Nieuw
+      // (bv. "Afspraak Ingepland" — voorkomt regressie van een gevorderde deal
+      // bij een contact-level follow-up).
+      const noResurfaceStageIds = new Set<Id<"pipelineStages">>(
+        stages.filter((s) => s.noResurface === true).map((s) => s._id),
+      );
 
       // Due leads: nextFollowUpAt in [1, now]. De range >= 1 sluit de
       // (vele) contacten met nextFollowUpAt = undefined uit.
@@ -68,8 +75,18 @@ export const processDueFollowups = internalMutation({
           .withIndex("by_contact", (q) => q.eq("contactId", c._id))
           .collect();
         for (const o of opps) {
-          if (o.stageId === firstStage._id) continue; // al in Nieuw
-          if (closedStageIds.has(o.stageId)) continue; // won/lost → laten staan
+          // Skip al-in-Nieuw, won/lost én vastgehouden stages. NB: als ÁLLE
+          // opps van dit contact worden vastgehouden, blijft de lead in z'n
+          // stage staan (zichtbaar op de kanban) en wordt nextFollowUpAt tóch
+          // gecleared (hieronder) — bedoeld: geen eindeloze her-trigger.
+          if (
+            !shouldResurfaceOpp(o.stageId, {
+              firstStageId: firstStage._id,
+              closedStageIds,
+              noResurfaceStageIds,
+            })
+          )
+            continue;
           await ctx.db.patch(o._id, { stageId: firstStage._id });
           await ctx.db.insert("opportunityStageHistory", {
             opportunityId: o._id,
