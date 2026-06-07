@@ -70,6 +70,9 @@ function PipelineEditor({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const reorderStages = useMutation(api.pipelines.reorderStages)
   const updateStageColor = useMutation(api.pipelines.updateStageColor)
   const setStageRole = useMutation(api.pipelines.setStageRole)
+  const setStageNoResurface = useMutation(
+    api.pipelines.setStageNoResurface,
+  )
 
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState(PRESET_COLORS[0])
@@ -213,6 +216,18 @@ function PipelineEditor({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                   )
                 }
               }}
+              onNoResurface={async (value) => {
+                try {
+                  await setStageNoResurface({ stageId: stage._id, value })
+                  toast.success(
+                    value
+                      ? 'Stage wordt vastgehouden bij follow-up'
+                      : 'Stage doet weer mee met follow-up',
+                  )
+                } catch (err) {
+                  toast.error(humanizeConvexError(err, 'Wijzigen mislukt'))
+                }
+              }}
               onDelete={async () => {
                 try {
                   await deleteStage({ stageId: stage._id })
@@ -271,6 +286,7 @@ function StageRow({
   onRename,
   onColor,
   onRole,
+  onNoResurface,
   onDelete,
 }: {
   stage: Doc<'pipelineStages'>
@@ -281,6 +297,7 @@ function StageRow({
   onRename: (next: string) => Promise<void>
   onColor: (color: string) => Promise<void>
   onRole: (role: 'normal' | 'won' | 'lost') => Promise<void>
+  onNoResurface: (value: boolean) => Promise<void>
   onDelete: () => Promise<void>
 }) {
   const role: 'normal' | 'won' | 'lost' = stage.isWonStage
@@ -330,6 +347,23 @@ function StageRow({
       </div>
 
       <RoleSelector value={role} onChange={onRole} />
+
+      {!isFirst && role === 'normal' && (
+        <button
+          type="button"
+          onClick={() => void onNoResurface(!stage.noResurface)}
+          className={cn(
+            'rounded-md border px-2 py-1 text-xs font-medium transition-colors',
+            stage.noResurface
+              ? 'border-amber-200 bg-amber-50 text-amber-700'
+              : 'border-zinc-200 text-zinc-500 hover:bg-zinc-50',
+          )}
+          title="Niet auto-terugzetten naar Nieuw bij een verlopen follow-up"
+          aria-pressed={stage.noResurface === true}
+        >
+          Vasthouden
+        </button>
+      )}
 
       <Button
         type="button"
