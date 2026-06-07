@@ -234,6 +234,8 @@ export default defineSchema({
     selectOptions: v.optional(v.array(v.string())),
     isRequired: v.boolean(),
     sortOrder: v.number(),
+    /** true = handmatig veld (settings-CRUD); leeg/false = Meta-form-veld. */
+    isManual: v.optional(v.boolean()),
     // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
     legacyId: v.optional(v.number()),
   }).index("by_workspace_entity", ["workspaceId", "entityType"])
