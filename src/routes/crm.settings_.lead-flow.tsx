@@ -2,7 +2,14 @@ import { useState, useEffect } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation } from 'convex/react'
 import { toast } from 'sonner'
-import { ArrowLeft, Save, RotateCcw, Route as RouteIcon } from 'lucide-react'
+import {
+  ArrowLeft,
+  Save,
+  RotateCcw,
+  Route as RouteIcon,
+  Plus,
+  Trash2,
+} from 'lucide-react'
 import {
   Card,
   CardContent,
@@ -25,6 +32,7 @@ const DEFAULTS = {
   maxCallAttempts: 3,
   defaultFollowUpDays: 2,
   followUpReminderDays: 2,
+  customerCallbackDays: 7,
 }
 
 function LeadFlowSettingsPage() {
@@ -56,6 +64,12 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const [followUpReminderDays, setReminder] = useState(
     DEFAULTS.followUpReminderDays,
   )
+  const [customerCallbackDays, setSafetyNet] = useState(
+    DEFAULTS.customerCallbackDays,
+  )
+  const [callbackPresets, setPresets] = useState<
+    Array<{ days: number; label: string }>
+  >([])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -63,6 +77,8 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
       setMax(settings.maxCallAttempts)
       setFollowUp(settings.defaultFollowUpDays)
       setReminder(settings.followUpReminderDays)
+      setSafetyNet(settings.customerCallbackDays)
+      setPresets(settings.callbackPresets)
     }
   }, [settings])
 
@@ -70,6 +86,8 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
     setMax(DEFAULTS.maxCallAttempts)
     setFollowUp(DEFAULTS.defaultFollowUpDays)
     setReminder(DEFAULTS.followUpReminderDays)
+    setSafetyNet(DEFAULTS.customerCallbackDays)
+    setPresets([])
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -82,6 +100,8 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
         maxCallAttempts,
         defaultFollowUpDays,
         followUpReminderDays,
+        customerCallbackDays,
+        callbackPresets,
       })
       toast.success('Instellingen opgeslagen')
     } catch (err) {
@@ -147,6 +167,88 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
               hint="Wanneer triggert 'follow_up_due' workflow (bv. SMS naar jezelf). Skipt als lead ondertussen afgehandeld."
               value={followUpReminderDays}
               onChange={setReminder}
+              min={1}
+              max={60}
+              suffix="dagen"
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Terugbel-knoppen</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-zinc-500">
+              De knoppen die verschijnen bij "Bel → opgenomen → bel later".
+              Leeg = standaardlijst.
+            </p>
+            <div className="space-y-2">
+              {callbackPresets.map((p, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={p.days}
+                    onChange={(e) =>
+                      setPresets((prev) =>
+                        prev.map((x, j) =>
+                          j === i
+                            ? { ...x, days: Number(e.target.value) }
+                            : x,
+                        ),
+                      )
+                    }
+                    className="w-24"
+                  />
+                  <span className="text-sm text-zinc-500">dagen</span>
+                  <Input
+                    value={p.label}
+                    maxLength={40}
+                    placeholder="Label (bv. Over een week)"
+                    onChange={(e) =>
+                      setPresets((prev) =>
+                        prev.map((x, j) =>
+                          j === i ? { ...x, label: e.target.value } : x,
+                        ),
+                      )
+                    }
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setPresets((prev) => prev.filter((_, j) => j !== i))
+                    }
+                    className="text-zinc-400 hover:text-red-600"
+                    aria-label="Knop verwijderen"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            {callbackPresets.length < 8 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setPresets((prev) => [...prev, { days: 7, label: '' }])
+                }
+              >
+                <Plus className="h-4 w-4" />
+                Knop toevoegen
+              </Button>
+            )}
+            <Field
+              label="Safety-net 'klant belt zelf terug' (dagen)"
+              hint="Als een klant zegt zelf terug te bellen, wordt na N dagen toch een follow-up ingepland zodat de lead niet verdwijnt."
+              value={customerCallbackDays}
+              onChange={setSafetyNet}
               min={1}
               max={60}
               suffix="dagen"

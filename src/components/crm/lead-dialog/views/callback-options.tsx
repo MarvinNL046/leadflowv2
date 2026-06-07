@@ -3,10 +3,11 @@ import { Button } from '#/components/ui/button.tsx'
 
 interface Props {
   processing: string | null
+  presets: Array<{ days: number; label: string }>
   onPick: (days: number) => void
 }
 
-const PRESETS = [
+const FALLBACK_PRESETS = [
   { days: 1, label: 'Morgen' },
   { days: 3, label: 'Over 3 dagen' },
   { days: 7, label: 'Over een week' },
@@ -14,13 +15,14 @@ const PRESETS = [
   { days: 30, label: 'Over een maand' },
 ]
 
-export function CallbackOptionsView({ processing, onPick }: Props) {
+export function CallbackOptionsView({ processing, presets, onPick }: Props) {
+  const items = presets.length > 0 ? presets : FALLBACK_PRESETS
   return (
     <div className="grid gap-2 pt-2">
       <p className="text-center text-sm font-medium text-zinc-600">
         Wanneer terugbellen?
       </p>
-      {PRESETS.map((p) => (
+      {items.map((p) => (
         <Button
           key={p.days}
           type="button"

@@ -52,6 +52,10 @@ export function LeadDialog({
   const tenants = useQuery(api.userProfiles.myTenants)
   const workspaceId = tenants?.find((t) => t.workspace !== null)?.workspace
     ?.id as Id<'workspaces'> | undefined
+  const callbackSettings = useQuery(
+    api.crmSettings.get,
+    workspaceId ? { workspaceId } : 'skip',
+  )
 
   if (!lead) return null
 
@@ -259,6 +263,7 @@ export function LeadDialog({
         {view === 'callback_options' && (
           <CallbackOptionsView
             processing={processing}
+            presets={callbackSettings?.callbackPresets ?? []}
             onPick={(days) =>
               runAction(
                 `callback_${days}d`,
