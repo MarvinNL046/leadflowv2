@@ -12,6 +12,11 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { normalizeEmail, normalizePhone } from "./lib/phone";
 import { getEffectiveSettings } from "./crmSettings";
 import {
+  renderTemplate,
+  htmlToPlainText,
+  leadTemplateVars,
+} from "./templateRender";
+import {
   normalizeForSearch,
   contactMatchesSearch,
   contactMatchesFilters,
@@ -742,6 +747,43 @@ export const recordCallNoAnswer = mutation({
         internal.workflowEngine.triggerLeadUnreachable,
         { workspaceId: contact.workspaceId, contactId: args.contactId },
       );
+      // Optionele auto-afscheidsmail (opt-in, default uit). Alleen bij de
+      // transitie naar onbereikbaar (!contact.unreachable = pre-patch waarde)
+      // en als er een e-mailadres is. Template ontbreekt → stil skippen.
+      if (
+        settings.sendEmailOnUnreachable &&
+        !contact.unreachable &&
+        contact.email
+      ) {
+        const templates = await ctx.db
+          .query("emailTemplates")
+          .withIndex("by_workspace", (q) =>
+            q.eq("workspaceId", contact.workspaceId),
+          )
+          .collect();
+        const goodbye = templates.find(
+          (t) => t.name.toLowerCase() === "afscheidsmail (deal verloren)",
+        );
+        if (goodbye) {
+          const vars = leadTemplateVars({
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+            email: contact.email,
+            phone: contact.phone,
+            city: contact.city,
+            company: contact.company,
+          });
+          const subject = renderTemplate(goodbye.subject, vars);
+          const html = renderTemplate(goodbye.body, vars);
+          await ctx.scheduler.runAfter(0, internal.messaging.sendInternal, {
+            contactId: args.contactId,
+            channel: "email" as const,
+            subject,
+            body: htmlToPlainText(html),
+            htmlBody: html,
+          });
+        }
+      }
     } else {
       // Schedule follow_up_due trigger na N dagen (settings). Triggert
       // alleen als contact dan nog steeds open is (engine-side check).
