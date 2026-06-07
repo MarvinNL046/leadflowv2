@@ -16,6 +16,7 @@ import {
   contactMatchesSearch,
   contactMatchesFilters,
   compareContacts,
+  buildSourceMap,
 } from "./contactSearch";
 
 /**
@@ -143,6 +144,9 @@ export const searchContacts = query({
         hasEmail: v.optional(v.boolean()),
         hasPhone: v.optional(v.boolean()),
         city: v.optional(v.string()),
+        source: v.optional(
+          v.union(v.literal("meta"), v.literal("api"), v.literal("manual")),
+        ),
       }),
     ),
     sort: v.optional(
@@ -170,16 +174,31 @@ export const searchContacts = query({
     const filters = args.filters ?? {};
     const sort = args.sort ?? "newest";
 
+    // Bron per contact (oudste attributie wint). leadAttribution.workspaceId is
+    // gevuld via ingest + backfill; oude rijen zonder → niet in deze map.
+    const attributions = await ctx.db
+      .query("leadAttribution")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
+      .collect();
+    const sourceMap = buildSourceMap(attributions);
+
     const matched = all
       .filter(
         (c) =>
           contactMatchesSearch(c, termNormalized) &&
-          contactMatchesFilters(c, filters),
+          contactMatchesFilters(c, filters) &&
+          (!filters.source || sourceMap.get(c._id) === filters.source),
       )
       .sort((a, b) => compareContacts(a, b, sort));
 
     const limit = args.limit ?? 25;
-    return { contacts: matched.slice(0, limit), total: matched.length };
+    return {
+      contacts: matched.slice(0, limit).map((c) => ({
+        ...c,
+        source: sourceMap.get(c._id) ?? null,
+      })),
+      total: matched.length,
+    };
   },
 });
 
