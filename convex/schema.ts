@@ -472,6 +472,7 @@ export default defineSchema({
 
   leadAttribution: defineTable({
     contactId: v.id("contacts"),
+    workspaceId: v.optional(v.id("workspaces")),
     source: v.union(v.literal("meta"), v.literal("api"), v.literal("manual")),
     metaPageId: v.optional(v.string()),
     metaFormId: v.optional(v.string()),
@@ -492,7 +493,8 @@ export default defineSchema({
     legacyId: v.optional(v.number()),
   }).index("by_contact", ["contactId"])
     .index("by_metaLeadgenId", ["metaLeadgenId"])
-    .index("by_legacyId", ["legacyId"]),
+    .index("by_legacyId", ["legacyId"])
+    .index("by_workspace", ["workspaceId"]),
 
   // Lead-ingest routes — bepaalt per form-id welk workspace de lead krijgt,
   // plus default pipeline/stage/assignee/value voor de auto-aangemaakte

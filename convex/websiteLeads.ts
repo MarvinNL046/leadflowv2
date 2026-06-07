@@ -81,6 +81,7 @@ export const ingestWebsiteLead = internalMutation({
     // Attribution → 'Website'-badge (source "api").
     await ctx.db.insert("leadAttribution", {
       contactId,
+      workspaceId: workspace._id,
       source: "api",
       utmSource: args.source,
     });

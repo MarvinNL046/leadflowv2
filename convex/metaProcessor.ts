@@ -386,6 +386,7 @@ export const upsertContactFromMetaLead = internalMutation({
     // Attribution-row altijd insert (1-op-1 met deze meta-lead).
     await ctx.db.insert("leadAttribution", {
       contactId,
+      workspaceId: workspace._id,
       source: "meta",
       metaPageId: args.pageId,
       metaFormId: args.formId,
