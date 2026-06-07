@@ -452,3 +452,26 @@ export const setStageRole = mutation({
     return null;
   },
 });
+
+/**
+ * Zet de "vasthouden bij follow-up"-vlag op een stage: de follow-up-cron zet
+ * opps in deze stage dan NIET auto terug naar Nieuw. Alleen voor actieve
+ * stages (Gewonnen/Verloren bewegen sowieso niet).
+ */
+export const setStageNoResurface = mutation({
+  args: { stageId: v.id("pipelineStages"), value: v.boolean() },
+  handler: async (ctx, args) => {
+    const stage = await ctx.db.get(args.stageId);
+    if (!stage) throw new Error("Stage niet gevonden");
+    const pipeline = await ctx.db.get(stage.pipelineId);
+    if (!pipeline) throw new Error("Pipeline niet gevonden");
+    await requireWorkspaceMembership(ctx, pipeline.workspaceId);
+    if (stage.isWonStage || stage.isLostStage) {
+      throw new Error(
+        "Alleen actieve stages kunnen worden vastgehouden (niet Gewonnen/Verloren)",
+      );
+    }
+    await ctx.db.patch(args.stageId, { noResurface: args.value });
+    return null;
+  },
+});
