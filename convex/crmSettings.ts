@@ -49,6 +49,17 @@ async function requireWorkspaceMembership(
   if (!membership) throw new Error("Not a member of this workspace");
 }
 
+/** Org-naam van een workspace (fallback-default voor companyName). */
+async function orgNameFor(
+  ctx: { db: QueryCtx["db"] | MutationCtx["db"] },
+  workspaceId: Id<"workspaces">,
+): Promise<string> {
+  const workspace = await ctx.db.get(workspaceId);
+  if (!workspace) return "";
+  const org = await ctx.db.get(workspace.orgId);
+  return org?.name ?? "";
+}
+
 /**
  * Get settings for workspace. Returnt huidige waarden met defaults voor
  * ontbrekende velden. UI gebruikt voor display + form-pre-fill.
@@ -57,6 +68,7 @@ export const get = query({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
     await requireWorkspaceMembership(ctx, args.workspaceId);
+    const orgName = await orgNameFor(ctx, args.workspaceId);
     const settings = await ctx.db
       .query("crmSettings")
       .withIndex("by_workspace", (q) =>
@@ -86,6 +98,7 @@ export const get = query({
       dashboardWindowDays:
         settings?.dashboardWindowDays ??
         DEFAULT_SETTINGS.dashboardWindowDays,
+      companyName: settings?.companyName ?? orgName,
     };
   },
 });
@@ -105,6 +118,7 @@ export const update = mutation({
     customerCallbackDays: v.optional(v.number()),
     sendEmailOnUnreachable: v.optional(v.boolean()),
     dashboardWindowDays: v.optional(v.number()),
+    companyName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await requireWorkspaceMembership(ctx, args.workspaceId);
@@ -167,6 +181,8 @@ export const update = mutation({
       patch.sendEmailOnUnreachable = args.sendEmailOnUnreachable;
     if (args.dashboardWindowDays !== undefined)
       patch.dashboardWindowDays = args.dashboardWindowDays;
+    if (args.companyName !== undefined)
+      patch.companyName = args.companyName.trim();
 
     if (existing) {
       await ctx.db.patch(existing._id, patch);
@@ -194,7 +210,9 @@ export async function getEffectiveSettings(
   customerCallbackDays: number;
   sendEmailOnUnreachable: boolean;
   dashboardWindowDays: number;
+  companyName: string;
 }> {
+  const orgName = await orgNameFor(ctx, workspaceId);
   const settings = await ctx.db
     .query("crmSettings")
     .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
@@ -213,5 +231,6 @@ export async function getEffectiveSettings(
       DEFAULT_SETTINGS.sendEmailOnUnreachable,
     dashboardWindowDays:
       settings?.dashboardWindowDays ?? DEFAULT_SETTINGS.dashboardWindowDays,
+    companyName: settings?.companyName ?? orgName,
   };
 }

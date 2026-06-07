@@ -797,14 +797,17 @@ export const recordCallNoAnswer = mutation({
           (t) => t.name.toLowerCase() === "afscheidsmail (deal verloren)",
         );
         if (goodbye) {
-          const vars = leadTemplateVars({
-            firstName: contact.firstName,
-            lastName: contact.lastName,
-            email: contact.email,
-            phone: contact.phone,
-            city: contact.city,
-            company: contact.company,
-          });
+          const vars = leadTemplateVars(
+            {
+              firstName: contact.firstName,
+              lastName: contact.lastName,
+              email: contact.email,
+              phone: contact.phone,
+              city: contact.city,
+              company: contact.company,
+            },
+            settings.companyName,
+          );
           const subject = renderTemplate(goodbye.subject, vars);
           const html = renderTemplate(goodbye.body, vars);
           await ctx.scheduler.runAfter(0, internal.messaging.sendInternal, {

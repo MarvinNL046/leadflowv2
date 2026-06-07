@@ -36,14 +36,17 @@ export function htmlToPlainText(html: string): string {
     .trim();
 }
 
-export function leadTemplateVars(lead: {
-  firstName?: string | null;
-  lastName?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  city?: string | null;
-  company?: string | null;
-}): Record<string, unknown> {
+export function leadTemplateVars(
+  lead: {
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    city?: string | null;
+    company?: string | null;
+  },
+  company: string,
+): Record<string, unknown> {
   return {
     contact: {
       firstName: lead.firstName ?? "",
@@ -53,6 +56,6 @@ export function leadTemplateVars(lead: {
       phone: lead.phone ?? "",
       city: lead.city ?? "",
     },
-    company: "Staycool Airconditioning",
+    company,
   };
 }

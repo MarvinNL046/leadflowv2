@@ -277,6 +277,8 @@ export default defineSchema({
     /** Recency-venster speed-to-lead-dashboard (dagen). Default 90. Leads ouder
      * dan dit + zonder due follow-up vallen van het bord (blijven in pipeline). */
     dashboardWindowDays: v.optional(v.number()),
+    /** Bedrijfsnaam voor de {{company}}-var in e-mails. Afwezig = org-naam. */
+    companyName: v.optional(v.string()),
   }).index("by_workspace", ["workspaceId"]),
 
   // ════════════════════════════════════════════════════════════════════

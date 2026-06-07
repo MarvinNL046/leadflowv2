@@ -15,13 +15,13 @@ const contact = {
 };
 
 describe("renderTemplate", () => {
-  it("substitueert contact-vars + company", () => {
-    const vars = leadTemplateVars(contact);
+  it("substitueert contact-vars + doorgegeven company", () => {
+    const vars = leadTemplateVars(contact, "Acme BV");
     expect(renderTemplate("Beste {{contact.firstName}}", vars)).toBe(
       "Beste Jan",
     );
     expect(renderTemplate("{{contact.fullName}}", vars)).toBe("Jan Jansen");
-    expect(renderTemplate("{{company}}", vars)).toBe("Staycool Airconditioning");
+    expect(renderTemplate("{{company}}", vars)).toBe("Acme BV");
   });
   it("ontbrekende var → lege string", () => {
     expect(renderTemplate("[{{onbekend}}]", {})).toBe("[]");
