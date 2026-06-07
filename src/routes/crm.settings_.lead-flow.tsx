@@ -34,6 +34,7 @@ const DEFAULTS = {
   followUpReminderDays: 2,
   customerCallbackDays: 7,
   sendEmailOnUnreachable: false,
+  dashboardWindowDays: 90,
 }
 
 function LeadFlowSettingsPage() {
@@ -72,6 +73,9 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
     Array<{ days: number; label: string }>
   >([])
   const [sendEmailOnUnreachable, setSendEmail] = useState(false)
+  const [dashboardWindowDays, setWindow] = useState(
+    DEFAULTS.dashboardWindowDays,
+  )
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -82,6 +86,7 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
       setSafetyNet(settings.customerCallbackDays)
       setPresets(settings.callbackPresets)
       setSendEmail(settings.sendEmailOnUnreachable)
+      setWindow(settings.dashboardWindowDays)
     }
   }, [settings])
 
@@ -92,6 +97,7 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
     setSafetyNet(DEFAULTS.customerCallbackDays)
     setPresets([])
     setSendEmail(false)
+    setWindow(DEFAULTS.dashboardWindowDays)
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -107,6 +113,7 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
         customerCallbackDays,
         callbackPresets,
         sendEmailOnUnreachable,
+        dashboardWindowDays,
       })
       toast.success('Instellingen opgeslagen')
     } catch (err) {
@@ -200,6 +207,15 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                 e-mail — niet allebei (dubbele mail).
               </p>
             </div>
+            <Field
+              label="Dashboard-venster"
+              hint="Nooit-opgevolgde leads ouder dan dit aantal dagen verdwijnen van het speed-to-lead-dashboard (ze blijven in de pipeline). Leads met een openstaande follow-up blijven altijd zichtbaar."
+              value={dashboardWindowDays}
+              onChange={setWindow}
+              min={7}
+              max={730}
+              suffix="dagen"
+            />
           </CardContent>
         </Card>
 
