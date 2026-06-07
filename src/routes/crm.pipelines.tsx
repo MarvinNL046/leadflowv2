@@ -144,6 +144,8 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
         </Button>
       </div>
 
+      <PipelineStatsBar pipelineId={pipeline.pipeline._id} />
+
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto pb-4">
           {stages.map((stage) => (
@@ -177,6 +179,42 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
         open={addOpen}
         onOpenChange={setAddOpen}
       />
+    </div>
+  )
+}
+
+function PipelineStatsBar({ pipelineId }: { pipelineId: Id<'pipelines'> }) {
+  const stats = useQuery(api.opportunities.pipelineStats, { pipelineId })
+  if (stats === undefined) {
+    return <Skeleton className="h-[68px] w-full" />
+  }
+  const items = [
+    { label: 'Open', value: String(stats.openCount), tone: 'text-zinc-900' },
+    {
+      label: 'Gewonnen',
+      value: String(stats.wonCount),
+      tone: 'text-emerald-600',
+    },
+    { label: 'Verloren', value: String(stats.lostCount), tone: 'text-rose-600' },
+    {
+      label: 'Win-rate',
+      value: stats.winRate === null ? '—' : `${stats.winRate}%`,
+      tone: 'text-blue-600',
+    },
+  ]
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {items.map((it) => (
+        <div
+          key={it.label}
+          className="rounded-lg border border-zinc-200 bg-white px-4 py-3"
+        >
+          <div className="text-xs text-zinc-500">{it.label}</div>
+          <div className={cn('mt-0.5 text-xl font-semibold', it.tone)}>
+            {it.value}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
