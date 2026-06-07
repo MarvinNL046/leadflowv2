@@ -7,6 +7,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { validatePipelineName } from "./pipelinesLogic";
 
 /**
  * Pipelines + pipeline-stages voor het Kanban board op /crm/pipelines.
@@ -24,6 +25,28 @@ const DEFAULT_STAGES = [
   { name: "Gewonnen", color: "#34d399", isWonStage: true, isLostStage: false },
   { name: "Verloren", color: "#f87171", isWonStage: false, isLostStage: true },
 ];
+
+/**
+ * Insert de DEFAULT_STAGES voor een pipeline (order 0..n). Gedeeld door
+ * seedDefault (CLI-seed) en createPipeline (UI). Geëxporteerd zodat de
+ * reversibele backend-smoke de échte helper test (niet een kopie).
+ */
+export async function insertDefaultStages(
+  ctx: MutationCtx,
+  pipelineId: Id<"pipelines">,
+): Promise<void> {
+  for (let i = 0; i < DEFAULT_STAGES.length; i++) {
+    const s = DEFAULT_STAGES[i];
+    await ctx.db.insert("pipelineStages", {
+      pipelineId,
+      name: s.name,
+      order: i,
+      color: s.color,
+      isWonStage: s.isWonStage,
+      isLostStage: s.isLostStage,
+    });
+  }
+}
 
 async function requireWorkspaceMembership(
   ctx: QueryCtx | MutationCtx,
@@ -94,19 +117,46 @@ export const seedDefault = mutation({
       isDefault: true,
     });
 
-    for (let i = 0; i < DEFAULT_STAGES.length; i++) {
-      const s = DEFAULT_STAGES[i];
-      await ctx.db.insert("pipelineStages", {
-        pipelineId,
-        name: s.name,
-        order: i,
-        color: s.color,
-        isWonStage: s.isWonStage,
-        isLostStage: s.isLostStage,
-      });
-    }
+    await insertDefaultStages(ctx, pipelineId);
 
     return { pipelineId, created: true };
+  },
+});
+
+/**
+ * Maak de (eerste) pipeline voor een workspace + de 5 default-stages. UI-pad
+ * voor de empty-state. Single-pipeline-model: weigert als er al een default is.
+ */
+export const createPipeline = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireWorkspaceMembership(ctx, args.workspaceId);
+
+    const result = validatePipelineName(args.name);
+    if ("error" in result) throw new Error(result.error);
+
+    // Guard: single-pipeline-model. Convex-mutations draaien atomisch in één
+    // transactie → geen race-window tussen deze check en de insert hieronder.
+    const existing = await ctx.db
+      .query("pipelines")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    if (existing) {
+      throw new Error("Er bestaat al een pipeline voor deze workspace");
+    }
+
+    const pipelineId = await ctx.db.insert("pipelines", {
+      workspaceId: args.workspaceId,
+      name: result.value,
+      isDefault: true,
+    });
+    await insertDefaultStages(ctx, pipelineId);
+
+    return pipelineId;
   },
 });
 
@@ -121,11 +171,10 @@ export const renamePipeline = mutation({
     if (!pipeline) throw new Error("Pipeline niet gevonden");
     await requireWorkspaceMembership(ctx, pipeline.workspaceId);
 
-    const trimmed = args.name.trim();
-    if (!trimmed) throw new Error("Naam mag niet leeg zijn");
-    if (trimmed.length > 80) throw new Error("Naam mag max 80 tekens zijn");
+    const result = validatePipelineName(args.name);
+    if ("error" in result) throw new Error(result.error);
 
-    await ctx.db.patch(args.pipelineId, { name: trimmed });
+    await ctx.db.patch(args.pipelineId, { name: result.value });
     return null;
   },
 });

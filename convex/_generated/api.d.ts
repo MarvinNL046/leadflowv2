@@ -37,6 +37,7 @@ import type * as notes from "../notes.js";
 import type * as opportunities from "../opportunities.js";
 import type * as pipelineStats from "../pipelineStats.js";
 import type * as pipelines from "../pipelines.js";
+import type * as pipelinesLogic from "../pipelinesLogic.js";
 import type * as templateRender from "../templateRender.js";
 import type * as userProfiles from "../userProfiles.js";
 import type * as websiteLeads from "../websiteLeads.js";
@@ -80,6 +81,7 @@ declare const fullApi: ApiFromModules<{
   opportunities: typeof opportunities;
   pipelineStats: typeof pipelineStats;
   pipelines: typeof pipelines;
+  pipelinesLogic: typeof pipelinesLogic;
   templateRender: typeof templateRender;
   userProfiles: typeof userProfiles;
   websiteLeads: typeof websiteLeads;
