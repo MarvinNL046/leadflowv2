@@ -269,6 +269,8 @@ export default defineSchema({
     ),
     /** Safety-net dagen voor "klant belt zelf terug" (default 7). */
     customerCallbackDays: v.optional(v.number()),
+    /** true = auto-afscheidsmail bij 3-strike-onbereikbaar (default false). */
+    sendEmailOnUnreachable: v.optional(v.boolean()),
   }).index("by_workspace", ["workspaceId"]),
 
   // ════════════════════════════════════════════════════════════════════
