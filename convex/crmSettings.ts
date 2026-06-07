@@ -27,6 +27,7 @@ export const DEFAULT_SETTINGS = {
   defaultFollowUpDays: 2,
   followUpReminderDays: 2,
   customerCallbackDays: 7,
+  sendEmailOnUnreachable: false,
   timezone: "Europe/Amsterdam",
 } as const;
 
@@ -78,6 +79,9 @@ export const get = query({
       customerCallbackDays:
         settings?.customerCallbackDays ??
         DEFAULT_SETTINGS.customerCallbackDays,
+      sendEmailOnUnreachable:
+        settings?.sendEmailOnUnreachable ??
+        DEFAULT_SETTINGS.sendEmailOnUnreachable,
     };
   },
 });
@@ -95,6 +99,7 @@ export const update = mutation({
       v.array(v.object({ days: v.number(), label: v.string() })),
     ),
     customerCallbackDays: v.optional(v.number()),
+    sendEmailOnUnreachable: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     await requireWorkspaceMembership(ctx, args.workspaceId);
@@ -147,6 +152,8 @@ export const update = mutation({
       patch.callbackPresets = args.callbackPresets;
     if (args.customerCallbackDays !== undefined)
       patch.customerCallbackDays = args.customerCallbackDays;
+    if (args.sendEmailOnUnreachable !== undefined)
+      patch.sendEmailOnUnreachable = args.sendEmailOnUnreachable;
 
     if (existing) {
       await ctx.db.patch(existing._id, patch);
@@ -172,6 +179,7 @@ export async function getEffectiveSettings(
   defaultFollowUpDays: number;
   followUpReminderDays: number;
   customerCallbackDays: number;
+  sendEmailOnUnreachable: boolean;
 }> {
   const settings = await ctx.db
     .query("crmSettings")
@@ -186,5 +194,8 @@ export async function getEffectiveSettings(
       settings?.followUpReminderDays ?? DEFAULT_SETTINGS.followUpReminderDays,
     customerCallbackDays:
       settings?.customerCallbackDays ?? DEFAULT_SETTINGS.customerCallbackDays,
+    sendEmailOnUnreachable:
+      settings?.sendEmailOnUnreachable ??
+      DEFAULT_SETTINGS.sendEmailOnUnreachable,
   };
 }
