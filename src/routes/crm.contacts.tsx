@@ -66,6 +66,14 @@ const SORT_OPTIONS = [
 type SortValue = (typeof SORT_OPTIONS)[number]['value']
 
 const ALL_CITIES = '__all__'
+const ALL_SOURCES = '__all__'
+
+// Sync met convex/schema.ts leadAttribution.source union (meta/api/manual).
+const SOURCE_LABELS: Record<string, string> = {
+  meta: 'Meta',
+  api: 'Website',
+  manual: 'Handmatig',
+}
 
 function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const [search, setSearch] = useState('')
@@ -73,6 +81,7 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const [hasEmail, setHasEmail] = useState(false)
   const [hasPhone, setHasPhone] = useState(false)
   const [city, setCity] = useState<string>(ALL_CITIES)
+  const [source, setSource] = useState<string>(ALL_SOURCES)
   const [sort, setSort] = useState<SortValue>('newest')
   const [limit, setLimit] = useState(PAGE_SIZE)
 
@@ -87,7 +96,7 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   // "Toon 25 meer" opnieuw resetten (lus).
   useEffect(() => {
     setLimit(PAGE_SIZE)
-  }, [debouncedSearch, hasEmail, hasPhone, city, sort])
+  }, [debouncedSearch, hasEmail, hasPhone, city, sort, source])
 
   // Stabiele referentie voor de query-args. Convex `useQuery` vergelijkt args
   // by-value (geen echte loop bij een nieuw object), maar useMemo houdt het
@@ -97,8 +106,11 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
       ...(hasEmail ? { hasEmail: true } : {}),
       ...(hasPhone ? { hasPhone: true } : {}),
       ...(city !== ALL_CITIES ? { city } : {}),
+      ...(source !== ALL_SOURCES
+        ? { source: source as 'meta' | 'api' | 'manual' }
+        : {}),
     }),
-    [hasEmail, hasPhone, city],
+    [hasEmail, hasPhone, city, source],
   )
 
   const cities = useQuery(api.contacts.contactCities, { workspaceId })
@@ -115,7 +127,11 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const total = data?.total ?? 0
   const hasMore = contacts.length < total
   const filtersActive =
-    debouncedSearch !== '' || hasEmail || hasPhone || city !== ALL_CITIES
+    debouncedSearch !== '' ||
+    hasEmail ||
+    hasPhone ||
+    city !== ALL_CITIES ||
+    source !== ALL_SOURCES
 
   return (
     <div className="space-y-6">
@@ -170,6 +186,18 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                     {c}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={source} onValueChange={setSource}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Alle bronnen" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_SOURCES}>Alle bronnen</SelectItem>
+                <SelectItem value="meta">Meta</SelectItem>
+                <SelectItem value="api">Website</SelectItem>
+                <SelectItem value="manual">Handmatig</SelectItem>
               </SelectContent>
             </Select>
 
@@ -247,6 +275,14 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                             {c.city && (
                               <Badge variant="secondary" className="text-xs">
                                 {c.city}
+                              </Badge>
+                            )}
+                            {c.source && SOURCE_LABELS[c.source] && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs text-zinc-500"
+                              >
+                                {SOURCE_LABELS[c.source]}
                               </Badge>
                             )}
                           </div>
