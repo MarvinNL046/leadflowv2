@@ -16,14 +16,22 @@ import {
   CheckCheck,
   Archive,
   ArchiveRestore,
+  FileText,
 } from 'lucide-react'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '#/components/ui/dropdown-menu.tsx'
 import { cn } from '#/lib/utils.ts'
 import { humanizeConvexError } from '#/lib/errors.ts'
+import { renderTemplateForChannel } from '#/lib/templates.ts'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
 
@@ -669,6 +677,9 @@ function ReplyForm({
   contact: Doc<'contacts'>
 }) {
   const send = useAction(api.messaging.send)
+  const templates = useQuery(api.emailTemplates.list, {
+    workspaceId: contact.workspaceId,
+  })
   const [channel, setChannel] = useState<'email' | 'sms' | 'whatsapp'>(() => {
     // Default = laatste channel waar contact iets in heeft? Voor MVP:
     // whatsapp als phone aanwezig, anders email
@@ -710,6 +721,26 @@ function ReplyForm({
     } finally {
       setSending(false)
     }
+  }
+
+  function applyTemplate(tpl: Doc<'emailTemplates'>) {
+    const rendered = renderTemplateForChannel(tpl, contact, channel)
+    setBody(rendered.body)
+    if (rendered.subject !== undefined) setSubject(rendered.subject)
+  }
+
+  function handlePick(tpl: Doc<'emailTemplates'>) {
+    const hasContent =
+      body.trim().length > 0 ||
+      (channel === 'email' && subject.trim().length > 0)
+    if (!hasContent) {
+      applyTemplate(tpl)
+      toast.success(`Template "${tpl.name}" ingevoegd`)
+      return
+    }
+    toast(`Bestaande tekst overschrijven met "${tpl.name}"?`, {
+      action: { label: 'Overschrijven', onClick: () => applyTemplate(tpl) },
+    })
   }
 
   if (!recipient) {
@@ -761,6 +792,40 @@ function ReplyForm({
             </button>
           )
         })}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              disabled={templates === undefined}
+              className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-300"
+              title="Template invoegen"
+            >
+              <FileText className="h-3 w-3" />
+              Template
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            className="max-h-64 overflow-y-auto"
+          >
+            {templates && templates.length === 0 ? (
+              <DropdownMenuItem asChild>
+                <Link to="/crm/settings/templates" className="text-zinc-500">
+                  Nog geen templates — maak ze in Instellingen
+                </Link>
+              </DropdownMenuItem>
+            ) : (
+              templates?.map((tpl) => (
+                <DropdownMenuItem
+                  key={tpl._id}
+                  onSelect={() => handlePick(tpl)}
+                >
+                  {tpl.name}
+                </DropdownMenuItem>
+              ))
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <span className="ml-auto text-zinc-400">→ {recipient}</span>
       </div>
 
