@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS = {
   followUpReminderDays: 2,
   customerCallbackDays: 7,
   sendEmailOnUnreachable: false,
+  dashboardWindowDays: 90,
   timezone: "Europe/Amsterdam",
 } as const;
 
@@ -82,6 +83,9 @@ export const get = query({
       sendEmailOnUnreachable:
         settings?.sendEmailOnUnreachable ??
         DEFAULT_SETTINGS.sendEmailOnUnreachable,
+      dashboardWindowDays:
+        settings?.dashboardWindowDays ??
+        DEFAULT_SETTINGS.dashboardWindowDays,
     };
   },
 });
@@ -100,6 +104,7 @@ export const update = mutation({
     ),
     customerCallbackDays: v.optional(v.number()),
     sendEmailOnUnreachable: v.optional(v.boolean()),
+    dashboardWindowDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     await requireWorkspaceMembership(ctx, args.workspaceId);
@@ -133,6 +138,12 @@ export const update = mutation({
     ) {
       throw new Error("Safety-net dagen moet tussen 1 en 60 zijn");
     }
+    if (
+      args.dashboardWindowDays !== undefined &&
+      (args.dashboardWindowDays < 7 || args.dashboardWindowDays > 730)
+    ) {
+      throw new Error("Dashboard-venster moet tussen 7 en 730 dagen zijn");
+    }
 
     const existing = await ctx.db
       .query("crmSettings")
@@ -154,6 +165,8 @@ export const update = mutation({
       patch.customerCallbackDays = args.customerCallbackDays;
     if (args.sendEmailOnUnreachable !== undefined)
       patch.sendEmailOnUnreachable = args.sendEmailOnUnreachable;
+    if (args.dashboardWindowDays !== undefined)
+      patch.dashboardWindowDays = args.dashboardWindowDays;
 
     if (existing) {
       await ctx.db.patch(existing._id, patch);
@@ -172,7 +185,7 @@ export const update = mutation({
  * gebruik door recordCallNoAnswer). Geen auth-check want interne call.
  */
 export async function getEffectiveSettings(
-  ctx: { db: MutationCtx["db"] },
+  ctx: { db: QueryCtx["db"] | MutationCtx["db"] },
   workspaceId: Id<"workspaces">,
 ): Promise<{
   maxCallAttempts: number;
@@ -180,6 +193,7 @@ export async function getEffectiveSettings(
   followUpReminderDays: number;
   customerCallbackDays: number;
   sendEmailOnUnreachable: boolean;
+  dashboardWindowDays: number;
 }> {
   const settings = await ctx.db
     .query("crmSettings")
@@ -197,5 +211,7 @@ export async function getEffectiveSettings(
     sendEmailOnUnreachable:
       settings?.sendEmailOnUnreachable ??
       DEFAULT_SETTINGS.sendEmailOnUnreachable,
+    dashboardWindowDays:
+      settings?.dashboardWindowDays ?? DEFAULT_SETTINGS.dashboardWindowDays,
   };
 }
