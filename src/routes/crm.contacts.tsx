@@ -1,9 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useQuery, useMutation, usePaginatedQuery } from 'convex/react'
+import { useQuery, useMutation } from 'convex/react'
 import { toast } from 'sonner'
-import { Plus, ChevronDown } from 'lucide-react'
+import { Plus, ChevronDown, Search } from 'lucide-react'
 import { Button } from '#/components/ui/button.tsx'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '#/components/ui/select.tsx'
+import { cn } from '#/lib/utils.ts'
 import {
   Card,
   CardContent,
@@ -48,17 +56,66 @@ function ContactsPage() {
   return <ContactsContent workspaceId={workspaceId} />
 }
 
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Nieuwste eerst' },
+  { value: 'oldest', label: 'Oudste eerst' },
+  { value: 'name_asc', label: 'Naam A-Z' },
+  { value: 'name_desc', label: 'Naam Z-A' },
+] as const
+
+type SortValue = (typeof SORT_OPTIONS)[number]['value']
+
+const ALL_CITIES = '__all__'
+
 function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
-  const totalCount = useQuery(api.contacts.count, { workspaceId })
-  const { results, status, loadMore } = usePaginatedQuery(
-    api.contacts.listPaginated,
-    { workspaceId },
-    { initialNumItems: PAGE_SIZE },
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [hasEmail, setHasEmail] = useState(false)
+  const [hasPhone, setHasPhone] = useState(false)
+  const [city, setCity] = useState<string>(ALL_CITIES)
+  const [sort, setSort] = useState<SortValue>('newest')
+  const [limit, setLimit] = useState(PAGE_SIZE)
+
+  // Debounce de zoekterm (voorkomt een query per toetsaanslag).
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  // Reset paginatie als zoekopdracht/filters/sortering wijzigt.
+  // `limit` staat bewust NIET in de deps — anders zou dit bij elke
+  // "Toon 25 meer" opnieuw resetten (lus).
+  useEffect(() => {
+    setLimit(PAGE_SIZE)
+  }, [debouncedSearch, hasEmail, hasPhone, city, sort])
+
+  // Stabiele referentie voor de query-args. Convex `useQuery` vergelijkt args
+  // by-value (geen echte loop bij een nieuw object), maar useMemo houdt het
+  // netjes en voorkomt twijfel over re-subscribes.
+  const filters = useMemo(
+    () => ({
+      ...(hasEmail ? { hasEmail: true } : {}),
+      ...(hasPhone ? { hasPhone: true } : {}),
+      ...(city !== ALL_CITIES ? { city } : {}),
+    }),
+    [hasEmail, hasPhone, city],
   )
 
-  const isLoading = status === 'LoadingFirstPage'
-  const hasMore = status === 'CanLoadMore'
-  const isLoadingMore = status === 'LoadingMore'
+  const cities = useQuery(api.contacts.contactCities, { workspaceId })
+  const data = useQuery(api.contacts.searchContacts, {
+    workspaceId,
+    search: debouncedSearch || undefined,
+    filters,
+    sort,
+    limit,
+  })
+
+  const isLoading = data === undefined
+  const contacts = data?.contacts ?? []
+  const total = data?.total ?? 0
+  const hasMore = contacts.length < total
+  const filtersActive =
+    debouncedSearch !== '' || hasEmail || hasPhone || city !== ALL_CITIES
 
   return (
     <div className="space-y-6">
@@ -66,9 +123,9 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">Contacts</h1>
           <p className="mt-1 text-sm text-zinc-500">
-            {totalCount === undefined
+            {isLoading
               ? '…'
-              : `${results.length} van ${totalCount.toLocaleString('nl-NL')} ${totalCount === 1 ? 'contact' : 'contacts'}`}
+              : `${contacts.length} van ${total.toLocaleString('nl-NL')} ${total === 1 ? 'contact' : 'contacts'}`}
           </p>
         </div>
       </div>
@@ -76,8 +133,73 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
       <CreateContactForm workspaceId={workspaceId} />
 
       <Card>
-        <CardHeader>
+        <CardHeader className="gap-3">
           <CardTitle className="text-base">Alle contacts</CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="relative min-w-[200px] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Zoek op naam, e-mail, telefoon, bedrijf, plaats…"
+                className="pl-9"
+              />
+            </div>
+
+            <Select value={sort} onValueChange={(v) => setSort(v as SortValue)}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SORT_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={city} onValueChange={setCity}>
+              <SelectTrigger className="w-[170px]">
+                <SelectValue placeholder="Alle plaatsen" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_CITIES}>Alle plaatsen</SelectItem>
+                {(cities ?? []).map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setHasEmail((v) => !v)}
+                className={cn(
+                  'rounded-md border px-3 py-2 text-xs font-medium transition-colors',
+                  hasEmail
+                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                    : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50',
+                )}
+              >
+                Heeft e-mail
+              </button>
+              <button
+                type="button"
+                onClick={() => setHasPhone((v) => !v)}
+                className={cn(
+                  'rounded-md border px-3 py-2 text-xs font-medium transition-colors',
+                  hasPhone
+                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                    : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50',
+                )}
+              >
+                Heeft telefoon
+              </button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -86,24 +208,22 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
             </div>
-          ) : results.length === 0 ? (
+          ) : contacts.length === 0 ? (
             <p className="py-8 text-center text-sm text-zinc-500">
-              Nog geen contacts. Voeg je eerste hierboven toe.
+              {filtersActive
+                ? 'Geen contacten gevonden voor deze zoekopdracht/filters.'
+                : 'Nog geen contacts. Voeg je eerste hierboven toe.'}
             </p>
           ) : (
             <>
               <ul className="divide-y divide-zinc-100">
-                {results.map((c) => {
+                {contacts.map((c) => {
                   const fullName = [c.firstName, c.lastName]
                     .filter(Boolean)
                     .join(' ')
                   const display =
                     fullName || c.email || c.phone || '(naamloos)'
-                  const initials = (
-                    fullName ||
-                    c.email ||
-                    '?'
-                  )
+                  const initials = (fullName || c.email || '?')
                     .slice(0, 2)
                     .toUpperCase()
                   return (
@@ -111,7 +231,7 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                       <Link
                         to="/crm/contacts/$id"
                         params={{ id: c._id }}
-                        className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-zinc-50/60 -mx-2 px-2 rounded-md"
+                        className="-mx-2 flex items-center gap-3 rounded-md px-2 py-3 transition-colors first:pt-0 last:pb-0 hover:bg-zinc-50/60"
                       >
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-medium text-violet-800">
                           {initials}
@@ -145,12 +265,11 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => loadMore(PAGE_SIZE)}
-                    disabled={isLoadingMore}
+                    onClick={() => setLimit((l) => l + PAGE_SIZE)}
                     className="w-full max-w-xs border-dashed"
                   >
                     <ChevronDown className="h-4 w-4" />
-                    {isLoadingMore ? 'Laden…' : `Toon ${PAGE_SIZE} meer`}
+                    Toon {PAGE_SIZE} meer
                   </Button>
                 </div>
               )}
