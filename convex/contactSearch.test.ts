@@ -4,6 +4,7 @@ import {
   contactMatchesSearch,
   contactMatchesFilters,
   compareContacts,
+  buildSourceMap,
 } from "./contactSearch";
 
 const base = {
@@ -116,5 +117,21 @@ describe("search + filter gecombineerd", () => {
     );
     expect(out).toHaveLength(1);
     expect(out[0]).toBe(base);
+  });
+});
+
+describe("buildSourceMap", () => {
+  it("oudste attributie per contact wint", () => {
+    const m = buildSourceMap([
+      { contactId: "c1", source: "meta", _creationTime: 200 },
+      { contactId: "c1", source: "api", _creationTime: 100 },
+      { contactId: "c2", source: "api", _creationTime: 150 },
+    ]);
+    expect(m.get("c1")).toBe("api"); // oudste (100) wint
+    expect(m.get("c2")).toBe("api");
+    expect(m.size).toBe(2);
+  });
+  it("lege input → lege map", () => {
+    expect(buildSourceMap([]).size).toBe(0);
   });
 });

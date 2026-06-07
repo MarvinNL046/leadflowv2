@@ -75,3 +75,22 @@ export function compareContacts(
       return b._creationTime - a._creationTime;
   }
 }
+
+/** Map contactId → bron (oudste attributie wint = oorspronkelijke bron). */
+export function buildSourceMap(
+  attributions: Array<{
+    contactId: string;
+    source: string;
+    _creationTime: number;
+  }>,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  // Sorteer oplopend op _creationTime; de map.has()-check zorgt dat alleen de
+  // oudste bron per contactId blijft staan.
+  for (const a of [...attributions].sort(
+    (x, y) => x._creationTime - y._creationTime,
+  )) {
+    if (!map.has(a.contactId)) map.set(a.contactId, a.source);
+  }
+  return map;
+}
