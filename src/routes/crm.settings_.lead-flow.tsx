@@ -33,6 +33,7 @@ const DEFAULTS = {
   defaultFollowUpDays: 2,
   followUpReminderDays: 2,
   customerCallbackDays: 7,
+  sendEmailOnUnreachable: false,
 }
 
 function LeadFlowSettingsPage() {
@@ -70,6 +71,7 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const [callbackPresets, setPresets] = useState<
     Array<{ days: number; label: string }>
   >([])
+  const [sendEmailOnUnreachable, setSendEmail] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -79,6 +81,7 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
       setReminder(settings.followUpReminderDays)
       setSafetyNet(settings.customerCallbackDays)
       setPresets(settings.callbackPresets)
+      setSendEmail(settings.sendEmailOnUnreachable)
     }
   }, [settings])
 
@@ -88,6 +91,7 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
     setReminder(DEFAULTS.followUpReminderDays)
     setSafetyNet(DEFAULTS.customerCallbackDays)
     setPresets([])
+    setSendEmail(false)
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -102,6 +106,7 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
         followUpReminderDays,
         customerCallbackDays,
         callbackPresets,
+        sendEmailOnUnreachable,
       })
       toast.success('Instellingen opgeslagen')
     } catch (err) {
@@ -171,6 +176,30 @@ function LeadFlowForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
               max={60}
               suffix="dagen"
             />
+            <div className="space-y-1.5">
+              <Label>Auto-afscheidsmail bij 3-strike</Label>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setSendEmail((v) => !v)}
+                  className={
+                    sendEmailOnUnreachable
+                      ? 'rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700'
+                      : 'rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50'
+                  }
+                  aria-pressed={sendEmailOnUnreachable}
+                >
+                  {sendEmailOnUnreachable ? 'Aan' : 'Uit'}
+                </button>
+              </div>
+              <p className="text-xs text-zinc-500">
+                Stuurt automatisch de "Afscheidsmail (Deal Verloren)"-template
+                wanneer een lead na {maxCallAttempts} mislukte belpogingen
+                onbereikbaar wordt (alleen als er een e-mailadres is). Let op:
+                gebruik dit óf hier óf via een "onbereikbaar"-workflow met
+                e-mail — niet allebei (dubbele mail).
+              </p>
+            </div>
           </CardContent>
         </Card>
 
