@@ -271,6 +271,9 @@ export default defineSchema({
     customerCallbackDays: v.optional(v.number()),
     /** true = auto-afscheidsmail bij 3-strike-onbereikbaar (default false). */
     sendEmailOnUnreachable: v.optional(v.boolean()),
+    /** Recency-venster speed-to-lead-dashboard (dagen). Default 90. Leads ouder
+     * dan dit + zonder due follow-up vallen van het bord (blijven in pipeline). */
+    dashboardWindowDays: v.optional(v.number()),
   }).index("by_workspace", ["workspaceId"]),
 
   // ════════════════════════════════════════════════════════════════════
