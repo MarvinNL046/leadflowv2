@@ -142,6 +142,9 @@ export default defineSchema({
     // Filter in alle list-queries; child-data (notes, messages,
     // attribution) blijven bestaan voor audit-trail.
     deletedAt: v.optional(v.number()),
+    // Gesprek-archief voor de inbox: timestamp = gearchiveerd (verbergen uit
+    // listConversations), undefined = actief. Reversibel; raakt opp/dashboard niet.
+    messagesArchivedAt: v.optional(v.number()),
     // Migration breadcrumb: integer-id van de bron-row in v1 Neon.
     // Idempotency-key voor de Neon→Convex ETL; rerun van migratie
     // detecteert bestaande row en doet patch i.p.v. duplicate insert.

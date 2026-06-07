@@ -513,6 +513,32 @@ export const recordInbound = internalMutation({
       }
     }
 
+    // Geen match → maak een kaal contact zodat het bericht zichtbaar wordt in
+    // de inbox (listConversations skipt contactloze messages). GEEN opp /
+    // leadAttribution / trigger: een inbound van een onbekende is nog geen
+    // gekwalificeerde lead — de gebruiker vult aan / promoot via de contact-UI.
+    if (!contactId) {
+      if (args.channel === "email") {
+        const normalized = normalizeEmail(args.from);
+        if (normalized) {
+          contactId = await ctx.db.insert("contacts", {
+            workspaceId: args.workspaceId,
+            email: normalized,
+            callCount: 0,
+          });
+        }
+      } else {
+        const normalized = normalizePhone(args.from);
+        if (normalized) {
+          contactId = await ctx.db.insert("contacts", {
+            workspaceId: args.workspaceId,
+            phone: normalized,
+            callCount: 0,
+          });
+        }
+      }
+    }
+
     const messageId = await ctx.db.insert("messages", {
       workspaceId: args.workspaceId,
       contactId,
@@ -663,6 +689,7 @@ export const listConversations = query({
         v.literal("messenger"),
       ),
     ),
+    includeArchived: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -719,6 +746,7 @@ export const listConversations = query({
       Array.from(byContact.entries()).map(async ([contactId, agg]) => {
         const c = await ctx.db.get(contactId);
         if (!c || c.deletedAt !== undefined) return null;
+        if (!args.includeArchived && c.messagesArchivedAt != null) return null;
         const m = agg.latestMessage;
         return {
           contactId,
@@ -744,6 +772,89 @@ export const listConversations = query({
     return conversations
       .filter((c): c is NonNullable<typeof c> => c !== null)
       .sort((a, b) => b.lastActivity - a.lastActivity);
+  },
+});
+
+export const archiveConversation = mutation({
+  args: { contactId: v.id("contacts") },
+  handler: async (ctx, { contactId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const contact = await ctx.db.get(contactId);
+    if (!contact) throw new Error("Contact not found");
+    const workspace = await ctx.db.get(contact.workspaceId);
+    if (!workspace) throw new Error("Workspace not found");
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) =>
+        q.eq("userId", userId).eq("orgId", workspace.orgId),
+      )
+      .first();
+    if (!membership) throw new Error("Not a member of this workspace");
+    await ctx.db.patch(contactId, { messagesArchivedAt: Date.now() });
+  },
+});
+
+export const unarchiveConversation = mutation({
+  args: { contactId: v.id("contacts") },
+  handler: async (ctx, { contactId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const contact = await ctx.db.get(contactId);
+    if (!contact) throw new Error("Contact not found");
+    const workspace = await ctx.db.get(contact.workspaceId);
+    if (!workspace) throw new Error("Workspace not found");
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) =>
+        q.eq("userId", userId).eq("orgId", workspace.orgId),
+      )
+      .first();
+    if (!membership) throw new Error("Not a member of this workspace");
+    await ctx.db.patch(contactId, { messagesArchivedAt: undefined });
+  },
+});
+
+/** Ongelezen-gesprekken per kanaal (laatste bericht inbound + ongelezen),
+ *  voor de filter-tab-badges. Respecteert archief/deleted. */
+export const inboxUnreadCounts = query({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, { workspaceId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { sms: 0, whatsapp: 0, email: 0, total: 0 };
+    const workspace = await ctx.db.get(workspaceId);
+    if (!workspace) return { sms: 0, whatsapp: 0, email: 0, total: 0 };
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) =>
+        q.eq("userId", userId).eq("orgId", workspace.orgId),
+      )
+      .first();
+    if (!membership) return { sms: 0, whatsapp: 0, email: 0, total: 0 };
+
+    const counts = { sms: 0, whatsapp: 0, email: 0 };
+    for (const channel of ["sms", "whatsapp", "email"] as const) {
+      const recent = await ctx.db
+        .query("messages")
+        .withIndex("by_workspace_channel_sent", (q) =>
+          q.eq("workspaceId", workspaceId).eq("channel", channel),
+        )
+        .order("desc")
+        .take(500);
+      // recent is desc → eerste per contact = laatste bericht; tel ongelezen inbound.
+      const seen = new Set<string>();
+      for (const m of recent) {
+        if (!m.contactId || seen.has(m.contactId)) continue;
+        seen.add(m.contactId);
+        if (m.direction === "inbound" && m.readAt === undefined) {
+          const c = await ctx.db.get(m.contactId);
+          if (c && c.deletedAt === undefined && c.messagesArchivedAt == null) {
+            counts[channel]++;
+          }
+        }
+      }
+    }
+    return { ...counts, total: counts.sms + counts.whatsapp + counts.email };
   },
 });
 
