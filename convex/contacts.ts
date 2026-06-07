@@ -11,6 +11,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { normalizeEmail, normalizePhone } from "./lib/phone";
 import { getEffectiveSettings } from "./crmSettings";
+import { isWithinDashboardWindow } from "./dashboardWindow";
 import {
   renderTemplate,
   htmlToPlainText,
@@ -258,6 +259,16 @@ export const listIncomingLeads = query({
 
     const limit = Math.min(args.limit ?? 200, 500);
 
+    // Recency-venster: leads ouder dan settings.dashboardWindowDays + zonder due
+    // follow-up vallen van het hot-bord. Cutoff afgeleid van de stabiele client-
+    // timestamp dueBefore (geen Date.now() → geen refetch-thrash). Geen dueBefore
+    // ⇒ geen venster (veilige fallback voor non-dashboard callers).
+    const settings = await getEffectiveSettings(ctx, args.workspaceId);
+    const windowCutoff =
+      args.dueBefore != null
+        ? args.dueBefore - settings.dashboardWindowDays * 86_400_000
+        : null;
+
     // Kandidaten: recente contacten (nieuwste eerst). Bounded window —
     // nieuwe/op-te-volgen leads zijn recent; oude stale leads horen in de
     // pipeline, niet op het speed-to-lead-dashboard.
@@ -327,7 +338,7 @@ export const listIncomingLeads = query({
           c.nextFollowUpAt != null &&
           c.nextFollowUpAt <= args.dueBefore
         ) {
-          return { c, keep: true };
+          return { c, keep: true, dueFollowup: true };
         }
         const opps = await ctx.db
           .query("opportunities")
@@ -336,7 +347,8 @@ export const listIncomingLeads = query({
         // Opp-loze contacten = geïmporteerde contacten zonder deal, GEEN
         // op-te-volgen lead. Niet tonen (anders floodt de bulk-import het
         // dashboard). Echte Meta/webhook-leads krijgen altijd een opp.
-        if (opps.length === 0) return { c, keep: false };
+        if (opps.length === 0)
+          return { c, keep: false, dueFollowup: false };
         const stages = await Promise.all(
           opps.map((o) => ctx.db.get(o.stageId)),
         );
@@ -346,16 +358,16 @@ export const listIncomingLeads = query({
         const anyFirst = stages.some(
           (s) => s != null && (s.order === 0 || isFirstStage(s.name)),
         );
-        return { c, keep: anyFirst };
+        return { c, keep: anyFirst, dueFollowup: false };
       }),
     );
     // Enrich ALLE keepers (niet pre-slicen — anders valt een verse
     // re-submission op een oud contact weg vóór de sort).
-    const keepers = checked.filter((x) => x.keep).map((x) => x.c);
+    const keepers = checked.filter((x) => x.keep);
 
     // Per contact: laad attribution + latest note in parallel
     const enriched = await Promise.all(
-      keepers.map(async (c) => {
+      keepers.map(async ({ c, dueFollowup }) => {
         const attribution = await ctx.db
           .query("leadAttribution")
           .withIndex("by_contact", (q) => q.eq("contactId", c._id))
@@ -374,6 +386,7 @@ export const listIncomingLeads = query({
           metaFormId: attribution?.metaFormId ?? null,
           latestNote: latestNote?.body ?? null,
           leadCreatedAt: attribution?._creationTime ?? c._creationTime,
+          dueFollowup,
         };
       }),
     );
@@ -381,6 +394,9 @@ export const listIncomingLeads = query({
     // Nieuwste lead-activiteit eerst (attribution-recency, niet contact-leeftijd),
     // dán pas de limit — zodat re-submissions op oude contacten bovenaan komen.
     return enriched
+      .filter((e) =>
+        isWithinDashboardWindow(e.leadCreatedAt, e.dueFollowup, windowCutoff),
+      )
       .sort((a, b) => b.leadCreatedAt - a.leadCreatedAt)
       .slice(0, limit);
   },
