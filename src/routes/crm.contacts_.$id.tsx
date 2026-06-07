@@ -37,6 +37,13 @@ import {
 } from '#/components/ui/card.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '#/components/ui/select.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { Separator } from '#/components/ui/separator.tsx'
@@ -269,6 +276,7 @@ function ContactDetailPage() {
       <DetailsSection contact={contact} />
       <OpportunitiesSection contactId={id as Id<'contacts'>} />
       <CustomFieldsSection contactId={id as Id<'contacts'>} />
+      <ManualFieldsSection contactId={id as Id<'contacts'>} />
       <ConversationSection contactId={id as Id<'contacts'>} />
       <NotesSection
         contactId={id as Id<'contacts'>}
@@ -1003,6 +1011,119 @@ function CustomFieldsSection({ contactId }: { contactId: Id<'contacts'> }) {
         </dl>
       </CardContent>
     </Card>
+  )
+}
+
+function ManualFieldsSection({ contactId }: { contactId: Id<'contacts'> }) {
+  const fields = useQuery(api.customFields.listManualForContact, { contactId })
+  const setValue = useMutation(api.customFields.setContactValue)
+  if (fields === undefined || fields.length === 0) return null
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Eigen velden</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {fields.map(({ definition, value }) => (
+          <ManualFieldRow
+            key={definition._id}
+            definition={definition}
+            value={value}
+            onSave={async (val) => {
+              try {
+                await setValue({
+                  contactId,
+                  definitionId: definition._id,
+                  value: val,
+                })
+                toast.success('Opgeslagen')
+              } catch (err) {
+                toast.error(humanizeConvexError(err, 'Opslaan mislukt'))
+              }
+            }}
+          />
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+function ManualFieldRow({
+  definition,
+  value,
+  onSave,
+}: {
+  definition: {
+    _id: Id<'customFieldDefinitions'>
+    label: string
+    fieldType: string
+    selectOptions?: string[]
+  }
+  value: unknown
+  onSave: (val: unknown) => Promise<void>
+}) {
+  const [text, setText] = useState(
+    value === null || value === undefined ? '' : String(value),
+  )
+  const original = value === null || value === undefined ? '' : String(value)
+
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs uppercase tracking-wider text-zinc-500">
+        {definition.label}
+      </Label>
+      {definition.fieldType === 'boolean' ? (
+        <button
+          type="button"
+          onClick={() => void onSave(value === true ? false : true)}
+          className={
+            value === true
+              ? 'rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700'
+              : 'rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50'
+          }
+        >
+          {value === true ? 'Ja' : 'Nee'}
+        </button>
+      ) : definition.fieldType === 'select' ? (
+        <Select
+          value={typeof value === 'string' ? value : ''}
+          onValueChange={(v) => void onSave(v)}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Kies…" />
+          </SelectTrigger>
+          <SelectContent>
+            {(definition.selectOptions ?? []).map((o) => (
+              <SelectItem key={o} value={o}>
+                {o}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Input
+          type={
+            definition.fieldType === 'number'
+              ? 'number'
+              : definition.fieldType === 'date'
+                ? 'date'
+                : 'text'
+          }
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => {
+            if (text === original) return
+            const out =
+              definition.fieldType === 'number'
+                ? text === ''
+                  ? null
+                  : Number(text)
+                : text
+            void onSave(out)
+          }}
+        />
+      )}
+    </div>
   )
 }
 
