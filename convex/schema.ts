@@ -175,6 +175,9 @@ export default defineSchema({
     // true = follow-up-cron zet opps in deze stage NIET auto terug naar Nieuw
     // (bv. "Afspraak Ingepland"). Leeg/false = huidig gedrag.
     noResurface: v.optional(v.boolean()),
+    /** Per-stage retry-interval (dagen tot volgende belpoging na "Niet bereikt").
+     * Afwezig = workspace-default (crmSettings.defaultFollowUpDays). */
+    followUpDays: v.optional(v.number()),
   }).index("by_pipeline_order", ["pipelineId", "order"]),
 
   opportunities: defineTable({
