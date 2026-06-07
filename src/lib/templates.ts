@@ -61,3 +61,35 @@ export function leadTemplateVars(lead: {
     company: 'Staycool Airconditioning',
   }
 }
+
+/**
+ * Render een template voor één kanaal. De inbox-compose is platte tekst, dus
+ * de body wordt altijd HTML→plain-text gestript. Alleen e-mail krijgt een
+ * (gerenderd) subject; SMS/WhatsApp niet.
+ */
+export function renderTemplateForChannel(
+  template: { subject: string; body: string },
+  contact: {
+    firstName?: string | null
+    lastName?: string | null
+    email?: string | null
+    phone?: string | null
+    city?: string | null
+    company?: string | null
+  },
+  channel: 'email' | 'sms' | 'whatsapp',
+): { body: string; subject?: string } {
+  const vars = leadTemplateVars({
+    firstName: contact.firstName,
+    lastName: contact.lastName,
+    email: contact.email,
+    phone: contact.phone,
+    city: contact.city,
+    company: contact.company,
+  })
+  const body = htmlToPlainText(renderTemplate(template.body, vars))
+  if (channel === 'email') {
+    return { body, subject: renderTemplate(template.subject, vars) }
+  }
+  return { body }
+}
