@@ -7,6 +7,10 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import {
+  DEFAULT_CALLBACK_PRESETS,
+  validateCallbackPresets,
+} from "./crmSettingsLogic";
 
 /**
  * CRM workspace-settings (per-workspace configurable):
@@ -22,6 +26,7 @@ export const DEFAULT_SETTINGS = {
   maxCallAttempts: 3,
   defaultFollowUpDays: 2,
   followUpReminderDays: 2,
+  customerCallbackDays: 7,
   timezone: "Europe/Amsterdam",
 } as const;
 
@@ -66,6 +71,13 @@ export const get = query({
         settings?.followUpReminderDays ??
         DEFAULT_SETTINGS.followUpReminderDays,
       timezone: settings?.timezone ?? DEFAULT_SETTINGS.timezone,
+      callbackPresets:
+        settings?.callbackPresets && settings.callbackPresets.length > 0
+          ? settings.callbackPresets
+          : DEFAULT_CALLBACK_PRESETS,
+      customerCallbackDays:
+        settings?.customerCallbackDays ??
+        DEFAULT_SETTINGS.customerCallbackDays,
     };
   },
 });
@@ -79,6 +91,10 @@ export const update = mutation({
     maxCallAttempts: v.optional(v.number()),
     defaultFollowUpDays: v.optional(v.number()),
     followUpReminderDays: v.optional(v.number()),
+    callbackPresets: v.optional(
+      v.array(v.object({ days: v.number(), label: v.string() })),
+    ),
+    customerCallbackDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     await requireWorkspaceMembership(ctx, args.workspaceId);
@@ -102,6 +118,16 @@ export const update = mutation({
     ) {
       throw new Error("Reminder dagen moet tussen 1 en 60 zijn");
     }
+    if (args.callbackPresets !== undefined) {
+      const err = validateCallbackPresets(args.callbackPresets);
+      if (err) throw new Error(err);
+    }
+    if (
+      args.customerCallbackDays !== undefined &&
+      (args.customerCallbackDays < 1 || args.customerCallbackDays > 60)
+    ) {
+      throw new Error("Safety-net dagen moet tussen 1 en 60 zijn");
+    }
 
     const existing = await ctx.db
       .query("crmSettings")
@@ -117,6 +143,10 @@ export const update = mutation({
       patch.defaultFollowUpDays = args.defaultFollowUpDays;
     if (args.followUpReminderDays !== undefined)
       patch.followUpReminderDays = args.followUpReminderDays;
+    if (args.callbackPresets !== undefined)
+      patch.callbackPresets = args.callbackPresets;
+    if (args.customerCallbackDays !== undefined)
+      patch.customerCallbackDays = args.customerCallbackDays;
 
     if (existing) {
       await ctx.db.patch(existing._id, patch);
@@ -141,6 +171,7 @@ export async function getEffectiveSettings(
   maxCallAttempts: number;
   defaultFollowUpDays: number;
   followUpReminderDays: number;
+  customerCallbackDays: number;
 }> {
   const settings = await ctx.db
     .query("crmSettings")
@@ -153,5 +184,7 @@ export async function getEffectiveSettings(
       settings?.defaultFollowUpDays ?? DEFAULT_SETTINGS.defaultFollowUpDays,
     followUpReminderDays:
       settings?.followUpReminderDays ?? DEFAULT_SETTINGS.followUpReminderDays,
+    customerCallbackDays:
+      settings?.customerCallbackDays ?? DEFAULT_SETTINGS.customerCallbackDays,
   };
 }
