@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation } from 'convex/react'
 import { toast } from 'sonner'
-import { Plus, ChevronDown, Search } from 'lucide-react'
+import { Plus, ChevronDown, Search, Upload } from 'lucide-react'
 import { Button } from '#/components/ui/button.tsx'
 import {
   Select,
@@ -144,6 +144,13 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
               : `${contacts.length} van ${total.toLocaleString('nl-NL')} ${total === 1 ? 'contact' : 'contacts'}`}
           </p>
         </div>
+        <Link
+          to="/crm/contacts/import"
+          className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        >
+          <Upload className="h-4 w-4" />
+          Importeren
+        </Link>
       </div>
 
       <CreateContactForm workspaceId={workspaceId} />
