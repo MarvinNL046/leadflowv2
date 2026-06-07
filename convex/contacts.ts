@@ -11,6 +11,12 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { normalizeEmail, normalizePhone } from "./lib/phone";
 import { getEffectiveSettings } from "./crmSettings";
+import {
+  normalizeForSearch,
+  contactMatchesSearch,
+  contactMatchesFilters,
+  compareContacts,
+} from "./contactSearch";
 
 /**
  * Contacts queries + mutations voor het CRM core.
@@ -120,6 +126,86 @@ export const count = query({
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
     return rows.length;
+  },
+});
+
+/**
+ * Doorzoekbare/filterbare/sorteerbare contactlijst. Collect-all + in-memory
+ * filter/sort (geen searchIndex). Leest de volledige workspace-set per call —
+ * gelijk aan `count`; prima voor ~6k, herzien met searchIndex bij >~15k.
+ */
+export const searchContacts = query({
+  args: {
+    workspaceId: v.id("workspaces"),
+    search: v.optional(v.string()),
+    filters: v.optional(
+      v.object({
+        hasEmail: v.optional(v.boolean()),
+        hasPhone: v.optional(v.boolean()),
+        city: v.optional(v.string()),
+      }),
+    ),
+    sort: v.optional(
+      v.union(
+        v.literal("newest"),
+        v.literal("oldest"),
+        v.literal("name_asc"),
+        v.literal("name_desc"),
+      ),
+    ),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await requireWorkspaceMembership(ctx, args.workspaceId);
+
+    const all = await ctx.db
+      .query("contacts")
+      .withIndex("by_workspace_created", (q) =>
+        q.eq("workspaceId", args.workspaceId),
+      )
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
+      .collect();
+
+    const termNormalized = args.search ? normalizeForSearch(args.search) : "";
+    const filters = args.filters ?? {};
+    const sort = args.sort ?? "newest";
+
+    const matched = all
+      .filter(
+        (c) =>
+          contactMatchesSearch(c, termNormalized) &&
+          contactMatchesFilters(c, filters),
+      )
+      .sort((a, b) => compareContacts(a, b, sort));
+
+    const limit = args.limit ?? 25;
+    return { contacts: matched.slice(0, limit), total: matched.length };
+  },
+});
+
+/** Distinct niet-lege plaatsen in de workspace, voor de filter-dropdown. */
+export const contactCities = query({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    await requireWorkspaceMembership(ctx, args.workspaceId);
+
+    const all = await ctx.db
+      .query("contacts")
+      .withIndex("by_workspace_created", (q) =>
+        q.eq("workspaceId", args.workspaceId),
+      )
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
+      .collect();
+
+    const cities = [
+      ...new Set(
+        all
+          .map((c) => c.city)
+          .filter((x): x is string => !!x && x.trim() !== ""),
+      ),
+    ];
+    cities.sort((a, b) => a.localeCompare(b, "nl"));
+    return cities;
   },
 });
 
