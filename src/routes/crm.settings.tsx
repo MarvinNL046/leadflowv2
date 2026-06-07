@@ -8,6 +8,7 @@ import {
   Kanban as KanbanIcon,
   Mail,
   Bot,
+  Tags,
 } from 'lucide-react'
 import {
   Card,
@@ -69,6 +70,14 @@ const SECTIONS: HubSection[] = [
           'API-key, context, toon en guardrails voor de AI-reactie-nodes',
         icon: Bot,
         iconColor: 'bg-violet-100 text-violet-700',
+      },
+      {
+        to: '/crm/settings/custom-fields',
+        title: 'Custom velden',
+        description:
+          'Eigen velden voor contacten definiëren (los van Meta-form-antwoorden)',
+        icon: Tags,
+        iconColor: 'bg-amber-100 text-amber-700',
       },
     ],
   },
