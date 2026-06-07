@@ -790,6 +790,7 @@ export const recordCallAnswered = mutation({
       ctx,
       args.contactId,
     );
+    const settings = await getEffectiveSettings(ctx, contact.workspaceId);
 
     const patch: Record<string, unknown> = {
       lastCallAt: Date.now(),
@@ -801,12 +802,12 @@ export const recordCallAnswered = mutation({
       // vergeet. Geen stage-update (blijft waar 't is).
       patch.callCount = (contact.callCount ?? 0) + 1;
       patch.nextFollowUpAt =
-        args.followUpAt ?? Date.now() + 7 * 24 * 60 * 60 * 1000;
+        args.followUpAt ?? Date.now() + settings.customerCallbackDays * 24 * 60 * 60 * 1000;
     } else if (args.followUpAt !== undefined) {
       patch.nextFollowUpAt = args.followUpAt;
     } else if (args.outcome === "callback") {
       // Default 7 dagen
-      patch.nextFollowUpAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+      patch.nextFollowUpAt = Date.now() + settings.customerCallbackDays * 24 * 60 * 60 * 1000;
     }
     await ctx.db.patch(args.contactId, patch);
 
