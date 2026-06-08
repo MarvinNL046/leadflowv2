@@ -576,6 +576,34 @@ http.route({
       return jsonResponse({ error: "Invalid JSON" }, 400);
     }
 
+    // Outbound: bericht verstuurd vanaf de gekoppelde bedrijfstelefoon (of een
+    // echo van een via-Leadflow verstuurd bericht). recordOutbound dedupt op
+    // externalMessageId, dus API-verstuurde berichten worden niet dubbel opgeslagen.
+    if (payload.event === "message.outbound") {
+      const to = payload.to ?? payload.phoneNumber;
+      if (!to) {
+        return jsonResponse({ received: true, skipped: "no to" }, 200);
+      }
+      const wsId = await ctx.runQuery(
+        internal.messaging.getStaycoolWorkspaceIdInternal,
+        {},
+      );
+      if (!wsId) {
+        return jsonResponse({ error: "Workspace not provisioned" }, 500);
+      }
+      await ctx.runMutation(internal.messaging.recordOutbound, {
+        workspaceId: wsId,
+        channel: "whatsapp",
+        to,
+        body: payload.message ?? payload.body ?? "",
+        from: payload.from,
+        externalMessageId: payload.messageId ?? payload.id ?? undefined,
+        mediaUrl: payload.mediaUrl ?? undefined,
+        mediaType: payload.mediaType ?? undefined,
+      });
+      return jsonResponse({ received: true, type: "outbound" }, 200);
+    }
+
     // Filter op inbound events; outbound-echo + status-receipts later
     const isInbound =
       payload.event === "message.incoming" ||
@@ -591,6 +619,10 @@ http.route({
           delivered: "delivered",
           read: "read",
           failed: "failed",
+          // WhatsApp-ack-levels (Voidfix stuurt numeriek): 1=sent, 2=delivered, 3=read.
+          "1": null,
+          "2": "delivered",
+          "3": "read",
         };
         // status kan een getal of string zijn → defensief naar string.
         const ns = statusMap[String(payload.status).toLowerCase()];
@@ -844,12 +876,13 @@ interface VoidfixSmsMessage {
 interface VoidfixWaEvent {
   event?: string;
   from?: string;
+  to?: string;
   phoneNumber?: string;
   body?: string;
   message?: string;
   messageId?: string;
   id?: string;
-  status?: string;
+  status?: string | number;
   mediaUrl?: string;
   mediaType?: string;
 }
