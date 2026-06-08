@@ -559,6 +559,111 @@ export const recordInbound = internalMutation({
   },
 });
 
+/**
+ * Outbound-bericht opslaan vanuit een Voidfix `message.outbound`-webhook
+ * (bericht verstuurd vanaf de gekoppelde bedrijfstelefoon, óf een echo van een
+ * via-Leadflow verstuurd bericht). Spiegel van recordInbound: contact wordt
+ * gezocht op het `to`-nummer (de ontvanger = de lead). Idempotent op
+ * externalMessageId → geen dubbele rij voor via-de-API verstuurde berichten.
+ */
+export const recordOutbound = internalMutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    channel: v.union(
+      v.literal("sms"),
+      v.literal("whatsapp"),
+      v.literal("email"),
+    ),
+    to: v.string(),
+    body: v.string(),
+    from: v.optional(v.string()),
+    externalMessageId: v.optional(v.string()),
+    mediaUrl: v.optional(v.string()),
+    mediaType: v.optional(v.string()),
+    sentAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    // Idempotency: skip als externalId al bestaat (bv. Leadflow stuurde 't zelf
+    // via de Voidfix-API → markSent zette dezelfde externalMessageId).
+    if (args.externalMessageId) {
+      const existing = await ctx.db
+        .query("messages")
+        .withIndex("by_external_id", (q) =>
+          q.eq("externalMessageId", args.externalMessageId),
+        )
+        .first();
+      if (existing) return { duplicate: true, messageId: existing._id };
+    }
+
+    // Contact-lookup op het `to`-nummer (de ontvanger/lead), centrale normalisatie.
+    let contactId: Id<"contacts"> | undefined;
+    if (args.channel === "email") {
+      const normalized = normalizeEmail(args.to);
+      if (normalized) {
+        const contact = await ctx.db
+          .query("contacts")
+          .withIndex("by_workspace_email", (q) =>
+            q.eq("workspaceId", args.workspaceId).eq("email", normalized),
+          )
+          .first();
+        if (contact) contactId = contact._id;
+      }
+    } else {
+      const normalized = normalizePhone(args.to);
+      if (normalized) {
+        const contact = await ctx.db
+          .query("contacts")
+          .withIndex("by_workspace_phone", (q) =>
+            q.eq("workspaceId", args.workspaceId).eq("phone", normalized),
+          )
+          .first();
+        if (contact) contactId = contact._id;
+      }
+    }
+
+    // Geen match → kaal contact (zodat het gesprek zichtbaar wordt in de inbox;
+    // zoals recordInbound). Geen opp/leadAttribution/trigger.
+    if (!contactId) {
+      if (args.channel === "email") {
+        const normalized = normalizeEmail(args.to);
+        if (normalized) {
+          contactId = await ctx.db.insert("contacts", {
+            workspaceId: args.workspaceId,
+            email: normalized,
+            callCount: 0,
+          });
+        }
+      } else {
+        const normalized = normalizePhone(args.to);
+        if (normalized) {
+          contactId = await ctx.db.insert("contacts", {
+            workspaceId: args.workspaceId,
+            phone: normalized,
+            callCount: 0,
+          });
+        }
+      }
+    }
+
+    const messageId = await ctx.db.insert("messages", {
+      workspaceId: args.workspaceId,
+      contactId,
+      channel: args.channel,
+      direction: "outbound",
+      status: "sent",
+      externalMessageId: args.externalMessageId,
+      to: args.to,
+      from: args.from,
+      body: args.body,
+      mediaUrl: args.mediaUrl,
+      mediaType: args.mediaType,
+      sentAt: args.sentAt ?? Date.now(),
+    });
+
+    return { matched: !!contactId, messageId };
+  },
+});
+
 /** Internal: Staycool default workspace voor inbound webhooks (MVP single-tenant). */
 export const getStaycoolWorkspaceIdInternal = internalQuery({
   args: {},
