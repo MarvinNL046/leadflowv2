@@ -262,6 +262,16 @@ export const moveToStage = mutation({
     }
 
     await ctx.db.patch(args.opportunityId, updates);
+    // Afgehandelde / vastgehouden stage → stop de auto-resurface-klok op het
+    // contact, anders sleept de follow-up-cron de opp later terug naar Nieuw.
+    // (bug 1: handmatige kanban-sleep naar Gewonnen/Verloren/Vasthouden)
+    if (
+      targetStage.isWonStage ||
+      targetStage.isLostStage ||
+      targetStage.noResurface === true
+    ) {
+      await ctx.db.patch(opp.contactId, { nextFollowUpAt: undefined });
+    }
     await ctx.db.insert("opportunityStageHistory", {
       opportunityId: args.opportunityId,
       fromStageId,
