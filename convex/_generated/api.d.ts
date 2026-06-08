@@ -12,6 +12,7 @@ import type * as aiAgentConfig from "../aiAgentConfig.js";
 import type * as aiLeadResponse from "../aiLeadResponse.js";
 import type * as aiLeadResponse_helpers from "../aiLeadResponse/helpers.js";
 import type * as auth from "../auth.js";
+import type * as callAttemptStage from "../callAttemptStage.js";
 import type * as contactSearch from "../contactSearch.js";
 import type * as contacts from "../contacts.js";
 import type * as crmSettings from "../crmSettings.js";
@@ -58,6 +59,7 @@ declare const fullApi: ApiFromModules<{
   aiLeadResponse: typeof aiLeadResponse;
   "aiLeadResponse/helpers": typeof aiLeadResponse_helpers;
   auth: typeof auth;
+  callAttemptStage: typeof callAttemptStage;
   contactSearch: typeof contactSearch;
   contacts: typeof contacts;
   crmSettings: typeof crmSettings;

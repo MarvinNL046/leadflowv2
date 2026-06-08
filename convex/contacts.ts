@@ -15,6 +15,7 @@ import { isWithinDashboardWindow } from "./dashboardWindow";
 import { pickFirstActiveStage } from "./pipelinesLogic";
 import { resolveFollowUpDays } from "./followUpInterval";
 import { leadDashboardDecision } from "./dashboardLeadVisibility";
+import { pickCallAttemptStage } from "./callAttemptStage";
 import {
   renderTemplate,
   htmlToPlainText,
@@ -821,6 +822,38 @@ export const recordCallNoAnswer = mutation({
         internal.workflowEngine.triggerFollowUpDue,
         { workspaceId: contact.workspaceId, contactId: args.contactId },
       );
+      // V1-call-progressie: verplaats de opp naar "Nx Gebeld" (N = nieuwe
+      // callCount) zodat de kanban-kolommen vullen. Geen zo'n stage → opp blijft
+      // staan; het dashboard verbergt 'm alsnog via de toekomstige follow-up.
+      // moveOppToStage raakt nextFollowUpAt NIET → de cron zet 'm na N dagen
+      // terug naar Nieuw (de V1-loop).
+      const attemptOppId = await findOrCreateOpportunity(
+        ctx,
+        contact.workspaceId,
+        args.contactId,
+        contactDisplay(contact),
+      );
+      if (attemptOppId) {
+        const pipelineData = await getDefaultPipelineStages(
+          ctx,
+          contact.workspaceId,
+        );
+        if (pipelineData) {
+          const attemptStage = pickCallAttemptStage(
+            pipelineData.stages,
+            newCount,
+          );
+          if (attemptStage) {
+            await moveOppToStage(
+              ctx,
+              attemptOppId,
+              attemptStage,
+              userId,
+              `called_${newCount}x`,
+            );
+          }
+        }
+      }
     }
 
     await ctx.db.insert("notes", {
