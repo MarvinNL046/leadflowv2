@@ -436,13 +436,25 @@ function ConversationView({
   const detail = useQuery(api.contacts.getDetail, { contactId })
   const messages = useQuery(api.messaging.listByContact, { contactId })
   const streamRef = useRef<HTMLDivElement>(null)
+  const prevContactId = useRef<string | null>(null)
 
-  // Auto-scroll naar onder bij open van conversation + bij nieuwe message
-  // (messages-array length change). Convex real-time bezorgt nieuwe inbound
-  // én de eigen verstuurde reply als update — beide triggeren deze scroll.
+  // WhatsApp-achtige scroll: bij het OPENEN van een gesprek direct naar onder;
+  // bij een NIEUW bericht in hetzelfde gesprek alleen naar onder als de
+  // gebruiker al ~onderaan zit (anders niet storen tijdens het teruglezen).
+  // Convex real-time bezorgt nieuwe inbound én de eigen reply als update.
   useEffect(() => {
-    if (streamRef.current) {
-      streamRef.current.scrollTop = streamRef.current.scrollHeight
+    const el = streamRef.current
+    if (!el) return
+    if (prevContactId.current !== contactId) {
+      // Nieuw gesprek geopend → direct naar onder.
+      el.scrollTop = el.scrollHeight
+      prevContactId.current = contactId
+      return
+    }
+    const distanceFromBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight
+    if (distanceFromBottom < 120) {
+      el.scrollTop = el.scrollHeight
     }
   }, [messages?.length, contactId])
 
