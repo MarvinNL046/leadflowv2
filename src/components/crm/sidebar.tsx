@@ -58,6 +58,14 @@ export function SidebarContent({
   )
   const pendingCount = pendingIds?.length ?? 0
 
+  // Globale ongelezen-inbox-teller — bolletje bij "Messages" zodat 't team
+  // intuïtief de inbox checkt. inboxUnreadCounts telt alleen ongelezen inbound.
+  const unread = useQuery(
+    api.messaging.inboxUnreadCounts,
+    workspaceId ? { workspaceId } : 'skip',
+  )
+  const unreadCount = unread?.total ?? 0
+
   return (
     <>
       {/* Brand */}
@@ -99,6 +107,11 @@ export function SidebarContent({
               {item.to === '/crm' && pendingCount > 0 && (
                 <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white">
                   {pendingCount}
+                </span>
+              )}
+              {item.to === '/crm/messages' && unreadCount > 0 && (
+                <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1.5 text-xs font-semibold text-white">
+                  {unreadCount}
                 </span>
               )}
             </Link>
