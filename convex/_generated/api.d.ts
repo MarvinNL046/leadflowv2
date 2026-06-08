@@ -19,6 +19,7 @@ import type * as crmSettingsLogic from "../crmSettingsLogic.js";
 import type * as crons from "../crons.js";
 import type * as customFields from "../customFields.js";
 import type * as customFieldsLogic from "../customFieldsLogic.js";
+import type * as dashboardLeadVisibility from "../dashboardLeadVisibility.js";
 import type * as dashboardWindow from "../dashboardWindow.js";
 import type * as emailTemplates from "../emailTemplates.js";
 import type * as followUpInterval from "../followUpInterval.js";
@@ -64,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   customFields: typeof customFields;
   customFieldsLogic: typeof customFieldsLogic;
+  dashboardLeadVisibility: typeof dashboardLeadVisibility;
   dashboardWindow: typeof dashboardWindow;
   emailTemplates: typeof emailTemplates;
   followUpInterval: typeof followUpInterval;

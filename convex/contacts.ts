@@ -14,6 +14,7 @@ import { getEffectiveSettings } from "./crmSettings";
 import { isWithinDashboardWindow } from "./dashboardWindow";
 import { pickFirstActiveStage } from "./pipelinesLogic";
 import { resolveFollowUpDays } from "./followUpInterval";
+import { leadDashboardDecision } from "./dashboardLeadVisibility";
 import {
   renderTemplate,
   htmlToPlainText,
@@ -330,32 +331,25 @@ export const listIncomingLeads = query({
     // gewonnen/verloren/onbereikbaar (3x) en opp-loze imports vallen eruit.
     const checked = await Promise.all(
       followable.map(async (c) => {
-        // (a) Verlopen follow-up → resurface (ongeacht stage). dueBefore =
-        // einde-vandaag, meegegeven door de client. Onbereikbare (3x) leads
-        // hebben geen nextFollowUpAt + zijn al uit `followable` gefilterd.
-        if (
-          args.dueBefore != null &&
-          c.nextFollowUpAt != null &&
-          c.nextFollowUpAt <= args.dueBefore
-        ) {
-          return { c, keep: true, dueFollowup: true };
-        }
         const opps = await ctx.db
           .query("opportunities")
           .withIndex("by_contact", (q) => q.eq("contactId", c._id))
           .collect();
-        // Opp-loze contacten = geïmporteerde contacten zonder deal, GEEN
-        // op-te-volgen lead. Niet tonen (anders floodt de bulk-import het
-        // dashboard). Echte Meta/webhook-leads krijgen altijd een opp.
-        if (opps.length === 0)
-          return { c, keep: false, dueFollowup: false };
-        // Toon als MINSTENS ÉÉN opp in de eerste actieve stage staat —
-        // single-sourced via firstStageIds (zie pickFirstActiveStage in de
-        // resurface-loop). Een contact kan meerdere opps hebben (elke submission
-        // = verse opp), dus een verse eerste-stage-opp naast oude afgehandelde
-        // moet tóch tonen.
-        const anyFirst = opps.some((o) => firstStageIds.has(o.stageId));
-        return { c, keep: anyFirst, dueFollowup: false };
+        const hasFirstStageOpp = opps.some((o) =>
+          firstStageIds.has(o.stageId),
+        );
+        // Toon-beslissing (zie leadDashboardDecision):
+        //   verlopen follow-up → tonen (ongeacht stage/opp) · geen opp →
+        //   verbergen (import zonder deal) · TOEKOMSTIGE follow-up → verbergen
+        //   tot due (1x gebeld → verdwijnt → komt na N dagen terug) · anders →
+        //   opp in eerste actieve stage (firstStageIds via pickFirstActiveStage).
+        const { keep, dueFollowup } = leadDashboardDecision({
+          nextFollowUpAt: c.nextFollowUpAt,
+          dueBefore: args.dueBefore,
+          hasAnyOpp: opps.length > 0,
+          hasFirstStageOpp,
+        });
+        return { c, keep, dueFollowup };
       }),
     );
     // Enrich ALLE keepers (niet pre-slicen — anders valt een verse
