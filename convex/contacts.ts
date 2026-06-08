@@ -874,11 +874,15 @@ export const recordCallAnswered = mutation({
       patch.callCount = (contact.callCount ?? 0) + 1;
       patch.nextFollowUpAt =
         args.followUpAt ?? Date.now() + settings.customerCallbackDays * 24 * 60 * 60 * 1000;
-    } else if (args.followUpAt !== undefined) {
-      patch.nextFollowUpAt = args.followUpAt;
     } else if (args.outcome === "callback") {
-      // Default 7 dagen
-      patch.nextFollowUpAt = Date.now() + settings.customerCallbackDays * 24 * 60 * 60 * 1000;
+      // Terugbel-afspraak → toekomstige follow-up (dashboard verbergt 'm tot due).
+      patch.nextFollowUpAt =
+        args.followUpAt ?? Date.now() + settings.customerCallbackDays * 24 * 60 * 60 * 1000;
+    } else {
+      // appointment / not_interested = afgehandeld → wis de resurface-klok zodat
+      // de cron de lead NIET terug naar Nieuw sleept. De afspraakdatum gaat al
+      // de note in (zie hieronder). (bug 1)
+      patch.nextFollowUpAt = undefined;
     }
     await ctx.db.patch(args.contactId, patch);
 
