@@ -2334,3 +2334,94 @@ export const backfillLeadAttributionWorkspace = internalMutation({
     return { processed, skipped, remaining: rest.length };
   },
 });
+
+// ════════════════════════════════════════════════════════════════════
+// REPAIR — contacten met een bel-uitkomst (opgenomen-afspraak, niet
+// geïnteresseerd, ongeldig nummer, onbereikbaar 3x, buiten gebied) maar
+// nóg open opps in een actieve stage. Historisch verplaatsten de
+// disposition-mutaties maar één opp per contact; duplicaten (V1-import /
+// re-submissions) bleven in "Nieuw" hangen → lead bleef op het dashboard.
+// Idempotent. dryRun: true → alleen tellen, niets wijzigen.
+// ════════════════════════════════════════════════════════════════════
+export const repairDispositionedOpenOpps = internalMutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    dryRun: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { workspaceId, dryRun }) => {
+    const pipeline = await ctx.db
+      .query("pipelines")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    if (!pipeline) throw new Error("Geen default pipeline voor workspace");
+
+    const stages = await ctx.db
+      .query("pipelineStages")
+      .withIndex("by_pipeline_order", (q) => q.eq("pipelineId", pipeline._id))
+      .collect();
+    const lost = stages.find((s) => s.isLostStage);
+    const active = stages
+      .filter((s) => !s.isWonStage && !s.isLostStage)
+      .sort((a, b) => a.order - b.order);
+    const qualified = active[active.length - 1]; // "Afspraak ingepland"
+    if (!lost || !qualified) {
+      throw new Error("Geen lost- of qualified-stage in default pipeline");
+    }
+
+    const perReason: Record<string, number> = {};
+    let moved = 0;
+
+    for (const stage of active) {
+      const opps = await ctx.db
+        .query("opportunities")
+        .withIndex("by_workspace_stage", (q) =>
+          q.eq("workspaceId", workspaceId).eq("stageId", stage._id),
+        )
+        .collect();
+      for (const opp of opps) {
+        if (opp.closedAt !== undefined) continue;
+        const contact = await ctx.db.get(opp.contactId);
+        if (!contact) continue;
+
+        let target: typeof lost | typeof qualified | null = null;
+        let reason = "";
+        if (contact.lastCallResult === "answered_appointment") {
+          target = qualified;
+          reason = "repair_answered_appointment";
+        } else if (contact.lastCallResult === "answered_not_interested") {
+          target = lost;
+          reason = "repair_not_interested";
+        } else if (contact.lastCallResult === "invalid") {
+          target = lost;
+          reason = "repair_invalid_number";
+        } else if (contact.unreachable) {
+          target = lost;
+          reason = "repair_unreachable";
+        } else if (contact.outsideArea) {
+          target = lost;
+          reason = "repair_outside_area";
+        }
+        if (!target || target._id === opp.stageId) continue;
+
+        perReason[reason] = (perReason[reason] ?? 0) + 1;
+        moved++;
+        if (dryRun) continue;
+
+        const updates: Record<string, unknown> = { stageId: target._id };
+        if (target.isLostStage) {
+          updates.closedAt = Date.now();
+          updates.closedReason = reason;
+        }
+        await ctx.db.patch(opp._id, updates);
+        await ctx.db.insert("opportunityStageHistory", {
+          opportunityId: opp._id,
+          fromStageId: opp.stageId,
+          toStageId: target._id,
+        });
+      }
+    }
+
+    return { dryRun: dryRun ?? false, planned: moved, perReason };
+  },
+});

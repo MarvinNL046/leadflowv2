@@ -606,20 +606,25 @@ function pickStageByRole(
 }
 
 /**
- * Vind bestaande open opp voor contact in default pipeline, of maak
- * nieuwe in Lead-stage. Returnt opportunityId.
+ * Vind ÁLLE bestaande open opps voor contact in default pipeline, of maak
+ * een nieuwe in Lead-stage. Returnt opportunityIds.
+ *
+ * Alle, niet alleen de eerste: een contact kan meerdere open opps hebben
+ * (re-submission / V1-import) en het dashboard blijft de lead tonen
+ * zolang er nog één in de eerste stage staat — een bel-uitkomst moet ze
+ * dus allemaal meeverplaatsen.
  */
-async function findOrCreateOpportunity(
+async function findOrCreateOpenOpportunities(
   ctx: MutationCtx,
   workspaceId: Id<"workspaces">,
   contactId: Id<"contacts">,
   contactName: string,
-): Promise<Id<"opportunities"> | null> {
+): Promise<Array<Id<"opportunities">>> {
   const pipelineData = await getDefaultPipelineStages(ctx, workspaceId);
-  if (!pipelineData) return null;
+  if (!pipelineData) return [];
   const { pipelineId, stages } = pipelineData;
 
-  // Bestaande opp voor dit contact in deze pipeline (non-closed)
+  // Bestaande opps voor dit contact in deze pipeline (non-closed)
   const existing = await ctx.db
     .query("opportunities")
     .withIndex("by_contact", (q) => q.eq("contactId", contactId))
@@ -629,11 +634,11 @@ async function findOrCreateOpportunity(
         q.eq(q.field("closedAt"), undefined),
       ),
     )
-    .first();
-  if (existing) return existing._id;
+    .collect();
+  if (existing.length > 0) return existing.map((o) => o._id);
 
   const leadStage = pickStageByRole(stages, "lead");
-  if (!leadStage) return null;
+  if (!leadStage) return [];
 
   const oppId = await ctx.db.insert("opportunities", {
     workspaceId,
@@ -646,7 +651,7 @@ async function findOrCreateOpportunity(
     opportunityId: oppId,
     toStageId: leadStage._id,
   });
-  return oppId;
+  return [oppId];
 }
 
 /** Patch opp naar nieuwe stage + history-row + closedAt bij Won/Lost. */
@@ -743,14 +748,14 @@ export const recordCallNoAnswer = mutation({
     await ctx.db.patch(args.contactId, patch);
 
     if (isFinalStrike) {
-      // Opp naar Lost — 3-strike-rule
-      const oppId = await findOrCreateOpportunity(
+      // Opps naar Lost — 3-strike-rule
+      const oppIds = await findOrCreateOpenOpportunities(
         ctx,
         contact.workspaceId,
         args.contactId,
         contactDisplay(contact),
       );
-      if (oppId) {
+      if (oppIds.length > 0) {
         const pipelineData = await getDefaultPipelineStages(
           ctx,
           contact.workspaceId,
@@ -758,13 +763,15 @@ export const recordCallNoAnswer = mutation({
         if (pipelineData) {
           const lostStage = pickStageByRole(pipelineData.stages, "lost");
           if (lostStage) {
-            await moveOppToStage(
-              ctx,
-              oppId,
-              lostStage,
-              userId,
-              "unreachable_3x",
-            );
+            for (const oppId of oppIds) {
+              await moveOppToStage(
+                ctx,
+                oppId,
+                lostStage,
+                userId,
+                "unreachable_3x",
+              );
+            }
           }
         }
       }
@@ -827,13 +834,13 @@ export const recordCallNoAnswer = mutation({
       // staan; het dashboard verbergt 'm alsnog via de toekomstige follow-up.
       // moveOppToStage raakt nextFollowUpAt NIET → de cron zet 'm na N dagen
       // terug naar Nieuw (de V1-loop).
-      const attemptOppId = await findOrCreateOpportunity(
+      const attemptOppIds = await findOrCreateOpenOpportunities(
         ctx,
         contact.workspaceId,
         args.contactId,
         contactDisplay(contact),
       );
-      if (attemptOppId) {
+      if (attemptOppIds.length > 0) {
         const pipelineData = await getDefaultPipelineStages(
           ctx,
           contact.workspaceId,
@@ -844,13 +851,15 @@ export const recordCallNoAnswer = mutation({
             newCount,
           );
           if (attemptStage) {
-            await moveOppToStage(
-              ctx,
-              attemptOppId,
-              attemptStage,
-              userId,
-              `called_${newCount}x`,
-            );
+            for (const attemptOppId of attemptOppIds) {
+              await moveOppToStage(
+                ctx,
+                attemptOppId,
+                attemptStage,
+                userId,
+                `called_${newCount}x`,
+              );
+            }
           }
         }
       }
@@ -897,14 +906,16 @@ export const recordCallAnswered = mutation({
     const settings = await getEffectiveSettings(ctx, contact.workspaceId);
 
     const patch: Record<string, unknown> = {
+      // Elk opgenomen gesprek telt als belpoging — anders blijft de
+      // lead-card "Nog niet gebeld" tonen na een uitkomst.
+      callCount: (contact.callCount ?? 0) + 1,
       lastCallAt: Date.now(),
       lastCallResult: `answered_${args.outcome}`,
     };
     if (args.outcome === "customer_will_callback") {
-      // Klant belt zelf terug — bumpt callCount (telt als 1× gebeld) +
-      // 7-dag safety-net follow-up zodat lead niet verdwijnt als klant
-      // vergeet. Geen stage-update (blijft waar 't is).
-      patch.callCount = (contact.callCount ?? 0) + 1;
+      // Klant belt zelf terug — 7-dag safety-net follow-up zodat lead
+      // niet verdwijnt als klant vergeet. Geen stage-update (blijft
+      // waar 't is).
       patch.nextFollowUpAt =
         args.followUpAt ?? Date.now() + settings.customerCallbackDays * 24 * 60 * 60 * 1000;
     } else if (args.outcome === "callback") {
@@ -920,13 +931,13 @@ export const recordCallAnswered = mutation({
     await ctx.db.patch(args.contactId, patch);
 
     // Opp-stage update
-    const oppId = await findOrCreateOpportunity(
+    const oppIds = await findOrCreateOpenOpportunities(
       ctx,
       contact.workspaceId,
       args.contactId,
       contactDisplay(contact),
     );
-    if (oppId) {
+    if (oppIds.length > 0) {
       const pipelineData = await getDefaultPipelineStages(
         ctx,
         contact.workspaceId,
@@ -941,13 +952,15 @@ export const recordCallAnswered = mutation({
         if (targetRole) {
           const targetStage = pickStageByRole(pipelineData.stages, targetRole);
           if (targetStage) {
-            await moveOppToStage(
-              ctx,
-              oppId,
-              targetStage,
-              userId,
-              targetRole,
-            );
+            for (const oppId of oppIds) {
+              await moveOppToStage(
+                ctx,
+                oppId,
+                targetStage,
+                userId,
+                targetRole,
+              );
+            }
           }
         }
       }
@@ -997,13 +1010,13 @@ export const markInvalidNumber = mutation({
       outsideArea: true,
     });
 
-    const oppId = await findOrCreateOpportunity(
+    const oppIds = await findOrCreateOpenOpportunities(
       ctx,
       contact.workspaceId,
       args.contactId,
       contactDisplay(contact),
     );
-    if (oppId) {
+    if (oppIds.length > 0) {
       const pipelineData = await getDefaultPipelineStages(
         ctx,
         contact.workspaceId,
@@ -1011,7 +1024,15 @@ export const markInvalidNumber = mutation({
       if (pipelineData) {
         const lostStage = pickStageByRole(pipelineData.stages, "lost");
         if (lostStage) {
-          await moveOppToStage(ctx, oppId, lostStage, userId, "invalid_number");
+          for (const oppId of oppIds) {
+            await moveOppToStage(
+              ctx,
+              oppId,
+              lostStage,
+              userId,
+              "invalid_number",
+            );
+          }
         }
       }
     }
@@ -1196,14 +1217,14 @@ export const markOutsideArea = mutation({
     );
     await ctx.db.patch(args.contactId, { outsideArea: true });
 
-    // Opp naar Lost (consistent met v1 — buiten gebied = unrealizable)
-    const oppId = await findOrCreateOpportunity(
+    // Opps naar Lost (consistent met v1 — buiten gebied = unrealizable)
+    const oppIds = await findOrCreateOpenOpportunities(
       ctx,
       contact.workspaceId,
       args.contactId,
       contactDisplay(contact),
     );
-    if (oppId) {
+    if (oppIds.length > 0) {
       const pipelineData = await getDefaultPipelineStages(
         ctx,
         contact.workspaceId,
@@ -1211,7 +1232,9 @@ export const markOutsideArea = mutation({
       if (pipelineData) {
         const lostStage = pickStageByRole(pipelineData.stages, "lost");
         if (lostStage) {
-          await moveOppToStage(ctx, oppId, lostStage, userId, "outside_area");
+          for (const oppId of oppIds) {
+            await moveOppToStage(ctx, oppId, lostStage, userId, "outside_area");
+          }
         }
       }
     }
