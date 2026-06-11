@@ -17,6 +17,7 @@ import type { Id } from '../../../../convex/_generated/dataModel'
 import type { Channel, DialogView, LeadDialogProps } from './types'
 import { MainView } from './views/main-view'
 import { AnsweredOptionsView } from './views/answered-options'
+import { AppointmentDateView } from './views/appointment-date'
 import { CallbackOptionsView } from './views/callback-options'
 import { OutsideAreaView } from './views/outside-area'
 import { NotAnsweredView } from './views/not-answered'
@@ -135,7 +136,8 @@ export function LeadDialog({
   }
 
   function backTarget(): DialogView {
-    if (view === 'callback_options') return 'answered_options'
+    if (view === 'callback_options' || view === 'appointment_date')
+      return 'answered_options'
     return 'main'
   }
 
@@ -223,17 +225,7 @@ export function LeadDialog({
         {view === 'answered_options' && (
           <AnsweredOptionsView
             processing={processing}
-            onScheduleNow={() =>
-              runAction(
-                'schedule_now',
-                () =>
-                  recordCallAnswered({
-                    contactId: lead._id as Id<'contacts'>,
-                    outcome: 'appointment',
-                  }),
-                'Afspraak vastgelegd — opp naar Voorstel',
-              )
-            }
+            onScheduleNow={() => setView('appointment_date')}
             onCallbackLater={() => setView('callback_options')}
             onCustomerWillCallback={() =>
               runAction(
@@ -255,6 +247,24 @@ export function LeadDialog({
                     outcome: 'not_interested',
                   }),
                 'Niet geïnteresseerd — opp gesloten als Verloren',
+              )
+            }
+          />
+        )}
+
+        {view === 'appointment_date' && (
+          <AppointmentDateView
+            processing={processing}
+            onSubmit={(followUpAt) =>
+              runAction(
+                'schedule_now',
+                () =>
+                  recordCallAnswered({
+                    contactId: lead._id as Id<'contacts'>,
+                    outcome: 'appointment',
+                    followUpAt,
+                  }),
+                'Afspraak ingepland — in agenda + opp naar Voorstel',
               )
             }
           />

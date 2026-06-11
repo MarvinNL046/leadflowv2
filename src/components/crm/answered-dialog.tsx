@@ -79,7 +79,7 @@ export function AnsweredDialog({
       })
       toast.success(
         outcome === 'appointment'
-          ? 'Afspraak ingepland — lead naar Voorstel-stage'
+          ? 'Afspraak ingepland — in agenda + lead naar Voorstel-stage'
           : outcome === 'callback'
             ? 'Terugbel-datum gezet'
             : 'Lead gemarkeerd als niet geïnteresseerd',

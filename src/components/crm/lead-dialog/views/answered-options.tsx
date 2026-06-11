@@ -25,7 +25,7 @@ export function AnsweredOptionsView({
       <ActionButton
         icon={CalendarPlus}
         title="Afspraak nu inplannen"
-        subtitle="Opp naar Voorstel-stage"
+        subtitle="Datum kiezen → in agenda + Voorstel-stage"
         color="violet"
         primary
         disabled={processing !== null}

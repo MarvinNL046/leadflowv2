@@ -4,6 +4,7 @@ export type DialogView =
   | 'main'
   | 'outside_area'
   | 'answered_options'
+  | 'appointment_date'
   | 'callback_options'
   | 'not_answered'
   | 'invalid_number'

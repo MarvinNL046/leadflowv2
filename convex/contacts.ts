@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import {
+  internalMutation,
   mutation,
   query,
   type MutationCtx,
@@ -687,6 +688,23 @@ async function moveOppToStage(
   });
 }
 
+/**
+ * Systeem-note zonder gebruiker (voor scheduler-acties, bv. de Google
+ * Calendar-koppeling). createdById blijft leeg.
+ */
+export const addSystemNote = internalMutation({
+  args: { contactId: v.id("contacts"), body: v.string() },
+  handler: async (ctx, args) => {
+    const contact = await ctx.db.get(args.contactId);
+    if (!contact) return;
+    await ctx.db.insert("notes", {
+      workspaceId: contact.workspaceId,
+      contactId: args.contactId,
+      body: args.body,
+    });
+  },
+});
+
 function contactDisplay(contact: Doc<"contacts">): string {
   return (
     [contact.firstName, contact.lastName].filter(Boolean).join(" ") ||
@@ -991,6 +1009,27 @@ export const recordCallAnswered = mutation({
       body: noteBody,
       createdById: userId,
     });
+
+    // Afspraak mét datum → adviesgesprek-event in de Google-agenda
+    // (fire-and-forget; faalt de koppeling, dan komt er een waarschuwings-
+    // note via addSystemNote).
+    if (args.outcome === "appointment" && args.followUpAt) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.googleCalendar.createAppointmentEvent,
+        {
+          contactId: args.contactId,
+          startMs: args.followUpAt,
+          name: contactDisplay(contact),
+          phone: contact.phone,
+          email: contact.email,
+          city: contact.city,
+          street: contact.street,
+          houseNumber: contact.houseNumber,
+          houseNumberAddition: contact.houseNumberAddition,
+        },
+      );
+    }
   },
 });
 
