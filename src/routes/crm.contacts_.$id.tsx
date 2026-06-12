@@ -20,6 +20,7 @@ import {
   Send,
   MessageCircle,
   MessageSquare,
+  Snowflake,
   Trash2,
 } from 'lucide-react'
 import { LeadDialog } from '../components/crm/lead-dialog'
@@ -49,6 +50,7 @@ import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { Separator } from '#/components/ui/separator.tsx'
 import { cn } from '#/lib/utils.ts'
 import { humanizeConvexError } from '#/lib/errors.ts'
+import { frostworkCustomerUrl } from '#/lib/external-apps.ts'
 import { getMetaFormLabel } from '#/lib/meta-forms.ts'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
@@ -259,6 +261,22 @@ function ContactDetailPage() {
               <MessageCircle className="h-4 w-4" />
             </Button>
           </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            title="Open deze klant in Frostwork (F-gassen & onderhoud)"
+            asChild
+          >
+            <a
+              href={frostworkCustomerUrl(fullName)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Snowflake className="h-4 w-4" />
+              Frostwork
+            </a>
+          </Button>
           <Button
             type="button"
             size="sm"
