@@ -4,8 +4,13 @@
  * Latere fase: webhook-sync (zie docs) en modules als upsell.
  */
 
-export const FROSTWORK_URL = 'https://frostwork.app'
-export const CASHFLOW_URL = 'https://wetrycashflow.com'
+/**
+ * Domeinstructuur (koepel "wetry", besloten 12 jun 2026):
+ *   wetry{product}.com     → marketing/landing
+ *   app.wetry{product}.com → de app zelf
+ */
+export const FROSTWORK_URL = 'https://app.wetryfrostwork.com'
+export const CASHFLOW_URL = 'https://app.wetrycashflow.com'
 
 /**
  * Deeplink naar de Frostwork-klantenlijst, voorgefilterd op naam
