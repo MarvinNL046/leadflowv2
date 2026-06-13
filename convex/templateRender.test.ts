@@ -26,6 +26,23 @@ describe("renderTemplate", () => {
   it("ontbrekende var → lege string", () => {
     expect(renderTemplate("[{{onbekend}}]", {})).toBe("[]");
   });
+
+  // Regressie: workflow-engine-mails lieten {{company}} letterlijk staan
+  // (engine gebruikte een eigen interpolate die alleen {{contact.<veld>}}
+  // kende). Engine gebruikt nu leadTemplateVars + renderTemplate, exact
+  // zoals hieronder — dit is het Diana-scenario uit de bugmelding.
+  it("rendert {{company}} in subject én body (workflow-engine-mail)", () => {
+    const vars = leadTemplateVars(
+      { firstName: "Diana", lastName: "de Graef", company: null },
+      "StayCool Airco",
+    );
+    expect(renderTemplate("Re: Je aanvraag bij {{company}}", vars)).toBe(
+      "Re: Je aanvraag bij StayCool Airco",
+    );
+    expect(
+      renderTemplate("Hoi {{contact.firstName}},\n\nGroet,\n{{company}}", vars),
+    ).toBe("Hoi Diana,\n\nGroet,\nStayCool Airco");
+  });
 });
 
 describe("htmlToPlainText", () => {

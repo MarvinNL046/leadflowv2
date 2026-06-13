@@ -6,6 +6,8 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
+import { getEffectiveSettings } from "./crmSettings";
+import { renderTemplate, leadTemplateVars } from "./templateRender";
 
 /**
  * Workflow engine — vervangt v1's QStash-based executor.
@@ -26,8 +28,8 @@ import type { Doc, Id } from "./_generated/dataModel";
  *   logs; markFailed bij action-error)
  * - Geen entityData snapshot — engine leest contact altijd live
  *
- * Template-interpolation: simpele `{{contact.firstName}}` regex —
- * geen Handlebars. Whitelist op contact-velden.
+ * Template-interpolation: renderTemplate + leadTemplateVars (zelfde als
+ * de hand-getypte e-mails) — ondersteunt {{contact.<veld>}} en {{company}}.
  */
 
 // ──────────────────────────────────────────────────────────────────────
@@ -330,7 +332,7 @@ export const runNode = internalAction({
       { executionId: args.executionId, nodeId: args.nodeId },
     );
     if (!ctxData) return;
-    const { node, execution, contact } = ctxData;
+    const { node, execution, contact, companyName } = ctxData;
 
     const startMs = Date.now();
 
@@ -403,10 +405,14 @@ export const runNode = internalAction({
                 : null;
 
         if (channel) {
-          const body = interpolate(String(config.body ?? ""), contact);
+          // Zelfde template-engine als de hand-getypte e-mails: ondersteunt
+          // {{company}} én {{contact.fullName}} (de oude interpolate kende
+          // alleen {{contact.<veld>}} → {{company}} bleef letterlijk staan).
+          const vars = leadTemplateVars(contact, companyName);
+          const body = renderTemplate(String(config.body ?? ""), vars);
           const subject =
             channel === "email"
-              ? interpolate(String(config.subject ?? ""), contact)
+              ? renderTemplate(String(config.subject ?? ""), vars)
               : undefined;
 
           await ctx.runAction(internal.messaging.sendInternal, {
@@ -482,6 +488,7 @@ export const loadNodeContext = internalQuery({
         node: Doc<"workflowNodes">;
         execution: Doc<"workflowExecutions">;
         contact: Doc<"contacts"> | null;
+        companyName: string;
       }
   > => {
     const execution = await ctx.db.get(args.executionId);
@@ -501,7 +508,14 @@ export const loadNodeContext = internalQuery({
       contact = await ctx.db.get(execution.entityId as Id<"contacts">);
     }
 
-    return { node, execution, contact };
+    // Bedrijfsnaam voor template-vars ({{company}}) — zelfde bron als de
+    // hand-getypte e-mails in contacts.ts (settings.companyName).
+    const { companyName } = await getEffectiveSettings(
+      ctx,
+      execution.workspaceId,
+    );
+
+    return { node, execution, contact, companyName };
   },
 });
 
@@ -575,15 +589,3 @@ export const logNode = internalMutation({
 // PURE HELPERS
 // ──────────────────────────────────────────────────────────────────────
 
-/**
- * Simple template-interpolation. Vervangt {{contact.field}} met de
- * value uit contact-doc. Onbekende keys → lege string. Whitelist op
- * contact-document velden voor veiligheid.
- */
-function interpolate(template: string, contact: Doc<"contacts">): string {
-  return template.replace(/\{\{contact\.(\w+)\}\}/g, (_, key) => {
-    const value = (contact as unknown as Record<string, unknown>)[key];
-    if (value === null || value === undefined) return "";
-    return String(value);
-  });
-}
