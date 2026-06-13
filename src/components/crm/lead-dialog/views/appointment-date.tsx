@@ -3,6 +3,7 @@ import { Send } from 'lucide-react'
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
+import { toLocalDatetimeInputValue } from '#/lib/datetime.ts'
 
 interface Props {
   processing: string | null
@@ -20,7 +21,7 @@ export function AppointmentDateView({ processing, onSubmit }: Props) {
     const d = new Date()
     d.setDate(d.getDate() + 1)
     d.setHours(10, 0, 0, 0)
-    return d.toISOString().slice(0, 16) // YYYY-MM-DDTHH:mm
+    return toLocalDatetimeInputValue(d)
   })
 
   return (

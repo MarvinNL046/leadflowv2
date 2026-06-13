@@ -20,6 +20,7 @@ import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
 import { cn } from '#/lib/utils.ts'
 import { humanizeConvexError } from '#/lib/errors.ts'
+import { toLocalDatetimeInputValue } from '#/lib/datetime.ts'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 
@@ -48,7 +49,7 @@ export function AnsweredDialog({
     const d = new Date()
     d.setDate(d.getDate() + 1)
     d.setHours(10, 0, 0, 0)
-    return d.toISOString().slice(0, 16)  // YYYY-MM-DDTHH:mm
+    return toLocalDatetimeInputValue(d)
   })
   const [appointmentNote, setAppointmentNote] = useState('')
 
