@@ -108,7 +108,8 @@ export function SegmentBuilder({
       <div className="rounded bg-zinc-50 p-3 text-sm">
         {preview === undefined ? 'Berekenen…' : (
           <>
-            <strong>{preview.count}</strong> contacten matchen.
+            <strong>{preview.count}{preview.capped ? '+' : ''}</strong> contacten matchen
+            {preview.capped && <span className="text-zinc-400"> (steekproef — exact aantal bij verzenden)</span>}.
             {preview.sample.length > 0 && (
               <span className="text-zinc-500"> Bv. {preview.sample.slice(0, 3).map((s) => s.name || s.email).join(', ')}…</span>
             )}
