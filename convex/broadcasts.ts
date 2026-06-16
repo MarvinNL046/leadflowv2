@@ -271,6 +271,23 @@ export const markFailed = internalMutation({
   },
 });
 
+export const bumpStatFromExternalId = internalMutation({
+  args: {
+    externalMessageId: v.string(),
+    field: v.union(v.literal("delivered"), v.literal("bounced"), v.literal("unsubscribed")),
+  },
+  handler: async (ctx, args) => {
+    const message = await ctx.db
+      .query("messages")
+      .withIndex("by_external_id", (q) => q.eq("externalMessageId", args.externalMessageId))
+      .first();
+    if (!message || message.relatedEntityType !== "broadcast" || !message.relatedEntityId) return;
+    const b = await ctx.db.get(message.relatedEntityId as Id<"broadcasts">);
+    if (!b) return;
+    await ctx.db.patch(b._id, { stats: { ...b.stats, [args.field]: b.stats[args.field] + 1 } });
+  },
+});
+
 export const runBatch = internalAction({
   args: { broadcastId: v.id("broadcasts") },
   handler: async (ctx, args): Promise<void> => {
