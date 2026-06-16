@@ -7,7 +7,9 @@ import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { Card, CardContent } from '#/components/ui/card.tsx'
-import { RichTextEditor } from './rich-text-editor.tsx'
+import { EmailBuilder } from './email-builder/EmailBuilder.tsx'
+import type { EmailBlock } from '../../../../convex/emailBlocks'
+import { renderBlocksToHtml } from '../../../../convex/emailBlocks'
 import { humanizeConvexError } from '#/lib/errors.ts'
 import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
@@ -17,6 +19,7 @@ type Template = {
   name: string
   subject: string
   body: string
+  bodyBlocks?: unknown
   description?: string
   isSystem: boolean
 }
@@ -30,7 +33,9 @@ interface TemplateEditorProps {
 function TemplateEditor({ initial, workspaceId, onDone }: TemplateEditorProps) {
   const [name, setName] = useState(initial?.name ?? '')
   const [subject, setSubject] = useState(initial?.subject ?? '')
-  const [body, setBody] = useState(initial?.body ?? '')
+  const [blocks, setBlocks] = useState<EmailBlock[]>(
+    (initial?.bodyBlocks as EmailBlock[] | undefined) ?? []
+  )
   const [busy, setBusy] = useState(false)
 
   const create = useMutation(api.emailTemplates.create)
@@ -39,14 +44,15 @@ function TemplateEditor({ initial, workspaceId, onDone }: TemplateEditorProps) {
   const handleSave = async () => {
     if (!name.trim()) { toast.error('Naam is verplicht'); return }
     if (!subject.trim()) { toast.error('Onderwerp is verplicht'); return }
-    if (!body.trim()) { toast.error('Body is verplicht'); return }
+    if (blocks.length === 0) { toast.error('Inhoud is verplicht'); return }
 
     setBusy(true)
     try {
+      const body = renderBlocksToHtml(blocks)
       if (initial) {
-        await update({ templateId: initial._id, name, subject, body })
+        await update({ templateId: initial._id, name, subject, body, bodyBlocks: blocks })
       } else {
-        await create({ workspaceId, name, subject, body })
+        await create({ workspaceId, name, subject, body, bodyBlocks: blocks })
       }
       toast.success(initial ? 'Template bijgewerkt' : 'Template aangemaakt')
       onDone()
@@ -76,8 +82,8 @@ function TemplateEditor({ initial, workspaceId, onDone }: TemplateEditorProps) {
         />
       </div>
       <div>
-        <Label>Body</Label>
-        <RichTextEditor value={body} onChange={setBody} />
+        <Label>Inhoud</Label>
+        <EmailBuilder value={blocks} onChange={setBlocks} workspaceId={workspaceId} />
       </div>
       <div className="flex gap-2">
         <Button onClick={handleSave} disabled={busy}>

@@ -9,7 +9,9 @@ import { renderTemplate, leadTemplateVars } from '#/lib/templates.ts'
 import { renderEmailShell } from '../../../../convex/emailShell'
 import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
-import { RichTextEditor } from './rich-text-editor.tsx'
+import { EmailBuilder } from './email-builder/EmailBuilder.tsx'
+import type { EmailBlock } from '../../../../convex/emailBlocks'
+import { renderBlocksToHtml } from '../../../../convex/emailBlocks'
 
 export function BroadcastComposer({
   workspaceId,
@@ -24,7 +26,7 @@ export function BroadcastComposer({
 }) {
   const [name, setName] = useState(initialName ?? '')
   const [subject, setSubject] = useState(initialSubject ?? '')
-  const [body, setBody] = useState('')
+  const [blocks, setBlocks] = useState<EmailBlock[]>([])
   const [segmentId, setSegmentId] = useState<string>('')
   const [draftId, setDraftId] = useState<Id<'broadcasts'> | null>(null)
   const [busy, setBusy] = useState(false)
@@ -42,7 +44,7 @@ export function BroadcastComposer({
     companyName,
   )
   const previewHtml = renderEmailShell(
-    renderTemplate(body || '<p style="color:#999">(nog geen inhoud)</p>', previewVars),
+    renderTemplate(renderBlocksToHtml(blocks) || '<p style="color:#999">(nog geen inhoud)</p>', previewVars),
     { companyName, unsubUrl: '#', previewText: renderTemplate(subject, previewVars) },
   )
   const previewSubject = renderTemplate(subject, previewVars)
@@ -55,13 +57,15 @@ export function BroadcastComposer({
   )
 
   const saveDraft = async (): Promise<Id<'broadcasts'>> => {
-    if (!name || !subject || !body || !segmentId) throw new Error('Vul naam, onderwerp, body en segment in')
+    if (!name || !subject || blocks.length === 0 || !segmentId) throw new Error('Vul naam, onderwerp, inhoud en segment in')
     if (draftId) return draftId
+    const bodyHtml = renderBlocksToHtml(blocks)
     const id = await create({
       workspaceId,
       name,
       subject,
-      body,
+      body: bodyHtml,
+      bodyBlocks: blocks,
       segmentId: segmentId as Id<'segments'>,
     })
     setDraftId(id)
@@ -121,22 +125,23 @@ export function BroadcastComposer({
         <Input value={subject} onChange={(e) => { setSubject(e.target.value); setDraftId(null) }} placeholder="bv. Onderhoudstip voor de zomer" />
       </div>
       <div>
-        <Label>Body — start eventueel vanaf een template</Label>
+        <Label>Inhoud — start eventueel vanaf een template</Label>
         {templates && templates.length > 0 && (
           <select className="mb-2 w-full rounded border px-2 py-1 text-sm"
             onChange={(e) => {
               const t = templates.find((x) => x._id === e.target.value)
-              if (t) { setBody(t.body); if (!subject) setSubject(t.subject); setDraftId(null) }
+              if (t) { setBlocks((t.bodyBlocks as EmailBlock[] | undefined) ?? []); if (!subject) setSubject(t.subject); setDraftId(null) }
             }}>
             <option value="">— template invoegen —</option>
             {templates.map((t) => <option key={t._id} value={t._id}>{t.name}</option>)}
           </select>
         )}
-        <RichTextEditor
-          value={body}
-          onChange={(html) => { setBody(html); setDraftId(null) }}
+        <EmailBuilder
+          value={blocks}
+          onChange={(b) => { setBlocks(b); setDraftId(null) }}
+          workspaceId={workspaceId}
         />
-        <p className="mt-1 text-xs text-zinc-500">Typ merge-variabelen als platte tekst in de editor: {'{{contact.firstName}}'}, {'{{company}}'}. Afmeldlink wordt automatisch toegevoegd.</p>
+        <p className="mt-1 text-xs text-zinc-500">Typ {'{{contact.firstName}}'} / {'{{company}}'} in een tekst- of kop-blok. Afmeldlink wordt automatisch toegevoegd.</p>
       </div>
       <div>
         <Label>Voorbeeld (zo ziet de ontvanger 'm)</Label>
