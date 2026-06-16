@@ -34,6 +34,9 @@ function esc(s: string): string {
 function safeUrl(url: string): string {
   return /^https?:\/\//i.test(url) ? url : "#";
 }
+function safeAlign(a: unknown): "left" | "center" | "right" {
+  return a === "center" || a === "right" ? a : "left";
+}
 function safeColor(c: string, fallback: string): string {
   return /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : fallback;
 }
@@ -47,23 +50,23 @@ export function renderBlockToHtml(block: EmailBlock): string {
   switch (block.type) {
     case "heading": {
       const { text, align } = block.props;
-      return `<h2 style="margin:0 0 14px;font-size:22px;font-weight:700;color:#1f2733;line-height:1.3;text-align:${align}">${esc(text)}</h2>`;
+      return `<h2 style="margin:0 0 14px;font-size:22px;font-weight:700;color:#1f2733;line-height:1.3;text-align:${safeAlign(align)}">${esc(text)}</h2>`;
     }
     case "text": {
       const { content, align } = block.props;
       const lines = esc(content).split("\n").join("<br>");
-      return `<p style="margin:0 0 14px;text-align:${align}">${lines}</p>`;
+      return `<p style="margin:0 0 14px;text-align:${safeAlign(align)}">${lines}</p>`;
     }
     case "button": {
       const { text, url, align, bgColor, textColor } = block.props;
       const bg = safeColor(bgColor, "#2080C0");
       const fg = safeColor(textColor, "#ffffff");
-      return `<div style="text-align:${align};margin:8px 0 18px"><a href="${safeUrl(url)}" style="display:inline-block;background:${bg};color:${fg};padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-family:Arial,Helvetica,sans-serif">${esc(text)}</a></div>`;
+      return `<div style="text-align:${safeAlign(align)};margin:8px 0 18px"><a href="${esc(safeUrl(url))}" style="display:inline-block;background:${bg};color:${fg};padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-family:Arial,Helvetica,sans-serif">${esc(text)}</a></div>`;
     }
     case "image": {
       const { src, alt, width, align } = block.props;
       if (!src) return "";
-      return `<div style="text-align:${align};margin:0 0 16px"><img src="${esc(src)}" alt="${esc(alt)}" style="width:${clampWidth(width)}%;max-width:100%;height:auto;border-radius:8px;display:inline-block" /></div>`;
+      return `<div style="text-align:${safeAlign(align)};margin:0 0 16px"><img src="${esc(safeUrl(src))}" alt="${esc(alt)}" style="width:${clampWidth(width)}%;max-width:100%;height:auto;border-radius:8px;display:inline-block" /></div>`;
     }
     case "divider": {
       const { color, thickness } = block.props;
