@@ -60,7 +60,7 @@ emailMarketingStatus: v.optional(
   v.union(v.literal("subscribed"), v.literal("unsubscribed"), v.literal("cleaned"))
 ),                                   // afwezig = subscribed (impliciete opt-in, grondslag A)
 marketingUnsubscribedAt: v.optional(v.number()),
-marketingUnsubReason: v.optional(
+marketingUnsubscribedReason: v.optional(
   v.union(v.literal("user"), v.literal("bounced"), v.literal("complained"), v.literal("manual"))
 ),
 ```
@@ -144,7 +144,7 @@ broadcasts: defineTable({
   `ENCRYPTION_KEY` (zie `convex/lib/crypto.ts`). Stateless: geen token-kolom, geen sessie;
   werkt ook maanden later.
 - Publieke route verifieert de handtekening → zet `emailMarketingStatus:"unsubscribed"`,
-  `marketingUnsubscribedAt`, `marketingUnsubReason:"user"`. Toont bevestigingspagina
+  `marketingUnsubscribedAt`, `marketingUnsubscribedReason:"user"`. Toont bevestigingspagina
   ("Je bent afgemeld") + optie "toch weer aanmelden".
 
 ### 4.2 `List-Unsubscribe`-headers (verplicht)
