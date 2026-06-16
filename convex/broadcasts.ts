@@ -129,59 +129,65 @@ export const sendNow = action({
     });
     if (!begin.started) throw new Error("Deze broadcast is al gestart of verzonden.");
 
-    const b = await ctx.runQuery(internal.broadcasts.loadForSend, { broadcastId: args.broadcastId });
-    if (!b) throw new Error("Broadcast niet gevonden");
+    try {
+      const b = await ctx.runQuery(internal.broadcasts.loadForSend, { broadcastId: args.broadcastId });
+      if (!b) throw new Error("Broadcast niet gevonden");
 
-    // Stap 1: haal alle ontvangers op via gepagineerde internalQuery
-    const seg = await ctx.runQuery(internal.broadcasts.loadSegment, { segmentId: b.segmentId });
-    if (!seg) throw new Error("Segment niet gevonden");
+      // Stap 1: haal alle ontvangers op via gepagineerde internalQuery
+      const seg = await ctx.runQuery(internal.broadcasts.loadSegment, { segmentId: b.segmentId });
+      if (!seg) throw new Error("Segment niet gevonden");
 
-    const allRecipients: Array<{
-      contactId: Id<"contacts">;
-      email: string;
-      firstName?: string;
-      lastName?: string;
-    }> = [];
-    let cursor: string | null = null;
-    let isDone = false;
-    while (!isDone) {
-      const result: {
-        recipients: Array<{ contactId: Id<"contacts">; email: string; firstName?: string; lastName?: string }>;
-        continueCursor: string;
-        isDone: boolean;
-      } = await ctx.runQuery(internal.segments.resolvePage, {
-        workspaceId: b.workspaceId,
-        rules: seg.rules,
-        cursor,
-        numItems: 500,
-      });
-      allRecipients.push(...result.recipients);
-      cursor = result.continueCursor;
-      isDone = result.isDone;
-    }
+      const allRecipients: Array<{
+        contactId: Id<"contacts">;
+        email: string;
+        firstName?: string;
+        lastName?: string;
+      }> = [];
+      let cursor: string | null = null;
+      let isDone = false;
+      while (!isDone) {
+        const result: {
+          recipients: Array<{ contactId: Id<"contacts">; email: string; firstName?: string; lastName?: string }>;
+          continueCursor: string;
+          isDone: boolean;
+        } = await ctx.runQuery(internal.segments.resolvePage, {
+          workspaceId: b.workspaceId,
+          rules: seg.rules,
+          cursor,
+          numItems: 500,
+        });
+        allRecipients.push(...result.recipients);
+        cursor = result.continueCursor;
+        isDone = result.isDone;
+      }
 
-    // Stap 2: dedupe op lowercased email
-    const deduped = dedupeByEmail(allRecipients);
+      // Stap 2: dedupe op lowercased email
+      const deduped = dedupeByEmail(allRecipients);
 
-    // Stap 3: schrijf broadcastRecipients-rijen in chunks van ≤ 500
-    const CHUNK = 500;
-    for (let i = 0; i < deduped.length; i += CHUNK) {
-      await ctx.runMutation(internal.broadcasts.addRecipients, {
+      // Stap 3: schrijf broadcastRecipients-rijen in chunks van ≤ 500
+      const CHUNK = 500;
+      for (let i = 0; i < deduped.length; i += CHUNK) {
+        await ctx.runMutation(internal.broadcasts.addRecipients, {
+          broadcastId: args.broadcastId,
+          workspaceId: b.workspaceId,
+          rows: deduped.slice(i, i + CHUNK),
+        });
+      }
+
+      // Stap 4: sla totaal op en plan eerste batch in
+      await ctx.runMutation(internal.broadcasts.setTotal, {
         broadcastId: args.broadcastId,
-        workspaceId: b.workspaceId,
-        rows: deduped.slice(i, i + CHUNK),
+        total: deduped.length,
       });
+      await ctx.scheduler.runAfter(0, internal.broadcasts.runBatch, {
+        broadcastId: args.broadcastId,
+      });
+      return { total: deduped.length };
+    } catch (err) {
+      // Reset naar "draft" zodat de gebruiker de broadcast opnieuw kan proberen.
+      await ctx.runMutation(internal.broadcasts.resetToDraft, { broadcastId: args.broadcastId });
+      throw err;
     }
-
-    // Stap 4: sla totaal op en plan eerste batch in
-    await ctx.runMutation(internal.broadcasts.setTotal, {
-      broadcastId: args.broadcastId,
-      total: deduped.length,
-    });
-    await ctx.scheduler.runAfter(0, internal.broadcasts.runBatch, {
-      broadcastId: args.broadcastId,
-    });
-    return { total: deduped.length };
   },
 });
 
@@ -223,6 +229,18 @@ export const loadSegment = internalQuery({
   args: { segmentId: v.id("segments") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.segmentId);
+  },
+});
+
+/** Reset een broadcast van "sending" terug naar "draft" als sendNow-setup
+ *  mislukt. Zo kan de gebruiker de broadcast opnieuw proberen te verzenden. */
+export const resetToDraft = internalMutation({
+  args: { broadcastId: v.id("broadcasts") },
+  handler: async (ctx, args) => {
+    const b = await ctx.db.get(args.broadcastId);
+    if (b && b.status === "sending") {
+      await ctx.db.patch(args.broadcastId, { status: "draft", startedAt: undefined });
+    }
   },
 });
 
@@ -277,6 +295,11 @@ export const addRecipients = internalMutation({
     }
   },
 });
+
+// FASE-1 LIMITATION: als de runBatch-action crasht ná claimBatch maar vóór recordSends,
+// blijven die rijen op status "sending" staan (at-most-once: niet opnieuw verzonden — de
+// veilige richting voor e-mail). Geen auto-recovery cron in fase 1; handmatige hervatting
+// of een toekomstige sweep die "sending"-rijen ouder dan N min terugzet naar "pending".
 
 /** Fix 2b: Atomic claim — leest pending-rijen EN flipt ze naar "sending" in
  *  één mutatie. Twee gelijktijdige runBatch-aanroepen kunnen dezelfde rijen
@@ -361,9 +384,24 @@ export const finishSending = internalMutation({
   args: { broadcastId: v.id("broadcasts") },
   handler: async (ctx, args) => {
     const b = await ctx.db.get(args.broadcastId);
-    if (b && b.status === "sending") {
-      await ctx.db.patch(args.broadcastId, { status: "sent", completedAt: Date.now() });
-    }
+    if (!b || b.status !== "sending") return;
+    // Guard: finaliseer de broadcast pas als er GEEN "pending" én GEEN "sending"
+    // ontvangers meer zijn. In-flight "sending"-rijen (batch crashte na claimBatch
+    // maar vóór recordSends) voorkomen premature afsluiting.
+    const stillPending = await ctx.db
+      .query("broadcastRecipients")
+      .withIndex("by_broadcast_status", (q) =>
+        q.eq("broadcastId", args.broadcastId).eq("status", "pending"),
+      )
+      .first();
+    const stillSending = await ctx.db
+      .query("broadcastRecipients")
+      .withIndex("by_broadcast_status", (q) =>
+        q.eq("broadcastId", args.broadcastId).eq("status", "sending"),
+      )
+      .first();
+    if (stillPending || stillSending) return; // niet finaliseren zolang er werk in-flight is
+    await ctx.db.patch(args.broadcastId, { status: "sent", completedAt: Date.now() });
   },
 });
 
