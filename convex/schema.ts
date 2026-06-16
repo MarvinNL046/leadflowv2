@@ -318,6 +318,34 @@ export default defineSchema({
     cachedAt: v.optional(v.number()),
   }).index("by_workspace", ["workspaceId"]),
 
+  broadcasts: defineTable({
+    workspaceId: v.id("workspaces"),
+    name: v.string(),
+    subject: v.string(),
+    body: v.optional(v.string()),            // HTML; leeg als templateId gezet
+    templateId: v.optional(v.id("emailTemplates")),
+    segmentId: v.id("segments"),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("scheduled"),
+      v.literal("sending"),
+      v.literal("sent"),
+      v.literal("cancelled"),
+      v.literal("failed"),
+    ),
+    scheduledAt: v.optional(v.number()),
+    stats: v.object({
+      total: v.number(),
+      sent: v.number(),
+      delivered: v.number(),
+      bounced: v.number(),
+      unsubscribed: v.number(),
+      failed: v.number(),
+    }),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+  }).index("by_workspace_status", ["workspaceId", "status"]),
+
   // ════════════════════════════════════════════════════════════════════
   // AI LEAD-RESPONSE AGENT
   // ════════════════════════════════════════════════════════════════════
