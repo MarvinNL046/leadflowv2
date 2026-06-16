@@ -18,6 +18,7 @@ import { Route as CrmSettingsRouteImport } from './routes/crm.settings'
 import { Route as CrmPipelinesRouteImport } from './routes/crm.pipelines'
 import { Route as CrmMessagesRouteImport } from './routes/crm.messages'
 import { Route as CrmContactsRouteImport } from './routes/crm.contacts'
+import { Route as CrmCampaignsRouteImport } from './routes/crm.campaigns'
 import { Route as CrmWorkflowsIdRouteImport } from './routes/crm.workflows_.$id'
 import { Route as CrmSettingsWhatsappRouteImport } from './routes/crm.settings_.whatsapp'
 import { Route as CrmSettingsTemplatesRouteImport } from './routes/crm.settings_.templates'
@@ -28,6 +29,7 @@ import { Route as CrmSettingsCustomFieldsRouteImport } from './routes/crm.settin
 import { Route as CrmSettingsAiAgentRouteImport } from './routes/crm.settings_.ai-agent'
 import { Route as CrmContactsImportRouteImport } from './routes/crm.contacts_.import'
 import { Route as CrmContactsIdRouteImport } from './routes/crm.contacts_.$id'
+import { Route as CrmCampaignsIdRouteImport } from './routes/crm.campaigns_.$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -72,6 +74,11 @@ const CrmMessagesRoute = CrmMessagesRouteImport.update({
 const CrmContactsRoute = CrmContactsRouteImport.update({
   id: '/contacts',
   path: '/contacts',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmCampaignsRoute = CrmCampaignsRouteImport.update({
+  id: '/campaigns',
+  path: '/campaigns',
   getParentRoute: () => CrmRoute,
 } as any)
 const CrmWorkflowsIdRoute = CrmWorkflowsIdRouteImport.update({
@@ -124,17 +131,24 @@ const CrmContactsIdRoute = CrmContactsIdRouteImport.update({
   path: '/contacts/$id',
   getParentRoute: () => CrmRoute,
 } as any)
+const CrmCampaignsIdRoute = CrmCampaignsIdRouteImport.update({
+  id: '/campaigns_/$id',
+  path: '/campaigns/$id',
+  getParentRoute: () => CrmRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/crm': typeof CrmRouteWithChildren
   '/login': typeof LoginRoute
+  '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
   '/crm/messages': typeof CrmMessagesRoute
   '/crm/pipelines': typeof CrmPipelinesRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/crm/': typeof CrmIndexRoute
+  '/crm/campaigns/$id': typeof CrmCampaignsIdRoute
   '/crm/contacts/$id': typeof CrmContactsIdRoute
   '/crm/contacts/import': typeof CrmContactsImportRoute
   '/crm/settings/ai-agent': typeof CrmSettingsAiAgentRoute
@@ -149,12 +163,14 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
   '/crm/messages': typeof CrmMessagesRoute
   '/crm/pipelines': typeof CrmPipelinesRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/crm': typeof CrmIndexRoute
+  '/crm/campaigns/$id': typeof CrmCampaignsIdRoute
   '/crm/contacts/$id': typeof CrmContactsIdRoute
   '/crm/contacts/import': typeof CrmContactsImportRoute
   '/crm/settings/ai-agent': typeof CrmSettingsAiAgentRoute
@@ -171,12 +187,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/crm': typeof CrmRouteWithChildren
   '/login': typeof LoginRoute
+  '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
   '/crm/messages': typeof CrmMessagesRoute
   '/crm/pipelines': typeof CrmPipelinesRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/crm/': typeof CrmIndexRoute
+  '/crm/campaigns_/$id': typeof CrmCampaignsIdRoute
   '/crm/contacts_/$id': typeof CrmContactsIdRoute
   '/crm/contacts_/import': typeof CrmContactsImportRoute
   '/crm/settings_/ai-agent': typeof CrmSettingsAiAgentRoute
@@ -194,12 +212,14 @@ export interface FileRouteTypes {
     | '/'
     | '/crm'
     | '/login'
+    | '/crm/campaigns'
     | '/crm/contacts'
     | '/crm/messages'
     | '/crm/pipelines'
     | '/crm/settings'
     | '/crm/workflows'
     | '/crm/'
+    | '/crm/campaigns/$id'
     | '/crm/contacts/$id'
     | '/crm/contacts/import'
     | '/crm/settings/ai-agent'
@@ -214,12 +234,14 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/crm/campaigns'
     | '/crm/contacts'
     | '/crm/messages'
     | '/crm/pipelines'
     | '/crm/settings'
     | '/crm/workflows'
     | '/crm'
+    | '/crm/campaigns/$id'
     | '/crm/contacts/$id'
     | '/crm/contacts/import'
     | '/crm/settings/ai-agent'
@@ -235,12 +257,14 @@ export interface FileRouteTypes {
     | '/'
     | '/crm'
     | '/login'
+    | '/crm/campaigns'
     | '/crm/contacts'
     | '/crm/messages'
     | '/crm/pipelines'
     | '/crm/settings'
     | '/crm/workflows'
     | '/crm/'
+    | '/crm/campaigns_/$id'
     | '/crm/contacts_/$id'
     | '/crm/contacts_/import'
     | '/crm/settings_/ai-agent'
@@ -324,6 +348,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmContactsRouteImport
       parentRoute: typeof CrmRoute
     }
+    '/crm/campaigns': {
+      id: '/crm/campaigns'
+      path: '/campaigns'
+      fullPath: '/crm/campaigns'
+      preLoaderRoute: typeof CrmCampaignsRouteImport
+      parentRoute: typeof CrmRoute
+    }
     '/crm/workflows_/$id': {
       id: '/crm/workflows_/$id'
       path: '/workflows/$id'
@@ -394,16 +425,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmContactsIdRouteImport
       parentRoute: typeof CrmRoute
     }
+    '/crm/campaigns_/$id': {
+      id: '/crm/campaigns_/$id'
+      path: '/campaigns/$id'
+      fullPath: '/crm/campaigns/$id'
+      preLoaderRoute: typeof CrmCampaignsIdRouteImport
+      parentRoute: typeof CrmRoute
+    }
   }
 }
 
 interface CrmRouteChildren {
+  CrmCampaignsRoute: typeof CrmCampaignsRoute
   CrmContactsRoute: typeof CrmContactsRoute
   CrmMessagesRoute: typeof CrmMessagesRoute
   CrmPipelinesRoute: typeof CrmPipelinesRoute
   CrmSettingsRoute: typeof CrmSettingsRoute
   CrmWorkflowsRoute: typeof CrmWorkflowsRoute
   CrmIndexRoute: typeof CrmIndexRoute
+  CrmCampaignsIdRoute: typeof CrmCampaignsIdRoute
   CrmContactsIdRoute: typeof CrmContactsIdRoute
   CrmContactsImportRoute: typeof CrmContactsImportRoute
   CrmSettingsAiAgentRoute: typeof CrmSettingsAiAgentRoute
@@ -417,12 +457,14 @@ interface CrmRouteChildren {
 }
 
 const CrmRouteChildren: CrmRouteChildren = {
+  CrmCampaignsRoute: CrmCampaignsRoute,
   CrmContactsRoute: CrmContactsRoute,
   CrmMessagesRoute: CrmMessagesRoute,
   CrmPipelinesRoute: CrmPipelinesRoute,
   CrmSettingsRoute: CrmSettingsRoute,
   CrmWorkflowsRoute: CrmWorkflowsRoute,
   CrmIndexRoute: CrmIndexRoute,
+  CrmCampaignsIdRoute: CrmCampaignsIdRoute,
   CrmContactsIdRoute: CrmContactsIdRoute,
   CrmContactsImportRoute: CrmContactsImportRoute,
   CrmSettingsAiAgentRoute: CrmSettingsAiAgentRoute,
