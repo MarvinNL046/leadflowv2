@@ -13,7 +13,7 @@ export function renderEmailShell(
   const { companyName, unsubUrl, previewText = "" } = opts;
   const brandBlue = "#2080C0";
   const esc = (s: string) =>
-    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const company = esc(companyName);
   return `<!doctype html>
 <html lang="nl">
