@@ -5,6 +5,8 @@ import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
 import { humanizeConvexError } from '#/lib/errors.ts'
+import { renderTemplate, leadTemplateVars } from '#/lib/templates.ts'
+import { injectUnsubFooter } from '../../../../convex/broadcastsLogic'
 import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
 
@@ -15,18 +17,30 @@ export function BroadcastComposer({
   workspaceId: Id<'workspaces'>
   onDone: () => void
 }) {
-  const segments = useQuery(api.segments.list, { workspaceId })
-  const templates = useQuery(api.emailTemplates.list, { workspaceId })
-  const create = useMutation(api.broadcasts.create)
-  const sendTest = useAction(api.broadcasts.sendTest)
-  const sendNow = useAction(api.broadcasts.sendNow)
-
   const [name, setName] = useState('')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [segmentId, setSegmentId] = useState<string>('')
   const [draftId, setDraftId] = useState<Id<'broadcasts'> | null>(null)
   const [busy, setBusy] = useState(false)
+
+  const segments = useQuery(api.segments.list, { workspaceId })
+  const templates = useQuery(api.emailTemplates.list, { workspaceId })
+  const crmSettings = useQuery(api.crmSettings.get, { workspaceId })
+  const create = useMutation(api.broadcasts.create)
+  const sendTest = useAction(api.broadcasts.sendTest)
+  const sendNow = useAction(api.broadcasts.sendNow)
+
+  const companyName = crmSettings?.companyName ?? 'StayCool Airco'
+  const previewVars = leadTemplateVars(
+    { firstName: 'Jan', lastName: 'Jansen', email: null, phone: null, city: null, company: null },
+    companyName,
+  )
+  const previewHtml = injectUnsubFooter(
+    renderTemplate(body || '<p style="color:#999">(nog geen inhoud)</p>', previewVars),
+    '#',
+  )
+  const previewSubject = renderTemplate(subject, previewVars)
 
   const preview = useQuery(
     api.segments.preview,
@@ -115,6 +129,18 @@ export function BroadcastComposer({
         )}
         <textarea className="h-48 w-full rounded border p-2 font-mono text-sm" value={body} onChange={(e) => { setBody(e.target.value); setDraftId(null) }} />
         <p className="mt-1 text-xs text-zinc-500">Vars: {'{{contact.firstName}}'}, {'{{company}}'}. Afmeldlink wordt automatisch toegevoegd.</p>
+      </div>
+      <div>
+        <Label>Voorbeeld (zo ziet de ontvanger 'm)</Label>
+        <div className="rounded-lg border border-zinc-200 bg-zinc-100 p-3">
+          <p className="mb-2 text-xs text-zinc-500">Onderwerp: <span className="font-medium text-zinc-800">{previewSubject || '(geen onderwerp)'}</span></p>
+          <iframe
+            title="E-mail voorbeeld"
+            srcDoc={previewHtml}
+            className="h-96 w-full max-w-[640px] rounded border border-zinc-200 bg-white"
+            sandbox=""
+          />
+        </div>
       </div>
       <div className="flex gap-2">
         <Button variant="outline" onClick={onTest} disabled={busy}>Testmail naar mezelf</Button>
