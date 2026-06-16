@@ -13,7 +13,8 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { renderTemplate, htmlToPlainText, leadTemplateVars } from "./templateRender";
 import { signUnsubToken } from "./unsubscribeToken";
-import { injectUnsubFooter, buildListUnsubHeaders } from "./broadcastsLogic";
+import { buildListUnsubHeaders } from "./broadcastsLogic";
+import { renderEmailShell } from "./emailShell";
 import { dedupeByEmail } from "./segmentsLogic";
 
 const RESEND_BATCH_URL = "https://api.resend.com/emails/batch";
@@ -100,10 +101,11 @@ export const sendTest = action({
     const b = await ctx.runQuery(internal.broadcasts.loadForSend, { broadcastId: args.broadcastId });
     if (!b) throw new Error("Broadcast niet gevonden");
     const vars = leadTemplateVars({ firstName: "Test", lastName: "" }, b.companyName);
-    const html = injectUnsubFooter(
-      renderTemplate(b.body ?? "", vars),
-      "https://example.com/unsubscribe?token=TEST",
-    );
+    const html = renderEmailShell(renderTemplate(b.body ?? "", vars), {
+      companyName: b.companyName,
+      unsubUrl: "https://example.com/unsubscribe?token=TEST",
+      previewText: renderTemplate(b.subject, vars),
+    });
     await postBatch([
       {
         from: b.from,
@@ -461,7 +463,11 @@ export const runBatch = internalAction({
           { firstName: r.firstName ?? "", lastName: r.lastName ?? "" },
           b.companyName,
         );
-        const html = injectUnsubFooter(renderTemplate(b.body ?? "", vars), unsubUrl);
+        const html = renderEmailShell(renderTemplate(b.body ?? "", vars), {
+          companyName: b.companyName,
+          unsubUrl,
+          previewText: renderTemplate(b.subject, vars),
+        });
         return {
           from: b.from,
           to: r.email,
