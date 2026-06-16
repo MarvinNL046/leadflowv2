@@ -300,6 +300,24 @@ export default defineSchema({
     companyName: v.optional(v.string()),
   }).index("by_workspace", ["workspaceId"]),
 
+  segments: defineTable({
+    workspaceId: v.id("workspaces"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    rules: v.object({
+      match: v.union(v.literal("all"), v.literal("any")),
+      conditions: v.array(
+        v.object({
+          field: v.string(),
+          op: v.string(),
+          value: v.any(),
+        }),
+      ),
+    }),
+    cachedCount: v.optional(v.number()),
+    cachedAt: v.optional(v.number()),
+  }).index("by_workspace", ["workspaceId"]),
+
   // ════════════════════════════════════════════════════════════════════
   // AI LEAD-RESPONSE AGENT
   // ════════════════════════════════════════════════════════════════════
