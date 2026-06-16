@@ -6,6 +6,7 @@ import { Card, CardContent } from '#/components/ui/card.tsx'
 import { cn } from '#/lib/utils.ts'
 import { SegmentList } from '#/components/crm/campaigns/segment-list.tsx'
 import { BroadcastList } from '#/components/crm/campaigns/broadcast-list.tsx'
+import { TemplateList } from '#/components/crm/campaigns/template-list.tsx'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 
@@ -14,6 +15,7 @@ export const Route = createFileRoute('/crm/campaigns')({ component: CampaignsPag
 const TABS = [
   { key: 'broadcasts', label: 'Broadcasts' },
   { key: 'segments', label: 'Segmenten' },
+  { key: 'templates', label: 'Templates' },
 ] as const
 
 function CampaignsPage() {
@@ -53,6 +55,7 @@ function CampaignsPage() {
       </div>
       {tab === 'broadcasts' && <BroadcastList workspaceId={workspaceId} />}
       {tab === 'segments' && <SegmentList workspaceId={workspaceId} />}
+      {tab === 'templates' && <TemplateList workspaceId={workspaceId} />}
     </div>
   )
 }
