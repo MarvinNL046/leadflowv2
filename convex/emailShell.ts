@@ -27,6 +27,14 @@ export function renderEmailShell(
     .sc-container{width:100%!important}
     .sc-pad{padding-left:20px!important;padding-right:20px!important}
   }
+  .sc-content h2{font-size:21px;font-weight:700;margin:0 0 12px;color:#1f2733;line-height:1.3}
+  .sc-content h3{font-size:17px;font-weight:700;margin:0 0 10px;color:#1f2733}
+  .sc-content p{margin:0 0 14px}
+  .sc-content a{color:#2080C0}
+  .sc-content ul,.sc-content ol{margin:0 0 14px;padding-left:22px}
+  .sc-content li{margin:0 0 6px}
+  .sc-content img{max-width:100%;height:auto;border-radius:8px}
+  .sc-content strong{font-weight:700}
 </style>
 </head>
 <body style="margin:0;padding:0;background:#eef2f5;-webkit-font-smoothing:antialiased;">
@@ -37,7 +45,7 @@ export function renderEmailShell(
       <tr><td style="background:${brandBlue};padding:22px 32px;">
         <span style="font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:700;color:#ffffff;letter-spacing:.2px;">${company}</span>
       </td></tr>
-      <tr><td class="sc-pad" style="padding:32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.65;color:#1f2733;">
+      <tr><td class="sc-pad sc-content" style="padding:32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.65;color:#1f2733;">
         ${contentHtml}
       </td></tr>
       <tr><td class="sc-pad" style="padding:22px 32px;border-top:1px solid #e6eaef;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#8a94a6;text-align:center;">
