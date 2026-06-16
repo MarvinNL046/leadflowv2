@@ -6,7 +6,7 @@ import { Button } from '#/components/ui/button.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
-import { BroadcastComposer } from './broadcast-composer.tsx'
+import { BroadcastEditor } from './broadcast-editor.tsx'
 import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
 
@@ -37,12 +37,12 @@ export function BroadcastList({
         <Button onClick={() => setCreating(true)}><Plus className="mr-1 h-4 w-4" /> Nieuwe broadcast</Button>
       )}
       {creating && (
-        <BroadcastComposer
+        <BroadcastEditor
           key={prefill ? `${prefill.name}::${prefill.subject}` : 'new'}
           workspaceId={workspaceId}
           initialName={prefill?.name}
           initialSubject={prefill?.subject}
-          onDone={() => {
+          onClose={() => {
             setCreating(false)
             onPrefillConsumed?.()
           }}
