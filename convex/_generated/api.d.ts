@@ -44,6 +44,8 @@ import type * as opportunities from "../opportunities.js";
 import type * as pipelineStats from "../pipelineStats.js";
 import type * as pipelines from "../pipelines.js";
 import type * as pipelinesLogic from "../pipelinesLogic.js";
+import type * as segments from "../segments.js";
+import type * as segmentsLogic from "../segmentsLogic.js";
 import type * as templateRender from "../templateRender.js";
 import type * as unsubscribeToken from "../unsubscribeToken.js";
 import type * as userProfiles from "../userProfiles.js";
@@ -95,6 +97,8 @@ declare const fullApi: ApiFromModules<{
   pipelineStats: typeof pipelineStats;
   pipelines: typeof pipelines;
   pipelinesLogic: typeof pipelinesLogic;
+  segments: typeof segments;
+  segmentsLogic: typeof segmentsLogic;
   templateRender: typeof templateRender;
   unsubscribeToken: typeof unsubscribeToken;
   userProfiles: typeof userProfiles;
