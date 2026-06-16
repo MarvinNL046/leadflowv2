@@ -7,6 +7,7 @@ import { cn } from '#/lib/utils.ts'
 import { SegmentList } from '#/components/crm/campaigns/segment-list.tsx'
 import { BroadcastList } from '#/components/crm/campaigns/broadcast-list.tsx'
 import { TemplateList } from '#/components/crm/campaigns/template-list.tsx'
+import { BacklogList } from '#/components/crm/campaigns/backlog-list.tsx'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 
@@ -15,6 +16,7 @@ export const Route = createFileRoute('/crm/campaigns')({ component: CampaignsPag
 const TABS = [
   { key: 'broadcasts', label: 'Broadcasts' },
   { key: 'segments', label: 'Segmenten' },
+  { key: 'backlog', label: 'Backlog' },
   { key: 'templates', label: 'Templates' },
 ] as const
 
@@ -23,6 +25,7 @@ function CampaignsPage() {
   const tenant = tenants?.find((t) => t.workspace !== null) ?? null
   const workspaceId = tenant?.workspace?.id as Id<'workspaces'> | undefined
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('broadcasts')
+  const [prefill, setPrefill] = useState<{ name: string; subject: string } | null>(null)
 
   if (tenants === undefined) return <Skeleton className="h-64 w-full" />
   if (!workspaceId)
@@ -53,8 +56,23 @@ function CampaignsPage() {
           </button>
         ))}
       </div>
-      {tab === 'broadcasts' && <BroadcastList workspaceId={workspaceId} />}
+      {tab === 'broadcasts' && (
+        <BroadcastList
+          workspaceId={workspaceId}
+          prefill={prefill}
+          onPrefillConsumed={() => setPrefill(null)}
+        />
+      )}
       {tab === 'segments' && <SegmentList workspaceId={workspaceId} />}
+      {tab === 'backlog' && (
+        <BacklogList
+          workspaceId={workspaceId}
+          onMakeBroadcast={(title) => {
+            setPrefill({ name: title, subject: title })
+            setTab('broadcasts')
+          }}
+        />
+      )}
       {tab === 'templates' && <TemplateList workspaceId={workspaceId} />}
     </div>
   )

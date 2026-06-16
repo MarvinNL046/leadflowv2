@@ -14,12 +14,16 @@ import { RichTextEditor } from './rich-text-editor.tsx'
 export function BroadcastComposer({
   workspaceId,
   onDone,
+  initialName,
+  initialSubject,
 }: {
   workspaceId: Id<'workspaces'>
   onDone: () => void
+  initialName?: string
+  initialSubject?: string
 }) {
-  const [name, setName] = useState('')
-  const [subject, setSubject] = useState('')
+  const [name, setName] = useState(initialName ?? '')
+  const [subject, setSubject] = useState(initialSubject ?? '')
   const [body, setBody] = useState('')
   const [segmentId, setSegmentId] = useState<string>('')
   const [draftId, setDraftId] = useState<Id<'broadcasts'> | null>(null)

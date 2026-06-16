@@ -300,6 +300,18 @@ export default defineSchema({
     companyName: v.optional(v.string()),
   }).index("by_workspace", ["workspaceId"]),
 
+  emailBacklog: defineTable({
+    workspaceId: v.id("workspaces"),
+    title: v.string(),
+    type: v.optional(v.string()),
+    timing: v.optional(v.string()),
+    category: v.optional(v.string()),
+    pageUrl: v.optional(v.string()),
+    status: v.union(v.literal("open"), v.literal("sent")),
+    sentAt: v.optional(v.number()),
+    sortOrder: v.number(),
+  }).index("by_workspace", ["workspaceId"]),
+
   segments: defineTable({
     workspaceId: v.id("workspaces"),
     name: v.string(),
