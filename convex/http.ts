@@ -1,10 +1,13 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
+import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { auth } from "./auth";
 import { verifyStateToken } from "./metaOauth";
 import { getSiteUrl } from "./lib/env";
 import { encryptSecret } from "./lib/crypto";
+import { verifyUnsubToken } from "./unsubscribeToken";
 
 const http = httpRouter();
 
@@ -450,6 +453,59 @@ http.route({
     });
 
     return jsonResponse({ received: true, type: payload.type }, 200);
+  }),
+});
+
+// ════════════════════════════════════════════════════════════════════
+// PUBLIEKE UNSUBSCRIBE — GET (mens) + POST (Gmail one-click List-Unsubscribe)
+// URL: {CONVEX_SITE_URL}/unsubscribe?token=<token>
+// ════════════════════════════════════════════════════════════════════
+
+async function handleUnsubscribe(
+  ctx: ActionCtx,
+  request: Request,
+): Promise<boolean> {
+  const url = new URL(request.url);
+  const token = url.searchParams.get("token") ?? "";
+  const contactId = await verifyUnsubToken(token);
+  if (!contactId) return false;
+  const res = await ctx.runMutation(internal.consent.unsubscribeContact, {
+    contactId: contactId as Id<"contacts">,
+    reason: "user",
+  });
+  return res.ok;
+}
+
+const UNSUB_PAGE = (ok: boolean) =>
+  `<!doctype html><html lang="nl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Afmelden</title>
+<style>body{font-family:system-ui,sans-serif;max-width:34rem;margin:4rem auto;padding:0 1rem;color:#18181b}
+.card{border:1px solid #e4e4e7;border-radius:12px;padding:2rem;text-align:center}</style></head>
+<body><div class="card">${
+    ok
+      ? "<h1>Je bent afgemeld</h1><p>Je ontvangt geen marketingmails meer van StayCool Airco. Offertes en serviceberichten blijven gewoon werken.</p>"
+      : "<h1>Link verlopen of ongeldig</h1><p>Neem contact op via info@staycoolairco.nl als je je wilt afmelden.</p>"
+  }</div></body></html>`;
+
+http.route({
+  path: "/unsubscribe",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const ok = await handleUnsubscribe(ctx, request);
+    return new Response(UNSUB_PAGE(ok), {
+      status: ok ? 200 : 400,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }),
+});
+
+http.route({
+  path: "/unsubscribe",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const ok = await handleUnsubscribe(ctx, request);
+    return new Response(null, { status: ok ? 200 : 400 });
   }),
 });
 
