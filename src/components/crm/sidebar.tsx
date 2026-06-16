@@ -5,6 +5,7 @@ import {
   Kanban,
   MessageSquare,
   Zap,
+  Send,
   Settings,
   ExternalLink,
   Snowflake,
@@ -27,6 +28,7 @@ const NAV: NavItem[] = [
   { to: '/crm/pipelines', label: 'Pipelines', icon: Kanban },
   { to: '/crm/messages', label: 'Messages', icon: MessageSquare },
   { to: '/crm/workflows', label: 'Workflows', icon: Zap },
+  { to: '/crm/campaigns', label: 'Campagnes', icon: Send },
 ]
 
 const EXTERNAL_NAV = [
