@@ -31,6 +31,7 @@ export function renderEmailShell(
   .sc-content h3{font-size:17px;font-weight:700;margin:0 0 10px;color:#1f2733}
   .sc-content p{margin:0 0 14px}
   .sc-content a{color:#2080C0}
+  .sc-content a[data-cta]{color:#ffffff!important}
   .sc-content ul,.sc-content ol{margin:0 0 14px;padding-left:22px}
   .sc-content li{margin:0 0 6px}
   .sc-content img{max-width:100%;height:auto;border-radius:8px}

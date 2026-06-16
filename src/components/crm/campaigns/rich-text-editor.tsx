@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
+import { CtaButton } from '#/components/crm/campaigns/cta-button-node.ts'
 import { Button } from '#/components/ui/button.tsx'
 import {
   Bold,
@@ -10,6 +11,7 @@ import {
   List,
   ListOrdered,
   Link2,
+  MousePointerClick,
 } from 'lucide-react'
 
 interface RichTextEditorProps {
@@ -27,6 +29,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
         openOnClick: false,
         autolink: true,
       }),
+      CtaButton,
     ],
     content: value,
     onUpdate: ({ editor }) => {
@@ -49,6 +52,14 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
   }, [value, editor])
 
   if (!editor) return null
+
+  const handleCtaButton = () => {
+    const text = window.prompt('Knoptekst:', 'Plan je afspraak')
+    if (text === null) return
+    const href = window.prompt('Link-URL:', 'https://staycoolairco.nl')
+    if (!href) return
+    editor.chain().focus().insertContent({ type: 'ctaButton', attrs: { text, href } }).run()
+  }
 
   const handleLink = () => {
     if (editor.isActive('link')) {
@@ -128,6 +139,18 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
           title="Link invoegen / bewerken"
         >
           <Link2 className="h-4 w-4" />
+        </Button>
+        <span className="mx-1 w-px self-stretch bg-zinc-200" aria-hidden="true" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleCtaButton}
+          className="flex items-center gap-1"
+          title="CTA-knop invoegen"
+        >
+          <MousePointerClick className="h-4 w-4" />
+          <span className="text-xs">Knop</span>
         </Button>
       </div>
       <EditorContent editor={editor} />
