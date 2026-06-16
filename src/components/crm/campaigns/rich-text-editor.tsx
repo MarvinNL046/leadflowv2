@@ -1,7 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
+import TiptapImage from '@tiptap/extension-image'
+import { useMutation } from 'convex/react'
+import { api } from '../../../../convex/_generated/api'
 import { CtaButton } from '#/components/crm/campaigns/cta-button-node.ts'
 import { Button } from '#/components/ui/button.tsx'
 import {
@@ -12,7 +15,9 @@ import {
   ListOrdered,
   Link2,
   MousePointerClick,
+  ImagePlus,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface RichTextEditorProps {
   value: string
@@ -20,6 +25,11 @@ interface RichTextEditorProps {
 }
 
 export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl)
+  const resolveStorageUrl = useMutation(api.files.resolveStorageUrl)
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -28,6 +38,12 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
       Link.configure({
         openOnClick: false,
         autolink: true,
+      }),
+      TiptapImage.configure({
+        inline: false,
+        HTMLAttributes: {
+          style: 'max-width:100%;height:auto;border-radius:8px;',
+        },
       }),
       CtaButton,
     ],
@@ -77,8 +93,34 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     }
   }
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // reset zodat dezelfde file opnieuw kan
+    if (!file) return
+    setUploading(true)
+    try {
+      const postUrl = await generateUploadUrl()
+      const res = await fetch(postUrl, { method: 'POST', headers: { 'Content-Type': file.type }, body: file })
+      if (!res.ok) throw new Error('Upload mislukt')
+      const { storageId } = await res.json()
+      const url = await resolveStorageUrl({ storageId })
+      editor?.chain().focus().setImage({ src: url }).run()
+    } catch (err) {
+      toast.error('Afbeelding uploaden mislukt')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
     <div>
+      <input
+        type="file"
+        accept="image/*"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
       <div className="rounded-t-md border border-zinc-200 bg-zinc-50 p-1.5 flex flex-wrap gap-1">
         <Button
           type="button"
@@ -151,6 +193,18 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
         >
           <MousePointerClick className="h-4 w-4" />
           <span className="text-xs">Knop</span>
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="flex items-center gap-1"
+          title="Afbeelding invoegen"
+        >
+          <ImagePlus className="h-4 w-4" />
+          <span className="text-xs">Afbeelding</span>
         </Button>
       </div>
       <EditorContent editor={editor} />

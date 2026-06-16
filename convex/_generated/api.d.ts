@@ -27,6 +27,7 @@ import type * as dashboardLeadVisibility from "../dashboardLeadVisibility.js";
 import type * as dashboardWindow from "../dashboardWindow.js";
 import type * as emailShell from "../emailShell.js";
 import type * as emailTemplates from "../emailTemplates.js";
+import type * as files from "../files.js";
 import type * as followUpInterval from "../followUpInterval.js";
 import type * as followupLogic from "../followupLogic.js";
 import type * as followups from "../followups.js";
@@ -83,6 +84,7 @@ declare const fullApi: ApiFromModules<{
   dashboardWindow: typeof dashboardWindow;
   emailShell: typeof emailShell;
   emailTemplates: typeof emailTemplates;
+  files: typeof files;
   followUpInterval: typeof followUpInterval;
   followupLogic: typeof followupLogic;
   followups: typeof followups;
