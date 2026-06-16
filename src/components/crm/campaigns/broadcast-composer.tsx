@@ -9,6 +9,7 @@ import { renderTemplate, leadTemplateVars } from '#/lib/templates.ts'
 import { renderEmailShell } from '../../../../convex/emailShell'
 import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
+import { RichTextEditor } from './rich-text-editor.tsx'
 
 export function BroadcastComposer({
   workspaceId,
@@ -116,7 +117,7 @@ export function BroadcastComposer({
         <Input value={subject} onChange={(e) => { setSubject(e.target.value); setDraftId(null) }} placeholder="bv. Onderhoudstip voor de zomer" />
       </div>
       <div>
-        <Label>Body (HTML) — start eventueel vanaf een template</Label>
+        <Label>Body — start eventueel vanaf een template</Label>
         {templates && templates.length > 0 && (
           <select className="mb-2 w-full rounded border px-2 py-1 text-sm"
             onChange={(e) => {
@@ -127,8 +128,11 @@ export function BroadcastComposer({
             {templates.map((t) => <option key={t._id} value={t._id}>{t.name}</option>)}
           </select>
         )}
-        <textarea className="h-48 w-full rounded border p-2 font-mono text-sm" value={body} onChange={(e) => { setBody(e.target.value); setDraftId(null) }} />
-        <p className="mt-1 text-xs text-zinc-500">Vars: {'{{contact.firstName}}'}, {'{{company}}'}. Afmeldlink wordt automatisch toegevoegd.</p>
+        <RichTextEditor
+          value={body}
+          onChange={(html) => { setBody(html); setDraftId(null) }}
+        />
+        <p className="mt-1 text-xs text-zinc-500">Typ merge-variabelen als platte tekst in de editor: {'{{contact.firstName}}'}, {'{{company}}'}. Afmeldlink wordt automatisch toegevoegd.</p>
       </div>
       <div>
         <Label>Voorbeeld (zo ziet de ontvanger 'm)</Label>
