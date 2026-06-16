@@ -3,6 +3,7 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import TiptapImage from '@tiptap/extension-image'
+import TextAlign from '@tiptap/extension-text-align'
 import { useMutation } from 'convex/react'
 import { api } from '../../../../convex/_generated/api'
 import { CtaButton } from '#/components/crm/campaigns/cta-button-node.ts'
@@ -16,6 +17,9 @@ import {
   Link2,
   MousePointerClick,
   ImagePlus,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -45,6 +49,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
           style: 'max-width:100%;height:auto;border-radius:8px;',
         },
       }),
+      TextAlign.configure({ types: ['heading', 'paragraph', 'ctaButton'], defaultAlignment: 'left' }),
       CtaButton,
     ],
     content: value,
@@ -184,6 +189,37 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
           title="Genummerde lijst"
         >
           <ListOrdered className="h-4 w-4" />
+        </Button>
+        <span className="mx-1 w-px self-stretch bg-zinc-200" aria-hidden="true" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().setTextAlign('left').run()}
+          className={editor.isActive({ textAlign: 'left' }) ? 'bg-zinc-200' : ''}
+          title="Links uitlijnen"
+        >
+          <AlignLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().setTextAlign('center').run()}
+          className={editor.isActive({ textAlign: 'center' }) ? 'bg-zinc-200' : ''}
+          title="Centreren"
+        >
+          <AlignCenter className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().setTextAlign('right').run()}
+          className={editor.isActive({ textAlign: 'right' }) ? 'bg-zinc-200' : ''}
+          title="Rechts uitlijnen"
+        >
+          <AlignRight className="h-4 w-4" />
         </Button>
         <Button
           type="button"

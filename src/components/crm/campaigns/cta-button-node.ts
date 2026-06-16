@@ -17,6 +17,11 @@ export const CtaButton = Node.create({
           return /^https?:\/\//i.test(v) ? v : '#'
         },
       },
+      textAlign: {
+        default: 'left',
+        parseHTML: (el) => (el as HTMLElement).style.textAlign ?? 'left',
+        renderHTML: () => ({}), // handled in renderHTML via style
+      },
     }
   },
 
@@ -35,9 +40,10 @@ export const CtaButton = Node.create({
   renderHTML({ node }) {
     // E-mail-veilige branded knop met inline styles. Gewrapt in een <p> met
     // marge zodat de knop los staat in de mail.
+    const align = (node.attrs.textAlign as string) || 'left'
     return [
       'p',
-      { style: 'margin:8px 0 18px;' },
+      { style: `margin:8px 0 18px;text-align:${align};` },
       [
         'a',
         mergeAttributes({
