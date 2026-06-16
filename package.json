@@ -30,6 +30,7 @@
     "@tanstack/react-router-ssr-query": "latest",
     "@tanstack/react-start": "latest",
     "@tanstack/router-plugin": "^1.132.0",
+    "@tiptap/extension-image": "^3.26.1",
     "@tiptap/extension-link": "^3.26.1",
     "@tiptap/pm": "^3.26.1",
     "@tiptap/react": "^3.26.1",
