@@ -12,6 +12,8 @@ import type * as aiAgentConfig from "../aiAgentConfig.js";
 import type * as aiLeadResponse from "../aiLeadResponse.js";
 import type * as aiLeadResponse_helpers from "../aiLeadResponse/helpers.js";
 import type * as auth from "../auth.js";
+import type * as broadcasts from "../broadcasts.js";
+import type * as broadcastsLogic from "../broadcastsLogic.js";
 import type * as callAttemptStage from "../callAttemptStage.js";
 import type * as consent from "../consent.js";
 import type * as contactSearch from "../contactSearch.js";
@@ -65,6 +67,8 @@ declare const fullApi: ApiFromModules<{
   aiLeadResponse: typeof aiLeadResponse;
   "aiLeadResponse/helpers": typeof aiLeadResponse_helpers;
   auth: typeof auth;
+  broadcasts: typeof broadcasts;
+  broadcastsLogic: typeof broadcastsLogic;
   callAttemptStage: typeof callAttemptStage;
   consent: typeof consent;
   contactSearch: typeof contactSearch;
