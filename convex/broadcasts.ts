@@ -121,6 +121,14 @@ export const sendNow = action({
   args: { broadcastId: v.id("broadcasts") },
   handler: async (ctx, args): Promise<{ total: number }> => {
     await ctx.runQuery(internal.broadcasts.assertBroadcastAccess, { broadcastId: args.broadcastId });
+
+    // Fix 1: atomic draft-guard — flip status draft→sending before doing any work.
+    // A second call (double-click, scheduler retry) sees status != "draft" and aborts.
+    const begin = await ctx.runMutation(internal.broadcasts.beginSend, {
+      broadcastId: args.broadcastId,
+    });
+    if (!begin.started) throw new Error("Deze broadcast is al gestart of verzonden.");
+
     const b = await ctx.runQuery(internal.broadcasts.loadForSend, { broadcastId: args.broadcastId });
     if (!b) throw new Error("Broadcast niet gevonden");
 
@@ -165,8 +173,8 @@ export const sendNow = action({
       });
     }
 
-    // Stap 4: broadcast-status updaten en eerste batch inplannen
-    await ctx.runMutation(internal.broadcasts.startSending, {
+    // Stap 4: sla totaal op en plan eerste batch in
+    await ctx.runMutation(internal.broadcasts.setTotal, {
       broadcastId: args.broadcastId,
       total: deduped.length,
     });
@@ -218,14 +226,28 @@ export const loadSegment = internalQuery({
   },
 });
 
-export const startSending = internalMutation({
+/** Fix 1: Atomische draft-guard. Leest en flipt status in één transactie.
+ *  Geeft { started: false } als broadcast niet in "draft" staat — zodat
+ *  een tweede aanroep (double-click, scheduler-retry) altijd veilig stopt. */
+export const beginSend = internalMutation({
+  args: { broadcastId: v.id("broadcasts") },
+  handler: async (ctx, args) => {
+    const b = await ctx.db.get(args.broadcastId);
+    if (!b) return { started: false as const };
+    if (b.status !== "draft") return { started: false as const };
+    await ctx.db.patch(args.broadcastId, { status: "sending", startedAt: Date.now() });
+    return { started: true as const };
+  },
+});
+
+/** Sla het totale aantal ontvangers op nadat addRecipients klaar is.
+ *  Status is al "sending" (gezet door beginSend). */
+export const setTotal = internalMutation({
   args: { broadcastId: v.id("broadcasts"), total: v.number() },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.broadcastId, {
-      status: "sending",
-      startedAt: Date.now(),
-      stats: { ...ZERO_STATS, total: args.total },
-    });
+    const b = await ctx.db.get(args.broadcastId);
+    if (!b) return;
+    await ctx.db.patch(args.broadcastId, { stats: { ...b.stats, total: args.total } });
   },
 });
 
@@ -256,36 +278,28 @@ export const addRecipients = internalMutation({
   },
 });
 
-/** Haal de volgende pending-ontvangers op voor de huidige batch. */
-export const nextPendingRecipients = internalQuery({
-  args: {
-    broadcastId: v.id("broadcasts"),
-    numItems: v.number(),
-  },
+/** Fix 2b: Atomic claim — leest pending-rijen EN flipt ze naar "sending" in
+ *  één mutatie. Twee gelijktijdige runBatch-aanroepen kunnen dezelfde rijen
+ *  NOOIT allebei claimen: de tweede ziet ze al als "sending" en slaat ze over. */
+export const claimBatch = internalMutation({
+  args: { broadcastId: v.id("broadcasts"), limit: v.number() },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const rows = await ctx.db
       .query("broadcastRecipients")
       .withIndex("by_broadcast_status", (q) =>
         q.eq("broadcastId", args.broadcastId).eq("status", "pending"),
       )
-      .take(args.numItems);
-  },
-});
-
-/** Patch een broadcastRecipients-rij na verzending. */
-export const patchRecipient = internalMutation({
-  args: {
-    recipientId: v.id("broadcastRecipients"),
-    status: v.union(v.literal("sent"), v.literal("failed")),
-    externalMessageId: v.optional(v.string()),
-    errorMessage: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.recipientId, {
-      status: args.status,
-      externalMessageId: args.externalMessageId,
-      errorMessage: args.errorMessage,
-    });
+      .take(args.limit);
+    for (const r of rows) {
+      await ctx.db.patch(r._id, { status: "sending" });
+    }
+    return rows.map((r) => ({
+      _id: r._id,
+      contactId: r.contactId,
+      email: r.email,
+      firstName: r.firstName,
+      lastName: r.lastName,
+    }));
   },
 });
 
@@ -309,7 +323,7 @@ export const recordSends = internalMutation({
     let sent = 0;
     let failed = 0;
     for (const s of args.sends) {
-      // Patch de broadcastRecipients-rij
+      // Patch de broadcastRecipients-rij (sending → sent/failed)
       await ctx.db.patch(s.recipientId, {
         status: s.failed ? "failed" : "sent",
         externalMessageId: s.externalMessageId,
@@ -386,13 +400,15 @@ export const runBatch = internalAction({
     const b = await ctx.runQuery(internal.broadcasts.loadForSend, { broadcastId: args.broadcastId });
     if (!b || b.status === "cancelled") return;
 
-    // Haal volgende pending-ontvangers op uit de recipient-queue (geen re-resolve!)
-    const pending = await ctx.runQuery(internal.broadcasts.nextPendingRecipients, {
+    // Fix 2c: gebruik claimBatch i.p.v. nextPendingRecipients — atomisch claim
+    // flipt pending→sending zodat gelijktijdige runBatch-aanroepen dezelfde
+    // batch nooit dubbel verwerken.
+    const claimed = await ctx.runMutation(internal.broadcasts.claimBatch, {
       broadcastId: args.broadcastId,
-      numItems: BATCH_SIZE,
+      limit: BATCH_SIZE,
     });
 
-    if (pending.length === 0) {
+    if (claimed.length === 0) {
       await ctx.runMutation(internal.broadcasts.finishSending, { broadcastId: args.broadcastId });
       return;
     }
@@ -400,7 +416,7 @@ export const runBatch = internalAction({
     const siteUrl = process.env.CONVEX_SITE_URL ?? "";
 
     const emails = await Promise.all(
-      pending.map(async (r) => {
+      claimed.map(async (r) => {
         const token = await signUnsubToken(String(r.contactId));
         const unsubUrl = `${siteUrl}/unsubscribe?token=${token}`;
         const vars = leadTemplateVars(
@@ -421,12 +437,23 @@ export const runBatch = internalAction({
       }),
     );
 
+    // Fix 3: onderscheid echte Resend-fout van JSON-parse-fout.
+    // fetch-throws of !res.ok → batchFailed=true.
+    // res.ok maar res.json() gooit → partial results, ontvangers toch "sent"
+    // (externalMessageId=undefined). Crash hier NIET de hele batch.
     let results: Array<{ id?: string }> = [];
     let batchFailed = false;
     try {
       results = await postBatch(emails.map(({ _recipientId: _r, _contactId: _c, ...e }) => e));
     } catch {
       batchFailed = true;
+    }
+
+    // Fix 4: waarschuw bij lengte-mismatch zonder te crashen.
+    if (!batchFailed && results.length !== emails.length) {
+      console.warn(
+        `[runBatch] Resend-response bevat ${results.length} items maar we stuurden ${emails.length} e-mails. Ontbrekende ids worden als undefined opgeslagen.`,
+      );
     }
 
     await ctx.runMutation(internal.broadcasts.recordSends, {
@@ -479,6 +506,14 @@ async function postBatch(
     const text = await res.text();
     throw new Error(`Resend batch ${res.status}: ${text.slice(0, 200)}`);
   }
-  const data = (await res.json()) as { data?: Array<{ id?: string }> };
-  return data.data ?? [];
+  // Fix 3: JSON-parse-fout is geen netwerk/Resend-fout; vang apart op zodat
+  // de batch niet als "failed" wordt gemarkeerd terwijl de e-mails wél
+  // verstuurd zijn. Geef lege array terug — caller slaat ids op als undefined.
+  try {
+    const data = (await res.json()) as { data?: Array<{ id?: string }> };
+    return data.data ?? [];
+  } catch {
+    console.warn("[postBatch] res.ok maar JSON-parse mislukt; ids worden niet opgeslagen.");
+    return [];
+  }
 }

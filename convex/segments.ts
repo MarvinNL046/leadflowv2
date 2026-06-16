@@ -168,13 +168,16 @@ export const preview = query({
     const joins = neededJoins(args.rules);
     // Worst-case reads per contact: met custom-joins tot ~10; zonder <3.
     const scanCap = joins.custom ? 300 : (joins.stage || joins.source) ? 800 : 2500;
+    // Fix 5: gebruik paginate() i.p.v. take() zodat isDone betrouwbaar aangeeft
+    // of de scan de cap raakte. take(N) geeft altijd exact N rijen terug als
+    // er ≥ N zijn, waardoor capped altijd true is voor grote workspaces.
     const page = await ctx.db
       .query("contacts")
       .withIndex("by_workspace_created", (q) => q.eq("workspaceId", args.workspaceId))
-      .take(scanCap);
+      .paginate({ cursor: null, numItems: scanCap });
     let count = 0;
     const sample: Array<{ email: string; name: string }> = [];
-    for (const c of page) {
+    for (const c of page.page) {
       if (c.deletedAt) continue;
       if (!isMailable({ emailMarketingStatus: c.emailMarketingStatus, email: c.email })) continue;
       const m = await toMatchable(ctx, c, joins);
@@ -187,7 +190,7 @@ export const preview = query({
         });
       }
     }
-    return { count, sample, capped: page.length >= scanCap };
+    return { count, sample, capped: !page.isDone };
   },
 });
 

@@ -353,7 +353,7 @@ export default defineSchema({
     email: v.string(),
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
-    status: v.union(v.literal("pending"), v.literal("sent"), v.literal("failed")),
+    status: v.union(v.literal("pending"), v.literal("sending"), v.literal("sent"), v.literal("failed")),
     externalMessageId: v.optional(v.string()),
     errorMessage: v.optional(v.string()),
   }).index("by_broadcast_status", ["broadcastId", "status"]),
