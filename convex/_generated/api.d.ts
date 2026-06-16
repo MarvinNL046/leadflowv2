@@ -25,6 +25,7 @@ import type * as customFields from "../customFields.js";
 import type * as customFieldsLogic from "../customFieldsLogic.js";
 import type * as dashboardLeadVisibility from "../dashboardLeadVisibility.js";
 import type * as dashboardWindow from "../dashboardWindow.js";
+import type * as emailShell from "../emailShell.js";
 import type * as emailTemplates from "../emailTemplates.js";
 import type * as followUpInterval from "../followUpInterval.js";
 import type * as followupLogic from "../followupLogic.js";
@@ -80,6 +81,7 @@ declare const fullApi: ApiFromModules<{
   customFieldsLogic: typeof customFieldsLogic;
   dashboardLeadVisibility: typeof dashboardLeadVisibility;
   dashboardWindow: typeof dashboardWindow;
+  emailShell: typeof emailShell;
   emailTemplates: typeof emailTemplates;
   followUpInterval: typeof followUpInterval;
   followupLogic: typeof followupLogic;

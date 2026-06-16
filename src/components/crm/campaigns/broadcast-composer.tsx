@@ -6,7 +6,7 @@ import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
 import { humanizeConvexError } from '#/lib/errors.ts'
 import { renderTemplate, leadTemplateVars } from '#/lib/templates.ts'
-import { injectUnsubFooter } from '../../../../convex/broadcastsLogic'
+import { renderEmailShell } from '../../../../convex/emailShell'
 import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
 
@@ -36,9 +36,9 @@ export function BroadcastComposer({
     { firstName: 'Jan', lastName: 'Jansen', email: null, phone: null, city: null, company: null },
     companyName,
   )
-  const previewHtml = injectUnsubFooter(
+  const previewHtml = renderEmailShell(
     renderTemplate(body || '<p style="color:#999">(nog geen inhoud)</p>', previewVars),
-    '#',
+    { companyName, unsubUrl: '#', previewText: renderTemplate(subject, previewVars) },
   )
   const previewSubject = renderTemplate(subject, previewVars)
 
