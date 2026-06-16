@@ -89,7 +89,13 @@ export function BroadcastComposer({
           <option value="">— kies segment —</option>
           {segments?.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
         </select>
-        {segmentId && <p className="mt-1 text-xs text-zinc-500">{preview === undefined ? 'Berekenen…' : `${preview.count} ontvangers`}</p>}
+        {segmentId && (
+          <p className="mt-1 text-xs text-zinc-500">
+            {preview === undefined
+              ? 'Berekenen…'
+              : `${preview.count}${preview.capped ? '+' : ''} ontvangers${preview.capped ? ' (schatting — exact bij verzenden)' : ''}`}
+          </p>
+        )}
       </div>
       <div>
         <Label>Onderwerp</Label>
