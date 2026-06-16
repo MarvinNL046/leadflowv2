@@ -129,6 +129,74 @@ export const update = mutation({
   },
 });
 
+/** Voeg 5 kant-en-klare StayCool-voorbeeldtemplates toe (idempotent per naam). */
+export const seedExampleTemplates = mutation({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    await requireWorkspaceMembership(ctx, args.workspaceId);
+
+    const existing = await ctx.db
+      .query("emailTemplates")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
+      .collect();
+    const existingNames = new Set(existing.map((r) => r.name));
+
+    const templates = [
+      {
+        name: "Zomer-check (onderhoud vóór de zomer)",
+        subject: "Je airco klaar voor de zomer?",
+        description:
+          "Seizoensmail — onderhoud inplannen vóór de eerste hittegolf.",
+        body: '<h2>Voor de eerste hittegolf, niet erna</h2><p>Hoi {{contact.firstName}},</p><p>De zomer komt eraan. Dat is precies het moment waarop een airco het laat afweten — meestal op de warmste dag, als half Limburg tegelijk belt.</p><p>Een onderhoudsbeurt voorkomt dat. We reinigen de filters, checken de druk en sporen een beginnende lekkage op vóór die een probleem wordt. Vanaf €99 all-in incl. BTW. Een nieuwe compressor kost een veelvoud daarvan.</p><p>In negen van de tien gevallen is het zo gepiept. Even inplannen nu het nog rustig is, scheelt je straks een hete week zonder koeling.</p><p style="margin:8px 0 18px;text-align:left;"><a data-cta="" href="https://staycoolairco.nl/airco-service" style="display:inline-block;background:#2080C0;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-family:Arial,Helvetica,sans-serif;">Plan je onderhoudsbeurt</a></p><p>Liever appen? Stuur gewoon een berichtje naar 06 36481054.</p><p>Groet,<br>Marvin — {{company}}</p>',
+      },
+      {
+        name: "Zelf bijvullen? Liever niet (F-gas)",
+        subject: "Je airco zelf bijvullen? Liever niet",
+        description:
+          "Educatief/eerlijk — waarom je airco bijvullen geen doe-het-zelf-klus is.",
+        body: '<h2>Airco bijvullen is geen klusje voor de zaterdag</h2><p>Hoi {{contact.firstName}},</p><p>Een airco die minder koelt "moet bijgevuld worden", denken veel mensen. Soms klopt dat. Maar het zelf doen mag niet, en dat heeft een reden.</p><p>Het koudemiddel in je airco is een F-gas. Daar mag alleen iemand met een F-gassen-certificaat aankomen. Doe je het zelf, dan riskeer je een boete en vervalt je garantie. En negen van de tien keer is "bijvullen" niet eens het probleem — een airco die goed is geïnstalleerd verliest namelijk geen koudemiddel.</p><p>Koelt \'ie minder? Dan is er meestal iets anders aan de hand: een vervuilde filter, of een kleine lekkage die gemaakt moet worden. Dat sporen we op tijdens een onderhoudsbeurt, vanaf €99 all-in.</p><p style="margin:8px 0 18px;text-align:left;"><a data-cta="" href="https://staycoolairco.nl/airco-vullen-kosten" style="display:inline-block;background:#2080C0;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-family:Arial,Helvetica,sans-serif;">Lees wat bijvullen écht kost</a></p><p>Twijfel je? Bel of app ons gewoon even: 06 36481054.</p><p>Groet,<br>Marvin — {{company}}</p>',
+      },
+      {
+        name: "Onderhoudsherinnering (jaarlijkse check)",
+        subject: "Tijd voor de jaarlijkse airco-check",
+        description: "Retentie — onderhoud ~12 maanden na installatie.",
+        body: '<h2>Een jaar verder — tijd voor een check</h2><p>Hoi {{contact.firstName}},</p><p>Je airco draait inmiddels een tijdje. Goed moment voor een onderhoudsbeurt.</p><p>Niet omdat het moet van ons, maar omdat een schone filter en een drukcheck het verschil maken tussen een airco die jaren meegaat en eentje die na vijf jaar hapert. We reinigen, controleren de druk en kijken of er ergens koudemiddel ontsnapt.</p><p>Vanaf €99 all-in incl. BTW, en meestal in een uurtje klaar. Je merkt het ook: schone filters koelen beter en verbruiken minder stroom.</p><p style="margin:8px 0 18px;text-align:left;"><a data-cta="" href="https://staycoolairco.nl/airco-service" style="display:inline-block;background:#2080C0;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-family:Arial,Helvetica,sans-serif;">Plan je onderhoud</a></p><p>We plannen het op een moment dat jou uitkomt. Een appje naar 06 36481054 kan ook.</p><p>Groet,<br>Marvin — {{company}}</p>',
+      },
+      {
+        name: "Garantie & nazorg (vertrouwen)",
+        subject: "Wat als er een jaar later iets lekt?",
+        description:
+          "Vertrouwen — nazorg/garantie-verhaal, geschikt voor klanten en koude leads.",
+        body: '<h2>Een garantie die we ook echt waarmaken</h2><p>Hoi {{contact.firstName}},</p><p>Een eerlijk verhaal. Een klant liet bijna een jaar na plaatsing een kleine lekkage zien — een slang aan de buitenunit was gescheurd. We kwamen langs en hebben het kosteloos opgelost.</p><p>Daar hebben we die installatiegarantie ook voor. Niet als marketingclaim, maar omdat we er moeten zijn als er ondanks alle zorg toch iets gebeurt. Het verschil met een installateur die na betaling onbereikbaar is, zit hem juist in dat moment.</p><p>We zijn begonnen in 2021 en staan op 4,9 sterren uit 231 reviews. Danny en de monteurs leveren het werk netjes op. Maar de echte test is wat er gebeurt als er een jaar later iets niet klopt.</p><p>Vragen over je eigen airco? Bel of app gerust: 06 36481054.</p><p>Groet,<br>Marvin — {{company}}</p>',
+      },
+      {
+        name: "Opschonen / re-engagement",
+        subject: "Krijg je onze mails nog graag?",
+        description:
+          "Re-engagement/cleanup voor koud segment — afmelden mag, geen harde CTA.",
+        body: '<h2>Even opruimen — sta je hier nog goed?</h2><p>Hoi {{contact.firstName}},</p><p>We sturen niet vaak een mail, en als we het doen willen we dat het nuttig is. Daarom even een korte check: wil je onze tips over airco en onderhoud nog ontvangen?</p><p>Wil je dat, dan hoef je niets te doen — je blijft gewoon op de lijst. Liever niet meer? Onderaan deze mail staat een afmeldlink. Eén klik en je bent eraf. Geen harde gevoelens.</p><p>En mocht je toevallig met een airco-vraag zitten — of die nu bij ons of ergens anders is geplaatst — bel of app gerust. We denken graag mee: 06 36481054.</p><p>Groet,<br>Marvin — {{company}}</p>',
+      },
+    ];
+
+    let seeded = 0;
+    for (const tpl of templates) {
+      if (!existingNames.has(tpl.name)) {
+        await ctx.db.insert("emailTemplates", {
+          workspaceId: args.workspaceId,
+          name: tpl.name,
+          subject: tpl.subject,
+          body: tpl.body,
+          description: tpl.description,
+          isSystem: false,
+        });
+        seeded++;
+      }
+    }
+
+    return { seeded };
+  },
+});
+
 /** Verwijder een template (alleen workspace-leden). */
 export const remove = mutation({
   args: {

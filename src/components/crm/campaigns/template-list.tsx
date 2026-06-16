@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from 'convex/react'
-import { Plus, Pencil, Trash2, X, Check } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Check, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
@@ -96,18 +96,41 @@ function TemplateEditor({ initial, workspaceId, onDone }: TemplateEditorProps) {
 export function TemplateList({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const templates = useQuery(api.emailTemplates.list, { workspaceId })
   const remove = useMutation(api.emailTemplates.remove)
+  const seedExamples = useMutation(api.emailTemplates.seedExampleTemplates)
 
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<Id<'emailTemplates'> | null>(null)
+  const [seeding, setSeeding] = useState(false)
+
+  const handleSeedExamples = async () => {
+    setSeeding(true)
+    try {
+      const res = await seedExamples({ workspaceId })
+      if (res.seeded > 0) {
+        toast.success(`${res.seeded} voorbeeldtemplates toegevoegd`)
+      } else {
+        toast.success('Geen nieuwe voorbeeldtemplates toegevoegd (al aanwezig)')
+      }
+    } catch (e) {
+      toast.error(humanizeConvexError(e, 'Importeren mislukt'))
+    } finally {
+      setSeeding(false)
+    }
+  }
 
   if (templates === undefined) return <Skeleton className="h-48 w-full" />
 
   return (
     <div className="space-y-4">
       {!creating && editingId === null && (
-        <Button onClick={() => setCreating(true)}>
-          <Plus className="mr-1 h-4 w-4" /> Nieuw template
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setCreating(true)}>
+            <Plus className="mr-1 h-4 w-4" /> Nieuw template
+          </Button>
+          <Button variant="outline" onClick={handleSeedExamples} disabled={seeding}>
+            <Sparkles className="mr-1 h-4 w-4" /> Importeer 5 voorbeeldtemplates
+          </Button>
+        </div>
       )}
 
       {creating && (
@@ -120,7 +143,8 @@ export function TemplateList({ workspaceId }: { workspaceId: Id<'workspaces'> })
       {templates.length === 0 && !creating && (
         <Card>
           <CardContent className="p-6 text-sm text-zinc-500">
-            Nog geen templates. Klik op "Nieuw template" om er één aan te maken.
+            Nog geen templates. Klik op "Nieuw template" om er één aan te maken,
+            of gebruik "Importeer 5 voorbeeldtemplates" om direct aan de slag te gaan.
           </CardContent>
         </Card>
       )}
