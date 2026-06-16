@@ -335,6 +335,7 @@ export default defineSchema({
     name: v.string(),
     subject: v.string(),
     body: v.optional(v.string()),            // HTML; leeg als templateId gezet
+    bodyBlocks: v.optional(v.array(v.any())),
     templateId: v.optional(v.id("emailTemplates")),
     segmentId: v.id("segments"),
     status: v.union(
@@ -482,6 +483,7 @@ export default defineSchema({
     name: v.string(),
     subject: v.string(),
     body: v.string(),      // HTML string
+    bodyBlocks: v.optional(v.array(v.any())),
     description: v.optional(v.string()),
     isSystem: v.boolean(),
     // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
