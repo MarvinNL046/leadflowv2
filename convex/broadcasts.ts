@@ -65,6 +65,7 @@ export const create = mutation({
     name: v.string(),
     subject: v.string(),
     body: v.string(),
+    bodyBlocks: v.optional(v.array(v.any())),
     segmentId: v.id("segments"),
   },
   handler: async (ctx, args) => {
@@ -74,6 +75,7 @@ export const create = mutation({
       name: args.name,
       subject: args.subject,
       body: args.body,
+      bodyBlocks: args.bodyBlocks,
       segmentId: args.segmentId,
       status: "draft",
       stats: ZERO_STATS,
