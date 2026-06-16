@@ -346,6 +346,18 @@ export default defineSchema({
     completedAt: v.optional(v.number()),
   }).index("by_workspace_status", ["workspaceId", "status"]),
 
+  broadcastRecipients: defineTable({
+    broadcastId: v.id("broadcasts"),
+    workspaceId: v.id("workspaces"),
+    contactId: v.id("contacts"),
+    email: v.string(),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    status: v.union(v.literal("pending"), v.literal("sent"), v.literal("failed")),
+    externalMessageId: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+  }).index("by_broadcast_status", ["broadcastId", "status"]),
+
   // ════════════════════════════════════════════════════════════════════
   // AI LEAD-RESPONSE AGENT
   // ════════════════════════════════════════════════════════════════════
