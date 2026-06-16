@@ -37,7 +37,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
       }),
       Link.configure({
         openOnClick: false,
-        autolink: true,
+        autolink: false,
       }),
       TiptapImage.configure({
         inline: false,
@@ -71,9 +71,13 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
 
   const handleCtaButton = () => {
     const text = window.prompt('Knoptekst:', 'Plan je afspraak')
-    if (text === null) return
+    if (text === null || text.trim() === '') return
     const href = window.prompt('Link-URL:', 'https://staycoolairco.nl')
     if (!href) return
+    if (!/^https?:\/\//i.test(href)) {
+      toast.error('Alleen https:// of http:// links zijn toegestaan')
+      return
+    }
     editor.chain().focus().insertContent({ type: 'ctaButton', attrs: { text, href } }).run()
   }
 
@@ -84,11 +88,19 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
       if (url === '') {
         editor.chain().focus().extendMarkRange('link').unsetLink().run()
       } else {
+        if (!/^https?:\/\//i.test(url)) {
+          toast.error('Alleen https:// of http:// links')
+          return
+        }
         editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
       }
     } else {
       const url = window.prompt('Link-URL:')
       if (!url) return
+      if (!/^https?:\/\//i.test(url)) {
+        toast.error('Alleen https:// of http:// links')
+        return
+      }
       editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
     }
   }
@@ -97,6 +109,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     const file = e.target.files?.[0]
     e.target.value = '' // reset zodat dezelfde file opnieuw kan
     if (!file) return
+    if (file.size > 5 * 1024 * 1024) { toast.error('Afbeelding mag maximaal 5 MB zijn'); return }
     setUploading(true)
     try {
       const postUrl = await generateUploadUrl()

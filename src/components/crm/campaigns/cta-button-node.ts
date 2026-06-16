@@ -1,14 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 
-// Minimal command-type augmentation so TypeScript accepts setCtaButton.
-declare module '@tiptap/core' {
-  interface Commands<ReturnType> {
-    ctaButton: {
-      setCtaButton: (attrs: { text: string; href: string }) => ReturnType
-    }
-  }
-}
-
 export const CtaButton = Node.create({
   name: 'ctaButton',
   group: 'block',
@@ -19,7 +10,13 @@ export const CtaButton = Node.create({
   addAttributes() {
     return {
       text: { default: 'Plan je afspraak' },
-      href: { default: 'https://staycoolairco.nl' },
+      href: {
+        default: 'https://staycoolairco.nl',
+        parseHTML: (el) => {
+          const v = (el as HTMLElement).getAttribute('href') ?? '#'
+          return /^https?:\/\//i.test(v) ? v : '#'
+        },
+      },
     }
   },
 
@@ -52,16 +49,5 @@ export const CtaButton = Node.create({
         node.attrs.text as string,
       ],
     ]
-  },
-
-  addCommands() {
-    return {
-      setCtaButton:
-        (attrs) =>
-        ({ chain }) =>
-          chain()
-            .insertContent({ type: this.name, attrs })
-            .run(),
-    }
   },
 })

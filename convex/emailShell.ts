@@ -51,7 +51,7 @@ export function renderEmailShell(
       </td></tr>
       <tr><td class="sc-pad" style="padding:22px 32px;border-top:1px solid #e6eaef;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#8a94a6;text-align:center;">
         Je ontvangt deze mail omdat je klant of aanvrager bent bij ${company}.<br>
-        <a href="${unsubUrl}" style="color:#8a94a6;text-decoration:underline;">Afmelden voor deze mails</a>
+        <a href="${esc(unsubUrl)}" style="color:#8a94a6;text-decoration:underline;">Afmelden voor deze mails</a>
       </td></tr>
     </table>
     <table role="presentation" class="sc-container" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;"><tr><td style="padding:14px 32px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#aab2c0;">${company}</td></tr></table>
