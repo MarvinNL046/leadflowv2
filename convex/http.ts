@@ -452,12 +452,24 @@ http.route({
           : undefined,
     });
 
+    // Broadcast-stats: bump delivered/bounced counters live via webhook.
+    if (payload.type === "email.delivered") {
+      await ctx.runMutation(internal.broadcasts.bumpStatFromExternalId, {
+        externalMessageId: externalId,
+        field: "delivered",
+      });
+    }
     // Marketing-consent: harde bounce of spam-klacht → contact permanent
     // uit alle verzendingen (cleaned). Alleen voor deze twee event-types.
     if (payload.type === "email.bounced" || payload.type === "email.complained") {
+      const reason = payload.type === "email.complained" ? "complained" : "bounced";
       await ctx.runMutation(internal.consent.cleanContactByExternalId, {
         externalMessageId: externalId,
-        reason: payload.type === "email.complained" ? "complained" : "bounced",
+        reason,
+      });
+      await ctx.runMutation(internal.broadcasts.bumpStatFromExternalId, {
+        externalMessageId: externalId,
+        field: "bounced",
       });
     }
 
