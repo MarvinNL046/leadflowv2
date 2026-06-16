@@ -452,6 +452,15 @@ http.route({
           : undefined,
     });
 
+    // Marketing-consent: harde bounce of spam-klacht → contact permanent
+    // uit alle verzendingen (cleaned). Alleen voor deze twee event-types.
+    if (payload.type === "email.bounced" || payload.type === "email.complained") {
+      await ctx.runMutation(internal.consent.cleanContactByExternalId, {
+        externalMessageId: externalId,
+        reason: payload.type === "email.complained" ? "complained" : "bounced",
+      });
+    }
+
     return jsonResponse({ received: true, type: payload.type }, 200);
   }),
 });
