@@ -137,6 +137,24 @@ export default defineSchema({
     // dashboard. Lead blijft zichtbaar in Contacts-lijst voor handmatige
     // heropening (reset bij stage-drag terug naar Lead).
     unreachable: v.optional(v.boolean()),
+    // ── Marketing-consent (e-mail module). Afwezig = subscribed (impliciete
+    // opt-in: contact zocht zelf contact). cleaned = harde bounce/spam-klacht.
+    emailMarketingStatus: v.optional(
+      v.union(
+        v.literal("subscribed"),
+        v.literal("unsubscribed"),
+        v.literal("cleaned"),
+      ),
+    ),
+    marketingUnsubscribedAt: v.optional(v.number()),
+    marketingUnsubscribedReason: v.optional(
+      v.union(
+        v.literal("user"),
+        v.literal("bounced"),
+        v.literal("complained"),
+        v.literal("manual"),
+      ),
+    ),
     externalId: v.optional(v.string()),
     // Soft-delete: timestamp van verwijdering, of undefined als actief.
     // Filter in alle list-queries; child-data (notes, messages,
@@ -157,7 +175,8 @@ export default defineSchema({
     .index("by_legacyContactId", ["legacyContactId"])
     // Voor de follow-up-cron: due-leads efficiënt vinden (range op
     // nextFollowUpAt binnen workspace).
-    .index("by_workspace_nextFollowUp", ["workspaceId", "nextFollowUpAt"]),
+    .index("by_workspace_nextFollowUp", ["workspaceId", "nextFollowUpAt"])
+    .index("by_workspace_marketingStatus", ["workspaceId", "emailMarketingStatus"]),
 
   pipelines: defineTable({
     workspaceId: v.id("workspaces"),

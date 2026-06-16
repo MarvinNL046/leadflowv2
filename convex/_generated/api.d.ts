@@ -26,6 +26,8 @@ import type * as emailTemplates from "../emailTemplates.js";
 import type * as followUpInterval from "../followUpInterval.js";
 import type * as followupLogic from "../followupLogic.js";
 import type * as followups from "../followups.js";
+import type * as googleCalendar from "../googleCalendar.js";
+import type * as googleCalendarLogic from "../googleCalendarLogic.js";
 import type * as http from "../http.js";
 import type * as integrations from "../integrations.js";
 import type * as lib_crypto from "../lib/crypto.js";
@@ -73,6 +75,8 @@ declare const fullApi: ApiFromModules<{
   followUpInterval: typeof followUpInterval;
   followupLogic: typeof followupLogic;
   followups: typeof followups;
+  googleCalendar: typeof googleCalendar;
+  googleCalendarLogic: typeof googleCalendarLogic;
   http: typeof http;
   integrations: typeof integrations;
   "lib/crypto": typeof lib_crypto;

@@ -71,7 +71,7 @@ Voeg deze toe direct ná `unreachable: v.optional(v.boolean()),`:
       ),
     ),
     marketingUnsubscribedAt: v.optional(v.number()),
-    marketingUnsubReason: v.optional(
+    marketingUnsubscribedReason: v.optional(
       v.union(
         v.literal("user"),
         v.literal("bounced"),
@@ -249,7 +249,7 @@ export const unsubscribeContact = internalMutation({
     await ctx.db.patch(args.contactId, {
       emailMarketingStatus: "unsubscribed",
       marketingUnsubscribedAt: Date.now(),
-      marketingUnsubReason: args.reason,
+      marketingUnsubscribedReason: args.reason,
     });
     return { ok: true as const };
   },
@@ -273,7 +273,7 @@ export const cleanContactByExternalId = internalMutation({
     await ctx.db.patch(message.contactId, {
       emailMarketingStatus: "cleaned",
       marketingUnsubscribedAt: Date.now(),
-      marketingUnsubReason: args.reason,
+      marketingUnsubscribedReason: args.reason,
     });
     return { ok: true as const, broadcastId: message.relatedEntityId };
   },
