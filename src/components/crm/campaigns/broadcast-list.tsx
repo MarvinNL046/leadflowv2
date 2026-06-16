@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from 'convex/react'
 import { Link } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
@@ -10,9 +10,24 @@ import { BroadcastComposer } from './broadcast-composer.tsx'
 import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
 
-export function BroadcastList({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
+export function BroadcastList({
+  workspaceId,
+  prefill,
+  onPrefillConsumed,
+}: {
+  workspaceId: Id<'workspaces'>
+  prefill?: { name: string; subject: string } | null
+  onPrefillConsumed?: () => void
+}) {
   const broadcasts = useQuery(api.broadcasts.list, { workspaceId })
   const [creating, setCreating] = useState(false)
+
+  // When a prefill arrives, open the composer
+  useEffect(() => {
+    if (prefill) {
+      setCreating(true)
+    }
+  }, [prefill])
 
   if (broadcasts === undefined) return <Skeleton className="h-48 w-full" />
 
@@ -21,7 +36,18 @@ export function BroadcastList({ workspaceId }: { workspaceId: Id<'workspaces'> }
       {!creating && (
         <Button onClick={() => setCreating(true)}><Plus className="mr-1 h-4 w-4" /> Nieuwe broadcast</Button>
       )}
-      {creating && <BroadcastComposer workspaceId={workspaceId} onDone={() => setCreating(false)} />}
+      {creating && (
+        <BroadcastComposer
+          key={prefill ? `${prefill.name}::${prefill.subject}` : 'new'}
+          workspaceId={workspaceId}
+          initialName={prefill?.name}
+          initialSubject={prefill?.subject}
+          onDone={() => {
+            setCreating(false)
+            onPrefillConsumed?.()
+          }}
+        />
+      )}
 
       {broadcasts.length === 0 && !creating && (
         <Card><CardContent className="p-6 text-sm text-zinc-500">Nog geen broadcasts.</CardContent></Card>
