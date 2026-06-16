@@ -13,7 +13,8 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { renderTemplate, htmlToPlainText, leadTemplateVars } from "./templateRender";
 import { signUnsubToken } from "./unsubscribeToken";
-import { nextBatch, injectUnsubFooter, buildListUnsubHeaders } from "./broadcastsLogic";
+import { injectUnsubFooter, buildListUnsubHeaders } from "./broadcastsLogic";
+import { dedupeByEmail } from "./segmentsLogic";
 
 const RESEND_BATCH_URL = "https://api.resend.com/emails/batch";
 const BATCH_SIZE = 100;
@@ -122,17 +123,57 @@ export const sendNow = action({
     await ctx.runQuery(internal.broadcasts.assertBroadcastAccess, { broadcastId: args.broadcastId });
     const b = await ctx.runQuery(internal.broadcasts.loadForSend, { broadcastId: args.broadcastId });
     if (!b) throw new Error("Broadcast niet gevonden");
-    const recipients = await ctx.runQuery(internal.segments.resolveRecipients, {
-      segmentId: b.segmentId,
-    });
+
+    // Stap 1: haal alle ontvangers op via gepagineerde internalQuery
+    const seg = await ctx.runQuery(internal.broadcasts.loadSegment, { segmentId: b.segmentId });
+    if (!seg) throw new Error("Segment niet gevonden");
+
+    const allRecipients: Array<{
+      contactId: Id<"contacts">;
+      email: string;
+      firstName?: string;
+      lastName?: string;
+    }> = [];
+    let cursor: string | null = null;
+    let isDone = false;
+    while (!isDone) {
+      const result: {
+        recipients: Array<{ contactId: Id<"contacts">; email: string; firstName?: string; lastName?: string }>;
+        continueCursor: string;
+        isDone: boolean;
+      } = await ctx.runQuery(internal.segments.resolvePage, {
+        workspaceId: b.workspaceId,
+        rules: seg.rules,
+        cursor,
+        numItems: 500,
+      });
+      allRecipients.push(...result.recipients);
+      cursor = result.continueCursor;
+      isDone = result.isDone;
+    }
+
+    // Stap 2: dedupe op lowercased email
+    const deduped = dedupeByEmail(allRecipients);
+
+    // Stap 3: schrijf broadcastRecipients-rijen in chunks van ≤ 500
+    const CHUNK = 500;
+    for (let i = 0; i < deduped.length; i += CHUNK) {
+      await ctx.runMutation(internal.broadcasts.addRecipients, {
+        broadcastId: args.broadcastId,
+        workspaceId: b.workspaceId,
+        rows: deduped.slice(i, i + CHUNK),
+      });
+    }
+
+    // Stap 4: broadcast-status updaten en eerste batch inplannen
     await ctx.runMutation(internal.broadcasts.startSending, {
       broadcastId: args.broadcastId,
-      total: recipients.length,
+      total: deduped.length,
     });
     await ctx.scheduler.runAfter(0, internal.broadcasts.runBatch, {
       broadcastId: args.broadcastId,
     });
-    return { total: recipients.length };
+    return { total: deduped.length };
   },
 });
 
@@ -170,6 +211,13 @@ export const loadForSend = internalQuery({
   },
 });
 
+export const loadSegment = internalQuery({
+  args: { segmentId: v.id("segments") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.segmentId);
+  },
+});
+
 export const startSending = internalMutation({
   args: { broadcastId: v.id("broadcasts"), total: v.number() },
   handler: async (ctx, args) => {
@@ -181,27 +229,63 @@ export const startSending = internalMutation({
   },
 });
 
-// CORRECTION vs plan: constrain by workspaceId + channel via the real index
-// (the plan used a no-op `(q)=>q` full scan which does not typecheck cleanly).
-// Filter relatedEntity in code. Takes workspaceId so the index can be used.
-export const alreadySentContactIds = internalQuery({
-  args: { broadcastId: v.id("broadcasts"), workspaceId: v.id("workspaces") },
+/** Schrijf een chunk broadcastRecipients-rijen (status: pending). */
+export const addRecipients = internalMutation({
+  args: {
+    broadcastId: v.id("broadcasts"),
+    workspaceId: v.id("workspaces"),
+    rows: v.array(v.object({
+      contactId: v.id("contacts"),
+      email: v.string(),
+      firstName: v.optional(v.string()),
+      lastName: v.optional(v.string()),
+    })),
+  },
   handler: async (ctx, args) => {
-    const rows = await ctx.db
-      .query("messages")
-      .withIndex("by_workspace_channel_sent", (q) =>
-        q.eq("workspaceId", args.workspaceId).eq("channel", "email"),
+    for (const r of args.rows) {
+      await ctx.db.insert("broadcastRecipients", {
+        broadcastId: args.broadcastId,
+        workspaceId: args.workspaceId,
+        contactId: r.contactId,
+        email: r.email,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        status: "pending",
+      });
+    }
+  },
+});
+
+/** Haal de volgende pending-ontvangers op voor de huidige batch. */
+export const nextPendingRecipients = internalQuery({
+  args: {
+    broadcastId: v.id("broadcasts"),
+    numItems: v.number(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("broadcastRecipients")
+      .withIndex("by_broadcast_status", (q) =>
+        q.eq("broadcastId", args.broadcastId).eq("status", "pending"),
       )
-      .collect();
-    return rows
-      .filter(
-        (m) =>
-          m.relatedEntityType === "broadcast" &&
-          m.relatedEntityId === (args.broadcastId as string) &&
-          m.status !== "failed",
-      )
-      .map((m) => m.contactId)
-      .filter((id): id is Id<"contacts"> => id !== undefined);
+      .take(args.numItems);
+  },
+});
+
+/** Patch een broadcastRecipients-rij na verzending. */
+export const patchRecipient = internalMutation({
+  args: {
+    recipientId: v.id("broadcastRecipients"),
+    status: v.union(v.literal("sent"), v.literal("failed")),
+    externalMessageId: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.recipientId, {
+      status: args.status,
+      externalMessageId: args.externalMessageId,
+      errorMessage: args.errorMessage,
+    });
   },
 });
 
@@ -212,6 +296,7 @@ export const recordSends = internalMutation({
     subject: v.string(),
     sends: v.array(
       v.object({
+        recipientId: v.id("broadcastRecipients"),
         contactId: v.id("contacts"),
         to: v.string(),
         externalMessageId: v.optional(v.string()),
@@ -224,6 +309,13 @@ export const recordSends = internalMutation({
     let sent = 0;
     let failed = 0;
     for (const s of args.sends) {
+      // Patch de broadcastRecipients-rij
+      await ctx.db.patch(s.recipientId, {
+        status: s.failed ? "failed" : "sent",
+        externalMessageId: s.externalMessageId,
+        errorMessage: s.errorMessage,
+      });
+      // Insert messages-rij (VERPLICHT: Resend-webhook gebruikt by_external_id)
       await ctx.db.insert("messages", {
         workspaceId: args.workspaceId,
         contactId: s.contactId,
@@ -294,34 +386,21 @@ export const runBatch = internalAction({
     const b = await ctx.runQuery(internal.broadcasts.loadForSend, { broadcastId: args.broadcastId });
     if (!b || b.status === "cancelled") return;
 
-    const recipients = await ctx.runQuery(internal.segments.resolveRecipients, {
-      segmentId: b.segmentId,
+    // Haal volgende pending-ontvangers op uit de recipient-queue (geen re-resolve!)
+    const pending = await ctx.runQuery(internal.broadcasts.nextPendingRecipients, {
+      broadcastId: args.broadcastId,
+      numItems: BATCH_SIZE,
     });
-    const sentIds = new Set(
-      (
-        await ctx.runQuery(internal.broadcasts.alreadySentContactIds, {
-          broadcastId: args.broadcastId,
-          workspaceId: b.workspaceId,
-        })
-      ).map(String),
-    );
-    const batchIds = nextBatch(
-      recipients.map((r) => String(r.contactId)),
-      sentIds,
-      BATCH_SIZE,
-    );
 
-    if (batchIds.length === 0) {
+    if (pending.length === 0) {
       await ctx.runMutation(internal.broadcasts.finishSending, { broadcastId: args.broadcastId });
       return;
     }
 
-    const batchIdSet = new Set(batchIds);
-    const batch = recipients.filter((r) => batchIdSet.has(String(r.contactId)));
     const siteUrl = process.env.CONVEX_SITE_URL ?? "";
 
     const emails = await Promise.all(
-      batch.map(async (r) => {
+      pending.map(async (r) => {
         const token = await signUnsubToken(String(r.contactId));
         const unsubUrl = `${siteUrl}/unsubscribe?token=${token}`;
         const vars = leadTemplateVars(
@@ -336,6 +415,7 @@ export const runBatch = internalAction({
           html,
           text: htmlToPlainText(html),
           headers: buildListUnsubHeaders(unsubUrl),
+          _recipientId: r._id,
           _contactId: r.contactId,
         };
       }),
@@ -344,7 +424,7 @@ export const runBatch = internalAction({
     let results: Array<{ id?: string }> = [];
     let batchFailed = false;
     try {
-      results = await postBatch(emails.map(({ _contactId, ...e }) => e));
+      results = await postBatch(emails.map(({ _recipientId: _r, _contactId: _c, ...e }) => e));
     } catch {
       batchFailed = true;
     }
@@ -354,6 +434,7 @@ export const runBatch = internalAction({
       workspaceId: b.workspaceId,
       subject: b.subject,
       sends: emails.map((e, i) => ({
+        recipientId: e._recipientId,
         contactId: e._contactId,
         to: e.to,
         externalMessageId: batchFailed ? undefined : results[i]?.id,
@@ -369,7 +450,7 @@ export const runBatch = internalAction({
       await ctx.runMutation(internal.broadcasts.markFailed, { broadcastId: args.broadcastId });
       return;
     }
-    // Volgende batch inplannen (getemporiseerd) zolang er nog ontvangers zijn.
+    // Volgende batch inplannen (getemporiseerd) zolang er nog pending-rijen zijn.
     await ctx.scheduler.runAfter(BATCH_DELAY_MS, internal.broadcasts.runBatch, {
       broadcastId: args.broadcastId,
     });
