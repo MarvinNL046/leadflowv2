@@ -25,7 +25,7 @@ function CampaignsPage() {
   const tenant = tenants?.find((t) => t.workspace !== null) ?? null
   const workspaceId = tenant?.workspace?.id as Id<'workspaces'> | undefined
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('broadcasts')
-  const [prefill, setPrefill] = useState<{ name: string; subject: string } | null>(null)
+  const [prefill, setPrefill] = useState<{ name: string; subject: string; blocks?: unknown } | null>(null)
 
   if (tenants === undefined) return <Skeleton className="h-64 w-full" />
   if (!workspaceId)
@@ -67,8 +67,8 @@ function CampaignsPage() {
       {tab === 'backlog' && (
         <BacklogList
           workspaceId={workspaceId}
-          onMakeBroadcast={(title) => {
-            setPrefill({ name: title, subject: title })
+          onMakeBroadcast={(draft) => {
+            setPrefill({ name: draft.name, subject: draft.subject, blocks: draft.blocks })
             setTab('broadcasts')
           }}
         />
