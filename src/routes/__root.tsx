@@ -33,7 +33,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'TanStack Start Starter',
+        title: 'LeadFlow',
       },
     ],
     links: [
@@ -41,6 +41,9 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         rel: 'stylesheet',
         href: appCss,
       },
+      { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/icons/favicon-32x32.png' },
+      { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/icons/favicon-16x16.png' },
+      { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
     ],
   }),
   shellComponent: RootDocument,
