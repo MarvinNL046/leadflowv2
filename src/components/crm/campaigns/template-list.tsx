@@ -10,6 +10,7 @@ import { Card, CardContent } from '#/components/ui/card.tsx'
 import { EmailBuilder } from './email-builder/EmailBuilder.tsx'
 import type { EmailBlock } from '../../../../convex/emailBlocks'
 import { renderBlocksToHtml } from '../../../../convex/emailBlocks'
+import { htmlToBlocks } from './email-builder/html-to-blocks.ts'
 import { humanizeConvexError } from '#/lib/errors.ts'
 import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
@@ -34,7 +35,7 @@ function TemplateEditor({ initial, workspaceId, onDone }: TemplateEditorProps) {
   const [name, setName] = useState(initial?.name ?? '')
   const [subject, setSubject] = useState(initial?.subject ?? '')
   const [blocks, setBlocks] = useState<EmailBlock[]>(
-    (initial?.bodyBlocks as EmailBlock[] | undefined) ?? []
+    (initial?.bodyBlocks as EmailBlock[] | undefined) ?? htmlToBlocks(initial?.body ?? '')
   )
   const [busy, setBusy] = useState(false)
 

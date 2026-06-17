@@ -9,6 +9,7 @@ import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import type { EmailBlock, BlockType } from '../../../../convex/emailBlocks'
 import { createBlock, renderBlocksToHtml } from '../../../../convex/emailBlocks'
+import { htmlToBlocks } from './email-builder/html-to-blocks.ts'
 import { BlockSidebar } from './email-builder/BlockSidebar.tsx'
 import { EmailCanvas } from './email-builder/EmailCanvas.tsx'
 import { PropertiesPanel } from './email-builder/PropertiesPanel.tsx'
@@ -222,7 +223,7 @@ export function BroadcastEditor({
                   onChange={(e) => {
                     const t = templates.find((x) => x._id === e.target.value)
                     if (t) {
-                      setBlocks((t.bodyBlocks as EmailBlock[] | undefined) ?? [])
+                      setBlocks((t.bodyBlocks as EmailBlock[] | undefined) ?? htmlToBlocks(t.body ?? ''))
                       if (!subject) setSubject(t.subject)
                       setDraftId(null)
                     }
