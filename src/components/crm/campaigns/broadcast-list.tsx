@@ -9,6 +9,7 @@ import { Badge } from '#/components/ui/badge.tsx'
 import { BroadcastEditor } from './broadcast-editor.tsx'
 import { api } from '../../../../convex/_generated/api'
 import type { Id } from '../../../../convex/_generated/dataModel'
+import type { EmailBlock } from '../../../../convex/emailBlocks'
 
 export function BroadcastList({
   workspaceId,
@@ -16,7 +17,7 @@ export function BroadcastList({
   onPrefillConsumed,
 }: {
   workspaceId: Id<'workspaces'>
-  prefill?: { name: string; subject: string } | null
+  prefill?: { name: string; subject: string; blocks?: unknown } | null
   onPrefillConsumed?: () => void
 }) {
   const broadcasts = useQuery(api.broadcasts.list, { workspaceId })
@@ -38,10 +39,11 @@ export function BroadcastList({
       )}
       {creating && (
         <BroadcastEditor
-          key={prefill ? `${prefill.name}::${prefill.subject}` : 'new'}
+          key={prefill ? `${prefill.name}::${prefill.subject}::${Array.isArray(prefill.blocks) ? prefill.blocks.length : 0}` : 'new'}
           workspaceId={workspaceId}
           initialName={prefill?.name}
           initialSubject={prefill?.subject}
+          initialBlocks={prefill?.blocks as EmailBlock[] | undefined}
           onClose={() => {
             setCreating(false)
             onPrefillConsumed?.()

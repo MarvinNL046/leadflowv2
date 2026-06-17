@@ -19,15 +19,17 @@ export function BroadcastEditor({
   onClose,
   initialName,
   initialSubject,
+  initialBlocks,
 }: {
   workspaceId: Id<'workspaces'>
   onClose: () => void
   initialName?: string
   initialSubject?: string
+  initialBlocks?: EmailBlock[]
 }) {
   const [name, setName] = useState(initialName ?? '')
   const [subject, setSubject] = useState(initialSubject ?? '')
-  const [blocks, setBlocks] = useState<EmailBlock[]>([])
+  const [blocks, setBlocks] = useState<EmailBlock[]>(initialBlocks ?? [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [segmentId, setSegmentId] = useState<string>('')
   const [draftId, setDraftId] = useState<Id<'broadcasts'> | null>(null)

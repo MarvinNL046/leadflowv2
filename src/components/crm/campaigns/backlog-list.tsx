@@ -14,7 +14,7 @@ import type { Id } from '../../../../convex/_generated/dataModel'
 
 interface Props {
   workspaceId: Id<'workspaces'>
-  onMakeBroadcast: (title: string) => void
+  onMakeBroadcast: (draft: { name: string; subject: string; blocks?: unknown }) => void
 }
 
 export function BacklogList({ workspaceId, onMakeBroadcast }: Props) {
@@ -219,7 +219,7 @@ export function BacklogList({ workspaceId, onMakeBroadcast }: Props) {
                     variant="ghost"
                     size="icon"
                     title="Maak broadcast"
-                    onClick={() => onMakeBroadcast(item.title)}
+                    onClick={() => onMakeBroadcast({ name: item.title, subject: item.subject || item.title, blocks: item.bodyBlocks })}
                   >
                     <Mail className="h-4 w-4" />
                   </Button>

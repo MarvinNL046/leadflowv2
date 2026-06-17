@@ -310,6 +310,8 @@ export default defineSchema({
     status: v.union(v.literal("open"), v.literal("sent")),
     sentAt: v.optional(v.number()),
     sortOrder: v.number(),
+    subject: v.optional(v.string()),
+    bodyBlocks: v.optional(v.array(v.any())),
   }).index("by_workspace", ["workspaceId"]),
 
   segments: defineTable({
