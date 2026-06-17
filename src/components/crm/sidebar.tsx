@@ -84,13 +84,16 @@ export function SidebarContent({
         <Link
           to="/"
           onClick={onNavigate}
-          className="flex items-center"
+          className="flex items-center gap-2"
         >
           <img
             src="/logo/wetryleadflow-logo-trans-bg.webp"
             alt="LeadFlow"
-            className="h-8 w-auto max-w-[180px] object-contain"
+            className="h-8 w-8 shrink-0 object-contain"
           />
+          <span className="text-base font-semibold tracking-tight text-zinc-900">
+            LeadFlow
+          </span>
         </Link>
       </div>
 
