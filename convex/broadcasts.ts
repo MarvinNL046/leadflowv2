@@ -221,10 +221,19 @@ export const loadForSend = internalQuery({
       .first();
     const ws = await ctx.db.get(b.workspaceId);
     const org = ws ? await ctx.db.get(ws.orgId) : null;
+    const companyName = settings?.companyName ?? org?.name ?? "StayCool Airco";
+    // Afzender-adres komt uit EMAIL_FROM (gedeelde, in Resend geverifieerde
+    // sender). Bevat de env al een display-naam ("Naam <addr>") dan gebruiken
+    // we die ongewijzigd; bij een kaal adres zetten we de workspace-bedrijfsnaam
+    // ervoor → per-tenant afzender-naam zonder per-workspace config.
+    const fromAddress = process.env.EMAIL_FROM ?? "noreply@example.com";
+    const from = fromAddress.includes("<")
+      ? fromAddress
+      : `${companyName} <${fromAddress}>`;
     return {
       ...b,
-      companyName: settings?.companyName ?? org?.name ?? "StayCool Airco",
-      from: process.env.EMAIL_FROM ?? "noreply@example.com",
+      companyName,
+      from,
     };
   },
 });
