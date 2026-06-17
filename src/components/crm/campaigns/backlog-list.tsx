@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from 'convex/react'
-import { Plus, Trash2, CheckCircle2, RotateCcw, Mail } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, RotateCcw, Mail, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
@@ -20,6 +20,7 @@ interface Props {
 export function BacklogList({ workspaceId, onMakeBroadcast }: Props) {
   const items = useQuery(api.emailBacklog.list, { workspaceId })
   const seedDefaults = useMutation(api.emailBacklog.seedDefaults)
+  const seedBacklogDrafts = useMutation(api.emailBacklog.seedBacklogDrafts)
   const createItem = useMutation(api.emailBacklog.create)
   const setStatus = useMutation(api.emailBacklog.setStatus)
   const removeItem = useMutation(api.emailBacklog.remove)
@@ -43,6 +44,15 @@ export function BacklogList({ workspaceId, onMakeBroadcast }: Props) {
       }
     } catch (e) {
       toast.error(humanizeConvexError(e, 'Importeren mislukt'))
+    }
+  }
+
+  const handleSeedDrafts = async () => {
+    try {
+      const res = await seedBacklogDrafts({ workspaceId })
+      toast.success(`${res.updated} concept-mails toegevoegd`)
+    } catch (e) {
+      toast.error(humanizeConvexError(e, 'Concept-mails importeren mislukt'))
     }
   }
 
@@ -128,6 +138,14 @@ export function BacklogList({ workspaceId, onMakeBroadcast }: Props) {
         >
           <Plus className="mr-1 h-4 w-4" />
           Nieuw onderwerp
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSeedDrafts}
+        >
+          <Sparkles className="mr-1 h-4 w-4" />
+          Importeer concept-mails
         </Button>
       </div>
 
