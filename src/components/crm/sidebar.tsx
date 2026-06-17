@@ -84,12 +84,13 @@ export function SidebarContent({
         <Link
           to="/"
           onClick={onNavigate}
-          className="flex items-center gap-2"
+          className="flex items-center"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded bg-violet-600 text-xs font-bold text-white">
-            L
-          </div>
-          <span className="text-sm font-semibold">LeadFlow v2</span>
+          <img
+            src="/logo/wetryleadflow-logo-trans-bg.webp"
+            alt="LeadFlow"
+            className="h-8 w-auto max-w-[180px] object-contain"
+          />
         </Link>
       </div>
 
