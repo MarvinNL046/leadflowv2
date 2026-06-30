@@ -836,6 +836,79 @@ http.route({
   }),
 });
 
+// ══════════════════════════════════════════════════════════════════════
+// CONTACT READ-API — leadflow-contacten lezen vanuit de andere wetry-apps
+// (cashflow / frostwork). Leadflow blijft de bron; dit is READ-ONLY.
+// Auth = READ_API_KEY via X-API-Key (apart van de write-key WEBSITE_API_KEY,
+// zodat read/write los te roteren zijn). Server-to-server, geen CORS.
+// ══════════════════════════════════════════════════════════════════════
+function readApiKeyError(request: Request): Response | null {
+  const expected = process.env.READ_API_KEY;
+  if (!expected) return jsonResponse({ error: "Server misconfigured" }, 500);
+  const key = request.headers.get("x-api-key");
+  if (!key || !timingSafeStringEqual(key, expected)) {
+    return jsonResponse({ error: "Invalid API key" }, 401);
+  }
+  return null;
+}
+
+http.route({
+  path: "/api/contacts/search",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const denied = readApiKeyError(request);
+    if (denied) return denied;
+
+    const url = new URL(request.url);
+    const search = url.searchParams.get("q") ?? undefined;
+    const limitRaw = url.searchParams.get("limit");
+    const limit =
+      limitRaw && Number.isFinite(Number(limitRaw)) ? Number(limitRaw) : undefined;
+
+    const workspaceId = await ctx.runQuery(
+      internal.messaging.getStaycoolWorkspaceIdInternal,
+      {},
+    );
+    if (!workspaceId) {
+      return jsonResponse({ error: "Workspace not provisioned" }, 500);
+    }
+
+    const result = await ctx.runQuery(internal.contactsRead.searchForStaycool, {
+      workspaceId,
+      search,
+      limit,
+    });
+    return jsonResponse(result, 200);
+  }),
+});
+
+http.route({
+  path: "/api/contacts/get",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const denied = readApiKeyError(request);
+    if (denied) return denied;
+
+    const id = new URL(request.url).searchParams.get("id");
+    if (!id) return jsonResponse({ error: "id vereist" }, 400);
+
+    const workspaceId = await ctx.runQuery(
+      internal.messaging.getStaycoolWorkspaceIdInternal,
+      {},
+    );
+    if (!workspaceId) {
+      return jsonResponse({ error: "Workspace not provisioned" }, 500);
+    }
+
+    const result = await ctx.runQuery(
+      internal.contactsRead.getDetailForStaycool,
+      { workspaceId, contactId: id as Id<"contacts"> },
+    );
+    if (!result) return jsonResponse({ error: "Not found" }, 404);
+    return jsonResponse(result, 200);
+  }),
+});
+
 // ──────────────────────────────────────────────────────────────────────
 // Shared HMAC helper voor SMS/WA (Meta gebruikt eigen wrapper)
 // ──────────────────────────────────────────────────────────────────────
