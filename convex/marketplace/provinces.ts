@@ -8,7 +8,7 @@
  * correspond to PC4 numbers that aren't actually used in the Dutch postal
  * system, so in practice no real lead will hit them.
  */
-import { INFERRED_PC4S, PC4_TO_PROVINCE } from "./provinces-data";
+import { INFERRED_PC4S, PC4_TO_PROVINCE } from "./provincesData";
 
 export type NlProvince =
 	| "Groningen"
