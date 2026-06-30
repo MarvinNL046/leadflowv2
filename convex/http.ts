@@ -8,6 +8,7 @@ import { verifyStateToken } from "./metaOauth";
 import { getSiteUrl } from "./lib/env";
 import { encryptSecret } from "./lib/crypto";
 import { verifyUnsubToken } from "./unsubscribeToken";
+import { hashApiKey } from "./marketplace/apiKeys";
 
 const http = httpRouter();
 
@@ -912,6 +913,168 @@ http.route({
 // ──────────────────────────────────────────────────────────────────────
 // Shared HMAC helper voor SMS/WA (Meta gebruikt eigen wrapper)
 // ──────────────────────────────────────────────────────────────────────
+
+// ══════════════════════════════════════════════════════════════════════
+// MARKETPLACE INTAKE — server-to-server (SEO landing pages) lead ingest.
+// Auth = Bearer <rawKey> → sha256 → findActiveByHash. CORS "*" because
+// landing pages may POST from the browser. Calls internal.marketplace.*.
+// ══════════════════════════════════════════════════════════════════════
+const MP_CORS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+const MP_VALID_JOB_SIZES = ["s", "m", "l", "xl"];
+const MP_VALID_BUYER_INTENTIONS = ["yes", "unknown", "no"];
+
+http.route({
+  path: "/marketplace/intake",
+  method: "OPTIONS",
+  handler: httpAction(
+    async () => new Response(null, { status: 204, headers: MP_CORS }),
+  ),
+});
+
+http.route({
+  path: "/marketplace/intake",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const cors = (body: unknown, status: number) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json", ...MP_CORS },
+      });
+
+    // 1. Bearer auth.
+    const authHeader = request.headers.get("authorization");
+    const match = authHeader?.match(/^Bearer\s+(.+)$/i);
+    const rawKey = match?.[1]?.trim();
+    if (!rawKey) {
+      return cors({ error: "missing_api_key" }, 401);
+    }
+
+    // 2. Hash + lookup active key.
+    const keyHash = await hashApiKey(rawKey);
+    const apiKey = await ctx.runQuery(
+      internal.marketplace.apiKeys.findActiveByHash,
+      { keyHash },
+    );
+    if (!apiKey) {
+      return cors({ error: "invalid_api_key" }, 401);
+    }
+
+    // 3. Parse + wire-validate body.
+    let body: Record<string, unknown>;
+    try {
+      const parsed = JSON.parse(await request.text());
+      if (typeof parsed !== "object" || parsed === null) {
+        return cors({ error: "invalid_body" }, 400);
+      }
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return cors({ error: "invalid_json" }, 400);
+    }
+
+    const str = (val: unknown): string | undefined =>
+      typeof val === "string" ? val : undefined;
+
+    const firstName = str(body.firstName);
+    const lastName = str(body.lastName);
+    const phone = str(body.phone);
+    const postalCode = str(body.postalCode);
+    if (!firstName?.trim()) return cors({ error: "missing_firstName" }, 400);
+    if (!lastName?.trim()) return cors({ error: "missing_lastName" }, 400);
+    if (!phone?.trim()) return cors({ error: "missing_phone" }, 400);
+    if (!postalCode?.trim()) return cors({ error: "missing_postalCode" }, 400);
+
+    const projectType = str(body.projectType);
+    if (projectType !== undefined && projectType.length > 255) {
+      return cors({ error: "projectType_too_long" }, 400);
+    }
+    const projectDescription = str(body.projectDescription);
+    if (projectDescription !== undefined && projectDescription.length > 4000) {
+      return cors({ error: "projectDescription_too_long" }, 400);
+    }
+
+    const jobSize = str(body.jobSize);
+    if (jobSize !== undefined && !MP_VALID_JOB_SIZES.includes(jobSize)) {
+      return cors({ error: "invalid_jobSize" }, 400);
+    }
+    const buyerIntention = str(body.buyerIntention);
+    if (
+      buyerIntention !== undefined &&
+      !MP_VALID_BUYER_INTENTIONS.includes(buyerIntention)
+    ) {
+      return cors({ error: "invalid_buyerIntention" }, 400);
+    }
+
+    let photos: string[] | undefined;
+    if (body.photos !== undefined) {
+      if (
+        !Array.isArray(body.photos) ||
+        body.photos.length > 10 ||
+        !body.photos.every((u) => typeof u === "string")
+      ) {
+        return cors({ error: "invalid_photos" }, 400);
+      }
+      photos = body.photos as string[];
+    }
+
+    // 4. Insert via the single-source internal mutation. Business-rule
+    //    rejects (invalid niche / phone / not allowed) throw → 400.
+    let result: {
+      ok: true;
+      leadId: string;
+      duplicate: boolean;
+      status: string;
+    };
+    try {
+      result = await ctx.runMutation(internal.marketplace.intake.insertLead, {
+        apiKeyId: apiKey._id,
+        niche: str(body.niche),
+        serviceType: str(body.serviceType),
+        segment: str(body.segment),
+        firstName,
+        lastName,
+        phone,
+        postalCode,
+        email: str(body.email),
+        projectType,
+        projectDescription,
+        jobSize,
+        buyerIntention,
+        nicheData:
+          body.nicheData && typeof body.nicheData === "object"
+            ? body.nicheData
+            : undefined,
+        photos,
+        urgency: str(body.urgency),
+        message: str(body.message),
+        city: str(body.city),
+        metadata:
+          body.metadata && typeof body.metadata === "object"
+            ? body.metadata
+            : undefined,
+      });
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "intake_failed";
+      console.warn("[marketplace-intake] rejected:", code);
+      return cors({ error: code }, 400);
+    }
+
+    // 5. Success.
+    return cors(
+      {
+        ok: true,
+        leadId: result.leadId,
+        duplicate: result.duplicate,
+        status: result.status,
+      },
+      200,
+    );
+  }),
+});
 
 async function isValidHmacSignature(
   rawBody: string,
