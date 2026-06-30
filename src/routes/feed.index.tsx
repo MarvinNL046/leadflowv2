@@ -5,18 +5,10 @@ import { Search } from 'lucide-react'
 import { Input } from '#/components/ui/input.tsx'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
-import { cn } from '#/lib/utils.ts'
 import { LeadCard, type FeedLead } from '#/components/marketplace/lead-card.tsx'
 import { api } from '../../convex/_generated/api'
 
 export const Route = createFileRoute('/feed/')({ component: FeedIndexPage })
-
-type Tab = 'beschikbaar' | 'ontgrendeld'
-
-const TAB_OPTIONS: { value: Tab; label: string }[] = [
-  { value: 'beschikbaar', label: 'Beschikbaar' },
-  { value: 'ontgrendeld', label: 'Ontgrendeld' },
-]
 
 function FeedIndexPage() {
   const navigate = useNavigate()
@@ -50,7 +42,6 @@ function FeedIndexPage() {
 }
 
 function FeedContent() {
-  const [tab, setTab] = useState<Tab>('beschikbaar')
   const [search, setSearch] = useState('')
   const [debounced, setDebounced] = useState('')
 
@@ -60,7 +51,7 @@ function FeedContent() {
   }, [search])
 
   const data = useQuery(api.marketplace.feed.getBuyerFeed, {
-    tab,
+    tab: 'beschikbaar',
     q: debounced || undefined,
     limit: 30,
   })
@@ -80,23 +71,6 @@ function FeedContent() {
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex gap-1">
-          {TAB_OPTIONS.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setTab(t.value)}
-              className={cn(
-                'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                tab === t.value
-                  ? 'bg-violet-50 text-violet-800'
-                  : 'text-zinc-600 hover:bg-zinc-100',
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
         <div className="relative min-w-[200px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <Input
@@ -116,9 +90,8 @@ function FeedContent() {
       ) : leads.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center text-sm text-zinc-500">
-            {tab === 'ontgrendeld'
-              ? 'Je hebt nog geen leads ontgrendeld.'
-              : 'Geen aanvragen die aan je voorkeuren voldoen. Pas je filters aan of kom later terug.'}
+            Geen aanvragen die aan je voorkeuren voldoen. Pas je filters aan of
+            kom later terug.
           </CardContent>
         </Card>
       ) : (

@@ -322,21 +322,52 @@ async function getBeschikbaarFeed(
 }
 
 /**
- * Purchased ("ontgrendeld") tab. Fase B ships this as a guarded STUB:
- * Fase C owns the purchase flow + the full unmasked join, so until then
- * there are no purchase rows to show. Returning [] keeps the feed tab
- * navigable without leaking anything.
- *
- * TODO-FaseC: replace with the real `by_buyer_purchased` → leads join +
- * unmasked DTO + buyerStatus/purchaseId annotation (see PORT-SPEC §4e
- * listMyPurchases).
+ * Purchased ("ontgrendeld") tab. Fase C: join `by_buyer_purchased` →
+ * leads and return UNMASKED DTOs (the buyer paid, so name/phone/email are
+ * revealed) annotated with `buyerStatus` + `purchaseId`. Same `MaskedLead`
+ * shape as the beschikbaar tab so the feed list renders uniformly; the
+ * `masked*` fields just carry the real values here.
  */
 async function getOntgrendeldFeed(
-	_ctx: QueryCtx,
-	_orgId: Id<"orgs">,
-	_opts: { limit: number; offset: number; from?: string; to?: string; q?: string },
+	ctx: QueryCtx,
+	orgId: Id<"orgs">,
+	opts: { limit: number; offset: number; from?: string; to?: string; q?: string },
 ): Promise<MaskedLead[]> {
-	return [];
+	const purchases = await ctx.db
+		.query("marketplacePurchases")
+		.withIndex("by_buyer_purchased", (q) => q.eq("buyerOrgId", orgId))
+		.order("desc")
+		.take(opts.offset + opts.limit + 200);
+
+	const qLower = opts.q ? opts.q.toLowerCase() : null;
+	const lo = fromBound(opts.from);
+	const hi = toBound(opts.to);
+
+	const results: MaskedLead[] = [];
+	for (const p of purchases.slice(opts.offset)) {
+		if (results.length >= opts.limit) break;
+		const lead = await ctx.db.get(p.leadId);
+		if (!lead) continue;
+		if (qLower) {
+			const fn = (lead.firstName ?? "").toLowerCase();
+			const ln = (lead.lastName ?? "").toLowerCase();
+			if (!fn.includes(qLower) && !ln.includes(qLower)) continue;
+		}
+		if (lo !== undefined && p.purchasedAt < lo) continue;
+		if (hi !== undefined && p.purchasedAt >= hi) continue;
+
+		// Unmasked DTO (buyer owns it). Reuse the masked builder for the
+		// non-PII fields, then overwrite the contact fields with real data.
+		const dto = toMaskedLead(lead, 0, false, false);
+		dto.maskedName =
+			[lead.firstName, lead.lastName].filter(Boolean).join(" ") || "—";
+		dto.maskedPhone = lead.phone ?? "—";
+		dto.maskedEmail = lead.email ?? null;
+		dto.buyerStatus = p.buyerStatus;
+		dto.purchaseId = p._id;
+		results.push(dto);
+	}
+	return results;
 }
 
 /**

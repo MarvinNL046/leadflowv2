@@ -4,6 +4,7 @@ import type { Id } from "../_generated/dataModel";
 import {
 	type MutationCtx,
 	type QueryCtx,
+	internalQuery,
 	mutation,
 	query,
 } from "../_generated/server";
@@ -108,6 +109,20 @@ export const marketplaceAccess = query({
 		} catch {
 			return { ok: false as const };
 		}
+	},
+});
+
+/**
+ * Internal context resolver for the Stripe top-up action (`stripe.ts`).
+ * Actions have no `ctx.db`, so the `"use node"` action calls this via
+ * `ctx.runQuery` to resolve the authenticated buyer org/user/workspace
+ * server-side. Identity is derived from the auth token inside the query —
+ * never trusted from the action's client args.
+ */
+export const requireBuyer = internalQuery({
+	args: {},
+	handler: async (ctx): Promise<MarketplaceContext> => {
+		return await requireMarketplaceAccess(ctx);
 	},
 });
 

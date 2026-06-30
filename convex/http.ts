@@ -1,4 +1,5 @@
 import { httpRouter } from "convex/server";
+import Stripe from "stripe";
 import { httpAction } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -1073,6 +1074,77 @@ http.route({
       },
       200,
     );
+  }),
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// MARKETPLACE STRIPE WEBHOOK — credits a buyer wallet on topup completion.
+// URL: ${CONVEX_SITE_URL}/webhooks/marketplace-stripe (its OWN Stripe
+// endpoint, distinct from any CRM webhook). Raw-body, signature-verified
+// with `constructEventAsync` (WebCrypto — stays in the V8 runtime, no
+// "use node"). Idempotent: creditTopupIdempotent guards on by_ref so
+// Stripe's at-least-once retry can't double-credit.
+//
+// Env (set via `npx convex env set`):
+//   STRIPE_SECRET_KEY                  — same key as createTopup
+//   STRIPE_MARKETPLACE_WEBHOOK_SECRET  — this endpoint's signing secret
+// Absent keys → 500 {error:"not_configured"} (safe to ship without them).
+// ══════════════════════════════════════════════════════════════════════
+http.route({
+  path: "/webhooks/marketplace-stripe",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const secret = process.env.STRIPE_MARKETPLACE_WEBHOOK_SECRET;
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!secret || !key) {
+      return jsonResponse({ error: "not_configured" }, 500);
+    }
+
+    const sig = request.headers.get("stripe-signature");
+    if (!sig) return jsonResponse({ error: "no_signature" }, 400);
+
+    // Raw body — exactly as received, for signature verification.
+    const body = await request.text();
+    let event: Stripe.Event;
+    try {
+      // constructEventAsync uses WebCrypto (works in the default V8
+      // runtime); the sync constructEvent needs node crypto.
+      event = await new Stripe(key).webhooks.constructEventAsync(
+        body,
+        sig,
+        secret,
+      );
+    } catch (err) {
+      console.warn("[marketplace-stripe] signature verify failed:", err);
+      return jsonResponse({ error: "invalid_signature" }, 400);
+    }
+
+    // Only completed Checkout Sessions of OUR topup kind are processed.
+    if (event.type !== "checkout.session.completed") {
+      return jsonResponse({ received: true }, 200);
+    }
+    const session = event.data.object as Stripe.Checkout.Session;
+    if (session.metadata?.kind !== "marketplace_topup") {
+      return jsonResponse({ received: true }, 200);
+    }
+
+    const orgId = session.metadata.marketplaceOrgId;
+    const userId = session.metadata.marketplaceUserId;
+    const amountCents = session.amount_total ?? 0;
+    if (!orgId || !amountCents) {
+      console.error("[marketplace-stripe] bad metadata", session.metadata);
+      return jsonResponse({ error: "bad_metadata" }, 400);
+    }
+
+    // Idempotency + credit happen in ONE mutation (by_ref guard).
+    await ctx.runMutation(internal.marketplace.wallet.creditTopupIdempotent, {
+      orgId: orgId as Id<"orgs">,
+      userId: userId ? (userId as Id<"users">) : undefined,
+      amountCents,
+      sessionId: session.id,
+    });
+
+    return jsonResponse({ received: true }, 200);
   }),
 });
 
