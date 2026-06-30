@@ -10,8 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as FeedRouteImport } from './routes/feed'
 import { Route as CrmRouteImport } from './routes/crm'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FeedOnboardingRouteImport } from './routes/feed_.onboarding'
+import { Route as FeedIndexRouteImport } from './routes/feed.index'
+import { Route as FeedLeadIdRouteImport } from './routes/feed.lead_.$id'
 import { Route as CrmIndexRouteImport } from './routes/crm.index'
 import { Route as CrmWorkflowsRouteImport } from './routes/crm.workflows'
 import { Route as CrmSettingsRouteImport } from './routes/crm.settings'
@@ -36,6 +40,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeedRoute = FeedRouteImport.update({
+  id: '/feed',
+  path: '/feed',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CrmRoute = CrmRouteImport.update({
   id: '/crm',
   path: '/crm',
@@ -45,6 +54,21 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const FeedOnboardingRoute = FeedOnboardingRouteImport.update({
+  id: '/feed_/onboarding',
+  path: '/feed/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedIndexRoute = FeedIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => FeedRoute,
+} as any)
+const FeedLeadIdRoute = FeedLeadIdRouteImport.update({
+  id: '/lead_/$id',
+  path: '/lead/$id',
+  getParentRoute: () => FeedRoute,
 } as any)
 const CrmIndexRoute = CrmIndexRouteImport.update({
   id: '/',
@@ -140,7 +164,11 @@ const CrmCampaignsIdRoute = CrmCampaignsIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/crm': typeof CrmRouteWithChildren
+  '/feed': typeof FeedRouteWithChildren
   '/login': typeof LoginRoute
+  '/feed/': typeof FeedIndexRoute
+  '/feed/lead/$id': typeof FeedLeadIdRoute
+  '/feed/onboarding': typeof FeedOnboardingRoute
   '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
   '/crm/messages': typeof CrmMessagesRoute
@@ -163,6 +191,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/feed': typeof FeedIndexRoute
+  '/feed/lead/$id': typeof FeedLeadIdRoute
+  '/feed/onboarding': typeof FeedOnboardingRoute
   '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
   '/crm/messages': typeof CrmMessagesRoute
@@ -186,7 +217,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/crm': typeof CrmRouteWithChildren
+  '/feed': typeof FeedRouteWithChildren
   '/login': typeof LoginRoute
+  '/feed/': typeof FeedIndexRoute
+  '/feed/lead_/$id': typeof FeedLeadIdRoute
+  '/feed_/onboarding': typeof FeedOnboardingRoute
   '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
   '/crm/messages': typeof CrmMessagesRoute
@@ -211,7 +246,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/crm'
+    | '/feed'
     | '/login'
+    | '/feed/'
+    | '/feed/lead/$id'
+    | '/feed/onboarding'
     | '/crm/campaigns'
     | '/crm/contacts'
     | '/crm/messages'
@@ -234,6 +273,9 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/feed'
+    | '/feed/lead/$id'
+    | '/feed/onboarding'
     | '/crm/campaigns'
     | '/crm/contacts'
     | '/crm/messages'
@@ -256,7 +298,11 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/crm'
+    | '/feed'
     | '/login'
+    | '/feed/'
+    | '/feed/lead_/$id'
+    | '/feed_/onboarding'
     | '/crm/campaigns'
     | '/crm/contacts'
     | '/crm/messages'
@@ -280,7 +326,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CrmRoute: typeof CrmRouteWithChildren
+  FeedRoute: typeof FeedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  FeedOnboardingRoute: typeof FeedOnboardingRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -299,12 +347,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/feed': {
+      id: '/feed'
+      path: '/feed'
+      fullPath: '/feed'
+      preLoaderRoute: typeof FeedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/feed_/onboarding': {
+      id: '/feed_/onboarding'
+      path: '/feed/onboarding'
+      fullPath: '/feed/onboarding'
+      preLoaderRoute: typeof FeedOnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feed/': {
+      id: '/feed/'
+      path: '/'
+      fullPath: '/feed/'
+      preLoaderRoute: typeof FeedIndexRouteImport
+      parentRoute: typeof FeedRoute
+    }
+    '/feed/lead_/$id': {
+      id: '/feed/lead_/$id'
+      path: '/lead/$id'
+      fullPath: '/feed/lead/$id'
+      preLoaderRoute: typeof FeedLeadIdRouteImport
+      parentRoute: typeof FeedRoute
     }
     '/crm/': {
       id: '/crm/'
@@ -479,10 +555,24 @@ const CrmRouteChildren: CrmRouteChildren = {
 
 const CrmRouteWithChildren = CrmRoute._addFileChildren(CrmRouteChildren)
 
+interface FeedRouteChildren {
+  FeedIndexRoute: typeof FeedIndexRoute
+  FeedLeadIdRoute: typeof FeedLeadIdRoute
+}
+
+const FeedRouteChildren: FeedRouteChildren = {
+  FeedIndexRoute: FeedIndexRoute,
+  FeedLeadIdRoute: FeedLeadIdRoute,
+}
+
+const FeedRouteWithChildren = FeedRoute._addFileChildren(FeedRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CrmRoute: CrmRouteWithChildren,
+  FeedRoute: FeedRouteWithChildren,
   LoginRoute: LoginRoute,
+  FeedOnboardingRoute: FeedOnboardingRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
