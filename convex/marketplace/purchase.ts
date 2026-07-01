@@ -297,12 +297,16 @@ async function copyLeadToContact(
 		body: noteLines.join("\n"),
 	});
 
-	// 7. Speed-to-lead workflows + AI-reactie fire (scheduled, post-commit).
-	await ctx.scheduler.runAfter(
-		0,
-		internal.workflowEngine.triggerContactCreated,
-		{ workspaceId, contactId },
-	);
+	// 7. Speed-to-lead workflows + AI-reactie fire ONLY for a genuinely new
+	//    contact. A dedup-merge into an existing contact must NOT re-trigger
+	//    the buyer's speed-to-lead automations on someone already in their CRM.
+	if (!contact) {
+		await ctx.scheduler.runAfter(
+			0,
+			internal.workflowEngine.triggerContactCreated,
+			{ workspaceId, contactId },
+		);
+	}
 
 	return contactId;
 }
