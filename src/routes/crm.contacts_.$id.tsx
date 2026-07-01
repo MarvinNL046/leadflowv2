@@ -51,6 +51,7 @@ import { Separator } from '#/components/ui/separator.tsx'
 import { cn } from '#/lib/utils.ts'
 import { humanizeConvexError } from '#/lib/errors.ts'
 import { frostworkCustomerUrl } from '#/lib/external-apps.ts'
+import { SuiteSummarySection } from '../components/crm/suite-summary'
 import { getMetaFormLabel } from '#/lib/meta-forms.ts'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
@@ -292,6 +293,10 @@ function ContactDetailPage() {
       </div>
 
       <DetailsSection contact={contact} />
+      <SuiteSummarySection
+        contactId={id as Id<'contacts'>}
+        contactName={fullName}
+      />
       <OpportunitiesSection contactId={id as Id<'contacts'>} />
       <CustomFieldsSection contactId={id as Id<'contacts'>} />
       <ManualFieldsSection contactId={id as Id<'contacts'>} />

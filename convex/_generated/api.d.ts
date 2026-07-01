@@ -22,6 +22,7 @@ import type * as contactsRead from "../contactsRead.js";
 import type * as crmSettings from "../crmSettings.js";
 import type * as crmSettingsLogic from "../crmSettingsLogic.js";
 import type * as crons from "../crons.js";
+import type * as crossApp from "../crossApp.js";
 import type * as customFields from "../customFields.js";
 import type * as customFieldsLogic from "../customFieldsLogic.js";
 import type * as dashboardLeadVisibility from "../dashboardLeadVisibility.js";
@@ -103,6 +104,7 @@ declare const fullApi: ApiFromModules<{
   crmSettings: typeof crmSettings;
   crmSettingsLogic: typeof crmSettingsLogic;
   crons: typeof crons;
+  crossApp: typeof crossApp;
   customFields: typeof customFields;
   customFieldsLogic: typeof customFieldsLogic;
   dashboardLeadVisibility: typeof dashboardLeadVisibility;
