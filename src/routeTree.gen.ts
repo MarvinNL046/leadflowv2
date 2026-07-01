@@ -10,15 +10,21 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as FeedRouteImport } from './routes/feed'
 import { Route as CrmRouteImport } from './routes/crm'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FeedIndexRouteImport } from './routes/feed.index'
 import { Route as CrmIndexRouteImport } from './routes/crm.index'
+import { Route as FeedOnboardingRouteImport } from './routes/feed_.onboarding'
+import { Route as FeedWalletRouteImport } from './routes/feed.wallet'
+import { Route as FeedPurchasedRouteImport } from './routes/feed.purchased'
 import { Route as CrmWorkflowsRouteImport } from './routes/crm.workflows'
 import { Route as CrmSettingsRouteImport } from './routes/crm.settings'
 import { Route as CrmPipelinesRouteImport } from './routes/crm.pipelines'
 import { Route as CrmMessagesRouteImport } from './routes/crm.messages'
 import { Route as CrmContactsRouteImport } from './routes/crm.contacts'
 import { Route as CrmCampaignsRouteImport } from './routes/crm.campaigns'
+import { Route as FeedLeadIdRouteImport } from './routes/feed.lead_.$id'
 import { Route as CrmWorkflowsIdRouteImport } from './routes/crm.workflows_.$id'
 import { Route as CrmSettingsWhatsappRouteImport } from './routes/crm.settings_.whatsapp'
 import { Route as CrmSettingsTemplatesRouteImport } from './routes/crm.settings_.templates'
@@ -36,6 +42,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeedRoute = FeedRouteImport.update({
+  id: '/feed',
+  path: '/feed',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CrmRoute = CrmRouteImport.update({
   id: '/crm',
   path: '/crm',
@@ -46,10 +57,30 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeedIndexRoute = FeedIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => FeedRoute,
+} as any)
 const CrmIndexRoute = CrmIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => CrmRoute,
+} as any)
+const FeedOnboardingRoute = FeedOnboardingRouteImport.update({
+  id: '/feed_/onboarding',
+  path: '/feed/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedWalletRoute = FeedWalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => FeedRoute,
+} as any)
+const FeedPurchasedRoute = FeedPurchasedRouteImport.update({
+  id: '/purchased',
+  path: '/purchased',
+  getParentRoute: () => FeedRoute,
 } as any)
 const CrmWorkflowsRoute = CrmWorkflowsRouteImport.update({
   id: '/workflows',
@@ -80,6 +111,11 @@ const CrmCampaignsRoute = CrmCampaignsRouteImport.update({
   id: '/campaigns',
   path: '/campaigns',
   getParentRoute: () => CrmRoute,
+} as any)
+const FeedLeadIdRoute = FeedLeadIdRouteImport.update({
+  id: '/lead_/$id',
+  path: '/lead/$id',
+  getParentRoute: () => FeedRoute,
 } as any)
 const CrmWorkflowsIdRoute = CrmWorkflowsIdRouteImport.update({
   id: '/workflows_/$id',
@@ -140,6 +176,7 @@ const CrmCampaignsIdRoute = CrmCampaignsIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/crm': typeof CrmRouteWithChildren
+  '/feed': typeof FeedRouteWithChildren
   '/login': typeof LoginRoute
   '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
@@ -147,7 +184,11 @@ export interface FileRoutesByFullPath {
   '/crm/pipelines': typeof CrmPipelinesRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/workflows': typeof CrmWorkflowsRoute
+  '/feed/purchased': typeof FeedPurchasedRoute
+  '/feed/wallet': typeof FeedWalletRoute
+  '/feed/onboarding': typeof FeedOnboardingRoute
   '/crm/': typeof CrmIndexRoute
+  '/feed/': typeof FeedIndexRoute
   '/crm/campaigns/$id': typeof CrmCampaignsIdRoute
   '/crm/contacts/$id': typeof CrmContactsIdRoute
   '/crm/contacts/import': typeof CrmContactsImportRoute
@@ -159,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/crm/settings/templates': typeof CrmSettingsTemplatesRoute
   '/crm/settings/whatsapp': typeof CrmSettingsWhatsappRoute
   '/crm/workflows/$id': typeof CrmWorkflowsIdRoute
+  '/feed/lead/$id': typeof FeedLeadIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -169,7 +211,11 @@ export interface FileRoutesByTo {
   '/crm/pipelines': typeof CrmPipelinesRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/workflows': typeof CrmWorkflowsRoute
+  '/feed/purchased': typeof FeedPurchasedRoute
+  '/feed/wallet': typeof FeedWalletRoute
+  '/feed/onboarding': typeof FeedOnboardingRoute
   '/crm': typeof CrmIndexRoute
+  '/feed': typeof FeedIndexRoute
   '/crm/campaigns/$id': typeof CrmCampaignsIdRoute
   '/crm/contacts/$id': typeof CrmContactsIdRoute
   '/crm/contacts/import': typeof CrmContactsImportRoute
@@ -181,11 +227,13 @@ export interface FileRoutesByTo {
   '/crm/settings/templates': typeof CrmSettingsTemplatesRoute
   '/crm/settings/whatsapp': typeof CrmSettingsWhatsappRoute
   '/crm/workflows/$id': typeof CrmWorkflowsIdRoute
+  '/feed/lead/$id': typeof FeedLeadIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/crm': typeof CrmRouteWithChildren
+  '/feed': typeof FeedRouteWithChildren
   '/login': typeof LoginRoute
   '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
@@ -193,7 +241,11 @@ export interface FileRoutesById {
   '/crm/pipelines': typeof CrmPipelinesRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/workflows': typeof CrmWorkflowsRoute
+  '/feed/purchased': typeof FeedPurchasedRoute
+  '/feed/wallet': typeof FeedWalletRoute
+  '/feed_/onboarding': typeof FeedOnboardingRoute
   '/crm/': typeof CrmIndexRoute
+  '/feed/': typeof FeedIndexRoute
   '/crm/campaigns_/$id': typeof CrmCampaignsIdRoute
   '/crm/contacts_/$id': typeof CrmContactsIdRoute
   '/crm/contacts_/import': typeof CrmContactsImportRoute
@@ -205,12 +257,14 @@ export interface FileRoutesById {
   '/crm/settings_/templates': typeof CrmSettingsTemplatesRoute
   '/crm/settings_/whatsapp': typeof CrmSettingsWhatsappRoute
   '/crm/workflows_/$id': typeof CrmWorkflowsIdRoute
+  '/feed/lead_/$id': typeof FeedLeadIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/crm'
+    | '/feed'
     | '/login'
     | '/crm/campaigns'
     | '/crm/contacts'
@@ -218,7 +272,11 @@ export interface FileRouteTypes {
     | '/crm/pipelines'
     | '/crm/settings'
     | '/crm/workflows'
+    | '/feed/purchased'
+    | '/feed/wallet'
+    | '/feed/onboarding'
     | '/crm/'
+    | '/feed/'
     | '/crm/campaigns/$id'
     | '/crm/contacts/$id'
     | '/crm/contacts/import'
@@ -230,6 +288,7 @@ export interface FileRouteTypes {
     | '/crm/settings/templates'
     | '/crm/settings/whatsapp'
     | '/crm/workflows/$id'
+    | '/feed/lead/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -240,7 +299,11 @@ export interface FileRouteTypes {
     | '/crm/pipelines'
     | '/crm/settings'
     | '/crm/workflows'
+    | '/feed/purchased'
+    | '/feed/wallet'
+    | '/feed/onboarding'
     | '/crm'
+    | '/feed'
     | '/crm/campaigns/$id'
     | '/crm/contacts/$id'
     | '/crm/contacts/import'
@@ -252,10 +315,12 @@ export interface FileRouteTypes {
     | '/crm/settings/templates'
     | '/crm/settings/whatsapp'
     | '/crm/workflows/$id'
+    | '/feed/lead/$id'
   id:
     | '__root__'
     | '/'
     | '/crm'
+    | '/feed'
     | '/login'
     | '/crm/campaigns'
     | '/crm/contacts'
@@ -263,7 +328,11 @@ export interface FileRouteTypes {
     | '/crm/pipelines'
     | '/crm/settings'
     | '/crm/workflows'
+    | '/feed/purchased'
+    | '/feed/wallet'
+    | '/feed_/onboarding'
     | '/crm/'
+    | '/feed/'
     | '/crm/campaigns_/$id'
     | '/crm/contacts_/$id'
     | '/crm/contacts_/import'
@@ -275,12 +344,15 @@ export interface FileRouteTypes {
     | '/crm/settings_/templates'
     | '/crm/settings_/whatsapp'
     | '/crm/workflows_/$id'
+    | '/feed/lead_/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CrmRoute: typeof CrmRouteWithChildren
+  FeedRoute: typeof FeedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  FeedOnboardingRoute: typeof FeedOnboardingRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -290,6 +362,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feed': {
+      id: '/feed'
+      path: '/feed'
+      fullPath: '/feed'
+      preLoaderRoute: typeof FeedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/crm': {
@@ -306,12 +385,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/feed/': {
+      id: '/feed/'
+      path: '/'
+      fullPath: '/feed/'
+      preLoaderRoute: typeof FeedIndexRouteImport
+      parentRoute: typeof FeedRoute
+    }
     '/crm/': {
       id: '/crm/'
       path: '/'
       fullPath: '/crm/'
       preLoaderRoute: typeof CrmIndexRouteImport
       parentRoute: typeof CrmRoute
+    }
+    '/feed_/onboarding': {
+      id: '/feed_/onboarding'
+      path: '/feed/onboarding'
+      fullPath: '/feed/onboarding'
+      preLoaderRoute: typeof FeedOnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feed/wallet': {
+      id: '/feed/wallet'
+      path: '/wallet'
+      fullPath: '/feed/wallet'
+      preLoaderRoute: typeof FeedWalletRouteImport
+      parentRoute: typeof FeedRoute
+    }
+    '/feed/purchased': {
+      id: '/feed/purchased'
+      path: '/purchased'
+      fullPath: '/feed/purchased'
+      preLoaderRoute: typeof FeedPurchasedRouteImport
+      parentRoute: typeof FeedRoute
     }
     '/crm/workflows': {
       id: '/crm/workflows'
@@ -354,6 +461,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/crm/campaigns'
       preLoaderRoute: typeof CrmCampaignsRouteImport
       parentRoute: typeof CrmRoute
+    }
+    '/feed/lead_/$id': {
+      id: '/feed/lead_/$id'
+      path: '/lead/$id'
+      fullPath: '/feed/lead/$id'
+      preLoaderRoute: typeof FeedLeadIdRouteImport
+      parentRoute: typeof FeedRoute
     }
     '/crm/workflows_/$id': {
       id: '/crm/workflows_/$id'
@@ -479,10 +593,28 @@ const CrmRouteChildren: CrmRouteChildren = {
 
 const CrmRouteWithChildren = CrmRoute._addFileChildren(CrmRouteChildren)
 
+interface FeedRouteChildren {
+  FeedPurchasedRoute: typeof FeedPurchasedRoute
+  FeedWalletRoute: typeof FeedWalletRoute
+  FeedIndexRoute: typeof FeedIndexRoute
+  FeedLeadIdRoute: typeof FeedLeadIdRoute
+}
+
+const FeedRouteChildren: FeedRouteChildren = {
+  FeedPurchasedRoute: FeedPurchasedRoute,
+  FeedWalletRoute: FeedWalletRoute,
+  FeedIndexRoute: FeedIndexRoute,
+  FeedLeadIdRoute: FeedLeadIdRoute,
+}
+
+const FeedRouteWithChildren = FeedRoute._addFileChildren(FeedRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CrmRoute: CrmRouteWithChildren,
+  FeedRoute: FeedRouteWithChildren,
   LoginRoute: LoginRoute,
+  FeedOnboardingRoute: FeedOnboardingRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

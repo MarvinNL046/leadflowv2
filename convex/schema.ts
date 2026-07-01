@@ -27,6 +27,12 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
+import {
+  marketplaceLeadScore,
+  marketplaceNiche,
+  marketplaceSegment,
+  marketplaceServiceType,
+} from "./marketplace/types";
 
 export default defineSchema({
   // ════════════════════════════════════════════════════════════════════
@@ -61,6 +67,9 @@ export default defineSchema({
     // Plan/billing — koppel later aan Stripe; in v1 was er client_subscriptions
     plan: v.optional(v.string()),
     stripeCustomerId: v.optional(v.string()),
+    // Marketplace access gate — true enables /feed routes + marketplace API.
+    // v1: orgs.marketplace_enabled (default false). undefined === false.
+    marketplaceEnabled: v.optional(v.boolean()),
   }).index("by_slug", ["slug"])
     .index("by_owner", ["ownerId"]),
 
@@ -815,102 +824,195 @@ export default defineSchema({
   }).index("by_flag_scope", ["flagKey", "scope", "scopeId"]),
 
   // ════════════════════════════════════════════════════════════════════
-  // MARKETPLACE (Marvin's beslissing: schema + UI porten, ondanks 0 customers)
+  // MARKETPLACE (v1-faithful port — LEAN scope)
   // ════════════════════════════════════════════════════════════════════
 
+  // Pricing matrix: per (niche × serviceType × segment) a min/max cents
+  // range. calculateLeadPrice() reads this; NOT keyed on score.
+  // v1: marketplace_lead_rates.
   marketplaceLeadRates: defineTable({
-    niche: v.string(),
-    region: v.string(),
-    sharedMin: v.number(),
-    sharedMax: v.number(),
-    exclusiveMultiplier: v.number(),  // typisch 4x
-    isActive: v.boolean(),
-  }).index("by_niche_region", ["niche", "region"]),
+    niche: v.string(), // seeded with marketplaceNiche values (v1 varchar)
+    serviceType: v.string(), // "install" | "repair" | "maintain"
+    segment: v.string(), // "b2c" | "b2b"
+    minCents: v.number(),
+    maxCents: v.number(),
+    updatedAt: v.number(),
+    legacyId: v.optional(v.number()),
+  })
+    .index("by_combo", ["niche", "serviceType", "segment"]) // uniqueness enforced in upsert
+    .index("by_niche", ["niche"])
+    .index("by_legacyId", ["legacyId"]),
 
+  // Platform-level intake API keys (no org scoping). Inbound SEO sites
+  // POST with one of these. v1: marketplace_api_keys.
   marketplaceApiKeys: defineTable({
-    orgId: v.id("orgs"),
-    keyHash: v.string(),
-    label: v.string(),
-    role: v.union(v.literal("buyer"), v.literal("seller")),
+    keyHash: v.string(), // sha256 hex — store hash only, never plaintext
+    keyPrefix: v.string(), // display prefix e.g. "lmk_ab12cd34"
+    name: v.string(),
+    defaultNiche: marketplaceNiche,
+    allowedNiches: v.array(v.string()), // validate ⊆ niche union in mutation
     isActive: v.boolean(),
+    createdByUserId: v.optional(v.id("users")),
     lastUsedAt: v.optional(v.number()),
-  }).index("by_org_role", ["orgId", "role"])
-    .index("by_keyHash", ["keyHash"]),
+    legacyId: v.optional(v.number()),
+  })
+    .index("by_keyHash", ["keyHash"]) // auth lookup (uniqueness enforced in mint)
+    .index("by_active", ["isActive"])
+    .index("by_legacyId", ["legacyId"]),
 
+  // Platform-owned lead inventory. PII stored in clear at rest; the FEED
+  // query masks it until purchase. v1: marketplace_leads.
   marketplaceLeads: defineTable({
-    sellerOrgId: v.id("orgs"),
-    contactId: v.id("contacts"),
-    niche: v.string(),
-    region: v.string(),
-    sharedPrice: v.number(),
-    exclusivePrice: v.number(),
-    status: v.union(
-      v.literal("available"),
-      v.literal("sold_shared"),
-      v.literal("sold_exclusive"),
-      v.literal("withdrawn")
+    apiKeyId: v.optional(v.id("marketplaceApiKeys")),
+    niche: marketplaceNiche,
+    serviceType: v.optional(marketplaceServiceType),
+    segment: marketplaceSegment, // default "b2c"
+    region: v.optional(v.string()),
+    province: v.optional(v.string()),
+    projectType: v.optional(v.string()),
+    projectDescription: v.optional(v.string()),
+    jobSize: v.optional(
+      v.union(
+        v.literal("s"),
+        v.literal("m"),
+        v.literal("l"),
+        v.literal("xl"),
+      ),
     ),
-    qualityScore: v.optional(v.number()),
-  }).index("by_status_niche_region", ["status", "niche", "region"]),
+    buyerIntention: v.optional(
+      v.union(v.literal("yes"), v.literal("unknown"), v.literal("no")),
+    ),
+    nicheData: v.optional(v.any()),
+    photos: v.optional(v.array(v.string())),
+    // PII (clear at rest, masked in feed)
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    phoneVerifiedAt: v.optional(v.number()),
+    emailVerifiedAt: v.optional(v.number()),
+    postalCode: v.optional(v.string()),
+    city: v.optional(v.string()),
+    urgency: v.optional(v.string()),
+    message: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+    score: marketplaceLeadScore, // computed at intake
+    status: v.union(
+      v.literal("pending_review"),
+      v.literal("published"),
+      v.literal("sold_exclusive"),
+      v.literal("sold_shared"),
+      v.literal("expired"),
+      v.literal("duplicate"),
+      v.literal("rejected"),
+    ),
+    priceExclusiveCents: v.number(),
+    priceSharedCents: v.number(),
+    maxSharedBuyers: v.number(), // default 4
+    allowExclusive: v.boolean(), // default true
+    allowShared: v.boolean(), // default true
+    publishedAt: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
+    adminNotes: v.optional(v.string()),
+    legacyId: v.optional(v.number()),
+  })
+    .index("by_niche_status", ["niche", "status"])
+    .index("by_status_published", ["status", "publishedAt"]) // FEED main query
+    .index("by_phone_niche", ["phone", "niche"]) // dedup at intake
+    .index("by_province", ["province"])
+    .index("by_legacyId", ["legacyId"]),
 
+  // A buyer org unlocking a lead. contactId = the auto-copied CRM contact.
+  // v1: marketplace_purchases. Unique (leadId, buyerOrgId) enforced in
+  // mutation.
   marketplacePurchases: defineTable({
-    buyerOrgId: v.id("orgs"),
     leadId: v.id("marketplaceLeads"),
-    purchaseType: v.union(v.literal("shared"), v.literal("exclusive")),
-    pricePaid: v.number(),
+    buyerOrgId: v.id("orgs"),
+    buyerWorkspaceId: v.id("workspaces"),
+    buyerUserId: v.id("users"),
+    mode: v.union(v.literal("exclusive"), v.literal("shared")),
+    priceCents: v.number(),
+    contactId: v.optional(v.id("contacts")),
     purchasedAt: v.number(),
-  }).index("by_buyer", ["buyerOrgId"])
-    .index("by_lead", ["leadId"]),
+    buyerStatus: v.string(), // default "new"
+    buyerStatusUpdatedAt: v.optional(v.number()),
+    legacyId: v.optional(v.number()),
+  })
+    .index("by_lead_org", ["leadId", "buyerOrgId"]) // buy-once-per-org guard
+    .index("by_buyer_purchased", ["buyerOrgId", "purchasedAt"])
+    .index("by_lead", ["leadId"]) // count shared slots
+    .index("by_buyerStatus", ["buyerStatus"])
+    .index("by_legacyId", ["legacyId"]),
 
+  // One wallet per buyer org (lazy-created). v1 PK = orgId; enforce
+  // single-row in getOrCreateWallet. No `currency` field (implicitly EUR).
   marketplaceWallets: defineTable({
     orgId: v.id("orgs"),
     balanceCents: v.number(),
-    currency: v.string(),
+    updatedAt: v.number(),
+    legacyOrgId: v.optional(v.number()),
   }).index("by_org", ["orgId"]),
 
+  // Append-only wallet ledger, keyed by orgId (v1 wallet has no serial
+  // id). v1: marketplace_wallet_transactions.
   marketplaceWalletTransactions: defineTable({
-    walletId: v.id("marketplaceWallets"),
-    amountCents: v.number(),          // negative for purchase
-    type: v.union(v.literal("topup"), v.literal("purchase"), v.literal("refund"), v.literal("payout")),
-    relatedPurchaseId: v.optional(v.id("marketplacePurchases")),
-    description: v.string(),
-  }).index("by_wallet", ["walletId"]),
+    orgId: v.id("orgs"),
+    type: v.union(
+      v.literal("topup"),
+      v.literal("purchase"),
+      v.literal("refund"),
+      v.literal("admin_adjustment"),
+    ),
+    amountCents: v.number(), // SIGNED: + credit / − debit
+    balanceAfterCents: v.number(), // running-balance snapshot for audit
+    referenceType: v.optional(v.string()), // "stripe_payment" | "purchase"
+    referenceId: v.optional(v.string()), // session.id | `lead_<id>_<ts>`
+    notes: v.optional(v.string()),
+    createdByUserId: v.optional(v.id("users")),
+    legacyId: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"]) // ledger list (order by _creationTime)
+    .index("by_ref", ["referenceType", "referenceId"]) // Stripe idempotency lookup
+    .index("by_legacyId", ["legacyId"]),
 
+  // Per-buyer-org feed filters + onboarding flag (one row per org).
+  // null array = "accept all"; [] = "accept none" — preserve the
+  // distinction. v1: marketplace_buyer_preferences.
   marketplaceBuyerPreferences: defineTable({
     orgId: v.id("orgs"),
-    niches: v.array(v.string()),
-    regions: v.array(v.string()),
-    autoBuyEnabled: v.boolean(),
-    maxPricePerLead: v.optional(v.number()),
-    dailyBudgetCents: v.optional(v.number()),
+    niches: v.array(v.string()), // default []
+    serviceTypes: v.optional(v.array(v.string())), // undefined = all
+    segments: v.optional(v.array(v.string())), // default ["b2c","b2b"]
+    regions: v.optional(v.array(v.string())), // stored, unused in feed
+    provinces: v.optional(v.array(v.string())), // ACTIVE geo filter
+    postalCodePrefixes: v.optional(v.array(v.string())), // stored, unused in feed
+    preferredMode: v.union(
+      v.literal("exclusive"),
+      v.literal("shared"),
+      v.literal("both"),
+    ),
+    notifyOnNewLead: v.boolean(),
+    notifyChannel: v.union(
+      v.literal("email"),
+      v.literal("whatsapp"),
+      v.literal("both"),
+      v.literal("none"),
+    ),
+    onboardingCompletedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+    legacyOrgId: v.optional(v.number()),
   }).index("by_org", ["orgId"]),
 
-  marketplaceOrgProfiles: defineTable({
+  // Lead-view dedup tracking (light analytics — kept because the
+  // lead-detail route writes it). v1: marketplace_lead_views.
+  marketplaceLeadViews: defineTable({
+    leadId: v.id("marketplaceLeads"),
     orgId: v.id("orgs"),
-    publicName: v.string(),
-    description: v.optional(v.string()),
-    logoUrl: v.optional(v.string()),
-    rating: v.optional(v.number()),
-    reviewCount: v.number(),
-  }).index("by_org", ["orgId"]),
-
-  marketplaceReviews: defineTable({
-    purchaseId: v.id("marketplacePurchases"),
-    buyerOrgId: v.id("orgs"),
-    sellerOrgId: v.id("orgs"),
-    rating: v.number(),               // 1-5
-    comment: v.optional(v.string()),
-  }).index("by_seller", ["sellerOrgId"]),
-
-  // platform-wide lead pool waar leads tussen orgs gerouted kunnen worden
-  platformLeadsPool: defineTable({
-    contactId: v.id("contacts"),
-    sourceOrgId: v.id("orgs"),
-    niche: v.string(),
-    region: v.string(),
-    status: v.union(v.literal("available"), v.literal("assigned"), v.literal("expired")),
-    assignedToOrgId: v.optional(v.id("orgs")),
-  }).index("by_status_niche", ["status", "niche"]),
+    userId: v.id("users"),
+    viewedAt: v.number(),
+  })
+    .index("by_lead_user", ["leadId", "userId", "viewedAt"]) // 5-min dedup lookup
+    .index("by_lead", ["leadId", "viewedAt"]),
 
   // ════════════════════════════════════════════════════════════════════
   // PERFORMANCE TIPS / OPEN VRAGEN

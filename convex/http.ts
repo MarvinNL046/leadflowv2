@@ -1,4 +1,5 @@
 import { httpRouter } from "convex/server";
+import Stripe from "stripe";
 import { httpAction } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -8,6 +9,7 @@ import { verifyStateToken } from "./metaOauth";
 import { getSiteUrl } from "./lib/env";
 import { encryptSecret } from "./lib/crypto";
 import { verifyUnsubToken } from "./unsubscribeToken";
+import { hashApiKey } from "./marketplace/apiKeys";
 
 const http = httpRouter();
 
@@ -912,6 +914,239 @@ http.route({
 // ──────────────────────────────────────────────────────────────────────
 // Shared HMAC helper voor SMS/WA (Meta gebruikt eigen wrapper)
 // ──────────────────────────────────────────────────────────────────────
+
+// ══════════════════════════════════════════════════════════════════════
+// MARKETPLACE INTAKE — server-to-server (SEO landing pages) lead ingest.
+// Auth = Bearer <rawKey> → sha256 → findActiveByHash. CORS "*" because
+// landing pages may POST from the browser. Calls internal.marketplace.*.
+// ══════════════════════════════════════════════════════════════════════
+const MP_CORS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+const MP_VALID_JOB_SIZES = ["s", "m", "l", "xl"];
+const MP_VALID_BUYER_INTENTIONS = ["yes", "unknown", "no"];
+
+http.route({
+  path: "/marketplace/intake",
+  method: "OPTIONS",
+  handler: httpAction(
+    async () => new Response(null, { status: 204, headers: MP_CORS }),
+  ),
+});
+
+http.route({
+  path: "/marketplace/intake",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const cors = (body: unknown, status: number) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json", ...MP_CORS },
+      });
+
+    // 1. Bearer auth.
+    const authHeader = request.headers.get("authorization");
+    const match = authHeader?.match(/^Bearer\s+(.+)$/i);
+    const rawKey = match?.[1]?.trim();
+    if (!rawKey) {
+      return cors({ error: "missing_api_key" }, 401);
+    }
+
+    // 2. Hash + lookup active key.
+    const keyHash = await hashApiKey(rawKey);
+    const apiKey = await ctx.runQuery(
+      internal.marketplace.apiKeys.findActiveByHash,
+      { keyHash },
+    );
+    if (!apiKey) {
+      return cors({ error: "invalid_api_key" }, 401);
+    }
+
+    // 3. Parse + wire-validate body.
+    let body: Record<string, unknown>;
+    try {
+      const parsed = JSON.parse(await request.text());
+      if (typeof parsed !== "object" || parsed === null) {
+        return cors({ error: "invalid_body" }, 400);
+      }
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return cors({ error: "invalid_json" }, 400);
+    }
+
+    const str = (val: unknown): string | undefined =>
+      typeof val === "string" ? val : undefined;
+
+    const firstName = str(body.firstName);
+    const lastName = str(body.lastName);
+    const phone = str(body.phone);
+    const postalCode = str(body.postalCode);
+    if (!firstName?.trim()) return cors({ error: "missing_firstName" }, 400);
+    if (!lastName?.trim()) return cors({ error: "missing_lastName" }, 400);
+    if (!phone?.trim()) return cors({ error: "missing_phone" }, 400);
+    if (!postalCode?.trim()) return cors({ error: "missing_postalCode" }, 400);
+
+    const projectType = str(body.projectType);
+    if (projectType !== undefined && projectType.length > 255) {
+      return cors({ error: "projectType_too_long" }, 400);
+    }
+    const projectDescription = str(body.projectDescription);
+    if (projectDescription !== undefined && projectDescription.length > 4000) {
+      return cors({ error: "projectDescription_too_long" }, 400);
+    }
+
+    const jobSize = str(body.jobSize);
+    if (jobSize !== undefined && !MP_VALID_JOB_SIZES.includes(jobSize)) {
+      return cors({ error: "invalid_jobSize" }, 400);
+    }
+    const buyerIntention = str(body.buyerIntention);
+    if (
+      buyerIntention !== undefined &&
+      !MP_VALID_BUYER_INTENTIONS.includes(buyerIntention)
+    ) {
+      return cors({ error: "invalid_buyerIntention" }, 400);
+    }
+
+    let photos: string[] | undefined;
+    if (body.photos !== undefined) {
+      if (
+        !Array.isArray(body.photos) ||
+        body.photos.length > 10 ||
+        !body.photos.every((u) => typeof u === "string")
+      ) {
+        return cors({ error: "invalid_photos" }, 400);
+      }
+      photos = body.photos as string[];
+    }
+
+    // 4. Insert via the single-source internal mutation. Business-rule
+    //    rejects (invalid niche / phone / not allowed) throw → 400.
+    let result: {
+      ok: true;
+      leadId: string;
+      duplicate: boolean;
+      status: string;
+    };
+    try {
+      result = await ctx.runMutation(internal.marketplace.intake.insertLead, {
+        apiKeyId: apiKey._id,
+        niche: str(body.niche),
+        serviceType: str(body.serviceType),
+        segment: str(body.segment),
+        firstName,
+        lastName,
+        phone,
+        postalCode,
+        email: str(body.email),
+        projectType,
+        projectDescription,
+        jobSize,
+        buyerIntention,
+        nicheData:
+          body.nicheData && typeof body.nicheData === "object"
+            ? body.nicheData
+            : undefined,
+        photos,
+        urgency: str(body.urgency),
+        message: str(body.message),
+        city: str(body.city),
+        metadata:
+          body.metadata && typeof body.metadata === "object"
+            ? body.metadata
+            : undefined,
+      });
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "intake_failed";
+      console.warn("[marketplace-intake] rejected:", code);
+      return cors({ error: code }, 400);
+    }
+
+    // 5. Success.
+    return cors(
+      {
+        ok: true,
+        leadId: result.leadId,
+        duplicate: result.duplicate,
+        status: result.status,
+      },
+      200,
+    );
+  }),
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// MARKETPLACE STRIPE WEBHOOK — credits a buyer wallet on topup completion.
+// URL: ${CONVEX_SITE_URL}/webhooks/marketplace-stripe (its OWN Stripe
+// endpoint, distinct from any CRM webhook). Raw-body, signature-verified
+// with `constructEventAsync` (WebCrypto — stays in the V8 runtime, no
+// "use node"). Idempotent: creditTopupIdempotent guards on by_ref so
+// Stripe's at-least-once retry can't double-credit.
+//
+// Env (set via `npx convex env set`):
+//   STRIPE_SECRET_KEY                  — same key as createTopup
+//   STRIPE_MARKETPLACE_WEBHOOK_SECRET  — this endpoint's signing secret
+// Absent keys → 500 {error:"not_configured"} (safe to ship without them).
+// ══════════════════════════════════════════════════════════════════════
+http.route({
+  path: "/webhooks/marketplace-stripe",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const secret = process.env.STRIPE_MARKETPLACE_WEBHOOK_SECRET;
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!secret || !key) {
+      return jsonResponse({ error: "not_configured" }, 500);
+    }
+
+    const sig = request.headers.get("stripe-signature");
+    if (!sig) return jsonResponse({ error: "no_signature" }, 400);
+
+    // Raw body — exactly as received, for signature verification.
+    const body = await request.text();
+    let event: Stripe.Event;
+    try {
+      // constructEventAsync uses WebCrypto (works in the default V8
+      // runtime); the sync constructEvent needs node crypto.
+      event = await new Stripe(key).webhooks.constructEventAsync(
+        body,
+        sig,
+        secret,
+      );
+    } catch (err) {
+      console.warn("[marketplace-stripe] signature verify failed:", err);
+      return jsonResponse({ error: "invalid_signature" }, 400);
+    }
+
+    // Only completed Checkout Sessions of OUR topup kind are processed.
+    if (event.type !== "checkout.session.completed") {
+      return jsonResponse({ received: true }, 200);
+    }
+    const session = event.data.object as Stripe.Checkout.Session;
+    if (session.metadata?.kind !== "marketplace_topup") {
+      return jsonResponse({ received: true }, 200);
+    }
+
+    const orgId = session.metadata.marketplaceOrgId;
+    const userId = session.metadata.marketplaceUserId;
+    const amountCents = session.amount_total ?? 0;
+    if (!orgId || !amountCents) {
+      console.error("[marketplace-stripe] bad metadata", session.metadata);
+      return jsonResponse({ error: "bad_metadata" }, 400);
+    }
+
+    // Idempotency + credit happen in ONE mutation (by_ref guard).
+    await ctx.runMutation(internal.marketplace.wallet.creditTopupIdempotent, {
+      orgId: orgId as Id<"orgs">,
+      userId: userId ? (userId as Id<"users">) : undefined,
+      amountCents,
+      sessionId: session.id,
+    });
+
+    return jsonResponse({ received: true }, 200);
+  }),
+});
 
 async function isValidHmacSignature(
   rawBody: string,
