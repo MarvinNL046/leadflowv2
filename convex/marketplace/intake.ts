@@ -128,7 +128,7 @@ export const insertLead = internalMutation({
 			? ("rejected" as const)
 			: isDup
 				? ("duplicate" as const)
-				: score === "low"
+				: score === "low" && !apiKey.trusted
 					? ("pending_review" as const)
 					: ("published" as const);
 		const now = Date.now();

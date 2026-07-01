@@ -42,6 +42,7 @@ import type * as lib_crypto from "../lib/crypto.js";
 import type * as lib_env from "../lib/env.js";
 import type * as lib_phone from "../lib/phone.js";
 import type * as marketplace_access from "../marketplace/access.js";
+import type * as marketplace_adminCli from "../marketplace/adminCli.js";
 import type * as marketplace_apiKeys from "../marketplace/apiKeys.js";
 import type * as marketplace_buyerPreferences from "../marketplace/buyerPreferences.js";
 import type * as marketplace_buyerStatus from "../marketplace/buyerStatus.js";
@@ -122,6 +123,7 @@ declare const fullApi: ApiFromModules<{
   "lib/env": typeof lib_env;
   "lib/phone": typeof lib_phone;
   "marketplace/access": typeof marketplace_access;
+  "marketplace/adminCli": typeof marketplace_adminCli;
   "marketplace/apiKeys": typeof marketplace_apiKeys;
   "marketplace/buyerPreferences": typeof marketplace_buyerPreferences;
   "marketplace/buyerStatus": typeof marketplace_buyerStatus;
