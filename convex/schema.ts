@@ -852,6 +852,9 @@ export default defineSchema({
     defaultNiche: marketplaceNiche,
     allowedNiches: v.array(v.string()), // validate ⊆ niche union in mutation
     isActive: v.boolean(),
+    // First-party/trusted source: low-score leads publish directly instead
+    // of landing in pending_review (honeypot + dedup still apply).
+    trusted: v.optional(v.boolean()),
     createdByUserId: v.optional(v.id("users")),
     lastUsedAt: v.optional(v.number()),
     legacyId: v.optional(v.number()),

@@ -92,3 +92,14 @@ export const mintKey = internalMutation({
 		return { rawKey, keyPrefix: rawKey.slice(0, 12) };
 	},
 });
+
+/** Flag an intake key as trusted/first-party (low-score leads auto-publish). */
+export const setKeyTrusted = internalMutation({
+	args: { apiKeyId: v.id("marketplaceApiKeys"), trusted: v.boolean() },
+	handler: async (ctx, { apiKeyId, trusted }) => {
+		const key = await ctx.db.get(apiKeyId);
+		if (!key) throw new Error("api key not found");
+		await ctx.db.patch(apiKeyId, { trusted });
+		return { ok: true, apiKeyId, trusted };
+	},
+});
