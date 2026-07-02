@@ -1,6 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "if [ \"$VERCEL_ENV\" = production ]; then npx convex deploy --cmd 'npm run build'; else npm run build; fi",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "app.wetryleadflow.com" }],
+      "destination": "https://leadflow.wetry.app/:path*",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
