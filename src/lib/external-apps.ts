@@ -5,12 +5,14 @@
  */
 
 /**
- * Domeinstructuur (koepel "wetry", besloten 12 jun 2026):
- *   wetry{product}.com     → marketing/landing
- *   app.wetry{product}.com → de app zelf
+ * Domeinstructuur (wetry.app-koepel, live sinds eind jun 2026 — vervangt
+ * het oudere app.wetry{product}.com-plan van 12 jun dat nooit is aangelegd):
+ *   wetry{product}.com   → marketing/landing
+ *   {product}.wetry.app  → de app zelf
+ * Leadflow zelf woont op leadflow.wetry.app.
  */
-export const FROSTWORK_URL = 'https://app.wetryfrostwork.com'
-export const CASHFLOW_URL = 'https://app.wetrycashflow.com'
+export const FROSTWORK_URL = 'https://frostwork.wetry.app'
+export const CASHFLOW_URL = 'https://cashflow.wetry.app'
 
 /**
  * Deeplink naar de Frostwork-klantenlijst, voorgefilterd op naam
