@@ -849,6 +849,69 @@ export const upsertContactsBatch = internalMutation({
 });
 
 // ──────────────────────────────────────────────────────────────────────
+// MONEYBIRD-IMPORT (fase A koepel-cleanup, 2026-07)
+// ──────────────────────────────────────────────────────────────────────
+
+const moneybirdContactValidator = v.object({
+  moneybirdId: v.string(),
+  firstName: v.optional(v.string()),
+  lastName: v.optional(v.string()),
+  company: v.optional(v.string()),
+  email: v.optional(v.string()),
+  phone: v.optional(v.string()),
+  street: v.optional(v.string()),
+  postalCode: v.optional(v.string()),
+  city: v.optional(v.string()),
+  country: v.optional(v.string()),
+});
+
+/**
+ * Fase A: Moneybird-klanten die (na offline matching op verse exports)
+ * NIET in leadflow bestaan als contact toevoegen. Insert-only — bestaande
+ * contacten worden bewust nooit aangeraakt; de match zelf gebeurt offline.
+ * externalId = "moneybird:<id>" (traceerbaar + basis voor fase C), tag
+ * "moneybird-import" voor segmenten. Chunked aanroepen; elke chunk is
+ * transactioneel, dus bij een fout alleen die chunk opnieuw.
+ */
+export const insertMoneybirdContacts = internalMutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    docs: v.array(moneybirdContactValidator),
+  },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    for (const doc of args.docs) {
+      await ctx.db.insert("contacts", {
+        workspaceId: args.workspaceId,
+        firstName: doc.firstName,
+        lastName: doc.lastName,
+        company: doc.company,
+        email: doc.email,
+        phone: doc.phone,
+        street: doc.street,
+        postalCode: doc.postalCode,
+        city: doc.city,
+        country: doc.country,
+        callCount: 0,
+        tags: ["moneybird-import"],
+        externalId: `moneybird:${doc.moneybirdId}`,
+      });
+      inserted++;
+    }
+    return { inserted };
+  },
+});
+
+/** Verificatie-teller voor de Moneybird-import (scan, eenmalig gebruik). */
+export const countMoneybirdContacts = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("contacts").collect();
+    return rows.filter((r) => r.externalId?.startsWith("moneybird:")).length;
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
 // LEAD ATTRIBUTION ETL
 // ──────────────────────────────────────────────────────────────────────
 
