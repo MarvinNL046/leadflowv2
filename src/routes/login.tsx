@@ -40,12 +40,18 @@ function LoginPage() {
       {/* Clerk's kant-en-klare sign-in (Google + e-mail/wachtwoord — wat op
           de gedeelde wetry-instance aanstaat). hash-routing zodat er geen
           extra TanStack-routes voor de sub-stappen (verify, MFA) nodig zijn.
-          forceRedirectUrl pint Clerk's post-sign-in full-page redirect op
-          /login zelf, zodat het bootstrap-useEffect hierboven gegarandeerd
-          draait (ensureProfile → navigate '/') i.p.v. dat Clerk de pagina
-          unloadt vóór het effect kan vuren. Vangnet: ProfileBootstrap in de
-          provider heelt elk pad dat hier toch omheen gaat. */}
-      <SignIn routing="hash" forceRedirectUrl="/login" />
+          BELANGRIJK: alleen renderen zolang Convex-auth nog niet rond is —
+          een <SignIn> mét actieve sessie redirect anders in een loop.
+          Na Clerk's post-sign-in redirect (default '/') doet de root-level
+          ProfileBootstrap de users-rij/profile/tenant-ensure; het effect
+          hierboven dekt het pad waarin de user op /login blijft. */}
+      {isAuthenticated && !isLoading ? (
+        <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-sm text-zinc-600">Ingelogd — profiel laden…</p>
+        </div>
+      ) : (
+        <SignIn routing="hash" />
+      )}
 
       {error && (
         <div className="w-full max-w-sm rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">
