@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./lib/identity";
 import {
   internalMutation,
   mutation,
@@ -47,7 +47,7 @@ async function requireWorkspaceMembership(
   ctx: QueryCtx,
   workspaceId: Id<"workspaces">,
 ): Promise<Id<"users">> {
-  const userId = await getAuthUserId(ctx);
+  const userId = await getUserId(ctx);
   if (!userId) {
     throw new Error("Not authenticated");
   }
@@ -403,7 +403,7 @@ export const listIncomingLeads = query({
 export const getDetail = query({
   args: { contactId: v.id("contacts") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
     const contact = await ctx.db.get(args.contactId);
@@ -505,7 +505,7 @@ async function requireMembershipForContact(
   ctx: MutationCtx,
   contactId: Id<"contacts">,
 ): Promise<{ contact: Doc<"contacts">; userId: Id<"users"> }> {
-  const userId = await getAuthUserId(ctx);
+  const userId = await getUserId(ctx);
   if (!userId) throw new Error("Not authenticated");
 
   const contact = await ctx.db.get(contactId);

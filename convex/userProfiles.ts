@@ -1,7 +1,12 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query, type MutationCtx } from "./_generated/server";
+import {
+  internalQuery,
+  mutation,
+  query,
+  type MutationCtx,
+} from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { getSuperAdminEmails } from "./lib/env";
+import { ensureUserId, getUserId } from "./lib/identity";
 
 /**
  * Haalt de app-level userProfile voor de huidig ingelogde gebruiker op,
@@ -24,9 +29,12 @@ import { getSuperAdminEmails } from "./lib/env";
  * owner van dezelfde tenant. Non-super-admins krijgen géén auto-tenant
  * (wachten op invite of admin-toewijzing later).
  *
- * BELANGRIJK: gebruik `getAuthUserId(ctx)` van @convex-dev/auth/server,
- * NIET `identity.subject`. identity.subject is composite
- * "<userId>|<sessionId>" string, niet de plain Id<"users">.
+ * BELANGRIJK: gebruik de brug-helpers uit lib/identity.ts (getUserId /
+ * ensureUserId), NIET `identity.subject` direct. Convex Auth's subject is
+ * een composiet "<userId>|<sessionId>"; Clerk's subject is "user_..." —
+ * de brug resolvet beide naar een plain Id<"users">. ensureUserId maakt
+ * of linkt bij een eerste Clerk-login ook de users-rij (e-mail-match naar
+ * de rij mét profile, dus nooit naar het bekende duplicaat).
  */
 // Super-admin e-mails uit env (SUPER_ADMIN_EMAILS, comma-gescheiden);
 // fallback op de bekende set zodat het nooit stilvalt.
@@ -39,7 +47,9 @@ const DEFAULT_WORKSPACE_NAME = "Default";
 export const getOrCreateUserProfile = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    // ensureUserId i.p.v. getUserId: maakt/linkt de users-rij bij een
+    // eerste Clerk-login (idempotent, no-op onder Convex Auth).
+    const userId = await ensureUserId(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -65,7 +75,15 @@ export const getOrCreateUserProfile = mutation({
     // dezelfde data maar via een aparte fetch — duurder).
     const authUser = await ctx.db.get(userId);
     const email = authUser?.email ?? "";
-    const isSuperAdmin = SUPER_ADMIN_EMAILS.has(email);
+    // Lowercase vóór de match: getSuperAdminEmails() lowercased de
+    // env-entries al; Clerk kan e-mails met hoofdletters aanleveren.
+    // GEVERIFIEERD-gate: super-admin (en dus de Staycool-tenant) alleen
+    // voor rijen met bevestigd e-mailadres — de gedeelde Clerk-instance
+    // heeft open sign-up, dus een onbevestigde rij met een super-admin-
+    // adres mag nooit tenant-toegang opleveren.
+    const isSuperAdmin =
+      authUser?.emailVerificationTime !== undefined &&
+      SUPER_ADMIN_EMAILS.has(email.toLowerCase());
 
     const profileId = await ctx.db.insert("userProfiles", {
       userId,
@@ -150,6 +168,18 @@ async function ensureStaycoolTenant(
 }
 
 /**
+ * Interne resolver voor actions (die hebben geen ctx.db en kunnen de
+ * Clerk-lookup uit lib/identity.ts dus niet zelf doen). Gebruikt door
+ * metaOauth.startOauth via ctx.runQuery.
+ */
+export const currentUserId = internalQuery({
+  args: {},
+  handler: async (ctx): Promise<Id<"users"> | null> => {
+    return await getUserId(ctx);
+  },
+});
+
+/**
  * Read-only helper voor de current user's profile. Returned null als
  * niet ingelogd of als profile nog niet aangemaakt is (front-end roept
  * dan eerst getOrCreateUserProfile aan).
@@ -157,7 +187,7 @@ async function ensureStaycoolTenant(
 export const me = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return null;
 
     return await ctx.db
@@ -175,7 +205,7 @@ export const me = query({
 export const myTenants = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return [];
 
     const memberships = await ctx.db

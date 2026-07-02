@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./lib/identity";
 import {
   action,
   internalAction,
@@ -233,7 +233,7 @@ export const resolveForSend = internalQuery({
         recipient: string;
       }
   > => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return { error: "Not authenticated" };
 
     const contact = await ctx.db.get(args.contactId);
@@ -348,7 +348,7 @@ export const insertPendingInternal = internalMutation({
 export const markAllRead = mutation({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const workspace = await ctx.db.get(args.workspaceId);
     if (!workspace) throw new Error("Workspace not found");
@@ -386,7 +386,7 @@ export const markAllRead = mutation({
 export const markConversationRead = mutation({
   args: { workspaceId: v.id("workspaces"), contactId: v.id("contacts") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const workspace = await ctx.db.get(args.workspaceId);
     if (!workspace) throw new Error("Workspace not found");
@@ -747,7 +747,7 @@ async function requireMembershipForContact(
   ctx: QueryCtx,
   contactId: Id<"contacts">,
 ): Promise<void> {
-  const userId = await getAuthUserId(ctx);
+  const userId = await getUserId(ctx);
   if (!userId) throw new Error("Not authenticated");
   const contact = await ctx.db.get(contactId);
   if (!contact) throw new Error("Contact not found");
@@ -797,7 +797,7 @@ export const listConversations = query({
     includeArchived: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const workspace = await ctx.db.get(args.workspaceId);
     if (!workspace) throw new Error("Workspace not found");
@@ -884,7 +884,7 @@ export const listConversations = query({
 export const archiveConversation = mutation({
   args: { contactId: v.id("contacts") },
   handler: async (ctx, { contactId }) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const contact = await ctx.db.get(contactId);
     if (!contact) throw new Error("Contact not found");
@@ -904,7 +904,7 @@ export const archiveConversation = mutation({
 export const unarchiveConversation = mutation({
   args: { contactId: v.id("contacts") },
   handler: async (ctx, { contactId }) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const contact = await ctx.db.get(contactId);
     if (!contact) throw new Error("Contact not found");
@@ -926,7 +926,7 @@ export const unarchiveConversation = mutation({
 export const inboxUnreadCounts = query({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, { workspaceId }) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return { sms: 0, whatsapp: 0, email: 0, total: 0 };
     const workspace = await ctx.db.get(workspaceId);
     if (!workspace) return { sms: 0, whatsapp: 0, email: 0, total: 0 };
@@ -982,7 +982,7 @@ export const listByWorkspace = query({
     ),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const workspace = await ctx.db.get(args.workspaceId);
     if (!workspace) throw new Error("Workspace not found");

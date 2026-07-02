@@ -2300,6 +2300,34 @@ export const relinkAuthAccount = internalMutation({
   },
 });
 
+/** Clerk-cutover: cement de link tussen een bestaande users-rij en het
+ * Clerk-account op de gedeelde wetry-instance, VÓÓR de frontend-cutover.
+ * Zo landt lib/identity's by_clerk_user-lookup gegarandeerd op de juiste
+ * rij (die met profile/membership/org-ownership), ongeacht met welk
+ * e-mailadres het Clerk-account binnenkomt — de e-mail-match in
+ * ensureUserId blijft puur als vangnet voor toekomstige users. Guard:
+ * weigert als het Clerk-id al aan een ándere rij hangt (voorkomt de
+ * .unique()-runtime-error in de brug). */
+export const setClerkUserId = internalMutation({
+  args: {
+    userId: v.id("users"),
+    clerkUserId: v.string(),
+  },
+  handler: async (ctx, { userId, clerkUserId }) => {
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("user niet gevonden");
+    const taken = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", clerkUserId))
+      .unique();
+    if (taken && taken._id !== userId) {
+      throw new Error(`clerkUserId hangt al aan user ${taken._id}`);
+    }
+    await ctx.db.patch(userId, { clerkUserId });
+    return { userId, clerkUserId, email: user.email };
+  },
+});
+
 /**
  * Eenmalige backfill: zet leadAttribution.workspaceId vanuit het gekoppelde
  * contact. Batched (max 500/call) + idempotent. Run herhaald tot processed===0.

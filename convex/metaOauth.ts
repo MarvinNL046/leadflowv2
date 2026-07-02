@@ -1,5 +1,4 @@
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -51,7 +50,12 @@ export const startOauth = action({
   handler: async (ctx, args): Promise<{
     redirectUrl: string;
   }> => {
-    const userId = await getAuthUserId(ctx);
+    // Action heeft geen ctx.db → identiteits-brug via internalQuery
+    // (resolvet zowel Convex Auth- als Clerk-tokens naar Id<"users">).
+    const userId: Id<"users"> | null = await ctx.runQuery(
+      internal.userProfiles.currentUserId,
+      {},
+    );
     if (!userId) throw new Error("Niet ingelogd");
 
     const appId = process.env.META_APP_ID;

@@ -1,30 +1,24 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
-import { useAuthActions } from '@convex-dev/auth/react'
+import { SignIn } from '@clerk/clerk-react'
 import { useConvexAuth, useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 
 export const Route = createFileRoute('/login')({ component: LoginPage })
 
-type Flow = 'signIn' | 'signUp'
-
 function LoginPage() {
-  const { signIn } = useAuthActions()
   const navigate = useNavigate()
   const { isAuthenticated, isLoading } = useConvexAuth()
   const ensureProfile = useMutation(api.userProfiles.getOrCreateUserProfile)
 
-  const [flow, setFlow] = useState<Flow>('signIn')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
 
-  // Reageer op auth-state changes via useEffect (correct React pattern —
-  // niet inline tijdens render). Convex's auth-state komt async binnen
-  // via websocket na succesvolle signIn, dus dit triggert vanzelf zodra
-  // de session-cookie geladen is.
+  // Zelfde bootstrap-moment als vóór de Clerk-migratie: zodra Convex het
+  // (nu door Clerk uitgegeven) token accepteert, ensure't deze mutation de
+  // users-rij + profile + tenant en sturen we door. Bij de allereerste
+  // Clerk-login linkt getOrCreateUserProfile (via lib/identity.ensureUserId)
+  // automatisch aan de bestaande CRM-user op geverifieerd e-mailadres.
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
       setStatusMsg('Ingelogd, profile aanmaken…')
@@ -41,180 +35,32 @@ function LoginPage() {
     }
   }, [isAuthenticated, isLoading, ensureProfile, navigate])
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setStatusMsg(flow === 'signIn' ? 'Inloggen…' : 'Account aanmaken…')
-    setSubmitting(true)
-    try {
-      const formData = new FormData()
-      formData.set('email', email)
-      formData.set('password', password)
-      formData.set('flow', flow)
-      const result = await signIn('password', formData)
-      console.log('[login] signIn result:', result)
-      setStatusMsg('Wacht op auth-state…')
-      // useEffect hierboven pakt verder over zodra isAuthenticated=true
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error('[login] signIn error:', err)
-      setError(
-        flow === 'signIn'
-          ? `Inloggen mislukt: ${msg}`
-          : `Registratie mislukt: ${msg}`,
-      )
-      setStatusMsg(null)
-      setSubmitting(false)
-    }
-  }
-
-  async function handleGoogle() {
-    setError(null)
-    setStatusMsg('Doorsturen naar Google…')
-    try {
-      await signIn('google')
-      // redirect naar Google; bij terugkeer pakt de useEffect de auth-state op
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error('[login] google signIn error:', err)
-      setError(`Google login mislukt: ${msg}`)
-      setStatusMsg(null)
-    }
-  }
-
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4">
-      <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">
-          {flow === 'signIn' ? 'Inloggen' : 'Account aanmaken'}
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          LeadFlow v2 — {flow === 'signIn' ? 'welkom terug' : 'start je account'}
-        </p>
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-zinc-50 p-4">
+      {/* Clerk's kant-en-klare sign-in (Google + e-mail/wachtwoord — wat op
+          de gedeelde wetry-instance aanstaat). hash-routing zodat er geen
+          extra TanStack-routes voor de sub-stappen (verify, MFA) nodig zijn.
+          forceRedirectUrl pint Clerk's post-sign-in full-page redirect op
+          /login zelf, zodat het bootstrap-useEffect hierboven gegarandeerd
+          draait (ensureProfile → navigate '/') i.p.v. dat Clerk de pagina
+          unloadt vóór het effect kan vuren. Vangnet: ProfileBootstrap in de
+          provider heelt elk pad dat hier toch omheen gaat. */}
+      <SignIn routing="hash" forceRedirectUrl="/login" />
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label
-              htmlFor="email"
-              className="mb-1 block text-sm font-medium text-zinc-700"
-            >
-              E-mailadres
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-              placeholder="naam@bedrijf.nl"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="password"
-              className="mb-1 block text-sm font-medium text-zinc-700"
-            >
-              Wachtwoord
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete={
-                flow === 'signIn' ? 'current-password' : 'new-password'
-              }
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-              placeholder="minimaal 8 tekens"
-            />
-          </div>
-
-          {error && (
-            <div className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">
-              {error}
-            </div>
-          )}
-
-          {statusMsg && !error && (
-            <div className="rounded-md bg-violet-50 px-3 py-2 text-sm text-violet-700">
-              {statusMsg}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-60"
-          >
-            {submitting
-              ? 'Bezig…'
-              : flow === 'signIn'
-                ? 'Inloggen'
-                : 'Account aanmaken'}
-          </button>
-        </form>
-
-        <div className="my-4 flex items-center gap-3 text-xs text-zinc-400">
-          <span className="h-px flex-1 bg-zinc-200" />
-          of
-          <span className="h-px flex-1 bg-zinc-200" />
+      {error && (
+        <div className="w-full max-w-sm rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {error}
         </div>
-
-        <button
-          type="button"
-          onClick={handleGoogle}
-          disabled={submitting}
-          className="flex w-full items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
-        >
-          <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
-            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-          </svg>
-          Inloggen met Google
-        </button>
-
-        <div className="mt-4 text-center text-sm text-zinc-600">
-          {flow === 'signIn' ? (
-            <>
-              Nog geen account?{' '}
-              <button
-                type="button"
-                onClick={() => setFlow('signUp')}
-                className="font-medium text-violet-700 hover:underline"
-              >
-                Registreren
-              </button>
-            </>
-          ) : (
-            <>
-              Heb je al een account?{' '}
-              <button
-                type="button"
-                onClick={() => setFlow('signIn')}
-                className="font-medium text-violet-700 hover:underline"
-              >
-                Inloggen
-              </button>
-            </>
-          )}
+      )}
+      {statusMsg && !error && (
+        <div className="w-full max-w-sm rounded-md bg-violet-50 px-3 py-2 text-sm text-violet-700">
+          {statusMsg}
         </div>
+      )}
 
-        <div className="mt-6 border-t border-zinc-100 pt-4 text-center text-xs text-zinc-400">
-          <Link to="/" className="hover:underline">
-            ← terug naar home
-          </Link>
-        </div>
-
-        {/* Google OAuth: voorbereid in convex/auth.ts maar wacht op
-            AUTH_GOOGLE_ID + AUTH_GOOGLE_SECRET env vars. Knop wordt
-            zichtbaar zodra die gezet zijn — voor nu placeholder-comment. */}
-      </div>
+      <Link to="/" className="text-xs text-zinc-400 hover:underline">
+        ← terug naar home
+      </Link>
     </div>
   )
 }

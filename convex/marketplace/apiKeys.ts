@@ -1,4 +1,4 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "../lib/identity";
 import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import {
@@ -38,7 +38,7 @@ function generateRawKey(): string {
 
 /** Throws unless the caller is an authenticated super-admin. */
 async function requireSuperAdmin(ctx: QueryCtx) {
-	const userId = await getAuthUserId(ctx);
+	const userId = await getUserId(ctx);
 	if (!userId) {
 		throw new Error("Not authenticated");
 	}

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Authenticated, Unauthenticated, useQuery, useMutation } from 'convex/react'
-import { useAuthActions } from '@convex-dev/auth/react'
+import { useClerk } from '@clerk/clerk-react'
 import { api } from '../../convex/_generated/api'
 
 export const Route = createFileRoute('/')({ component: Home })
@@ -29,7 +29,7 @@ function Home() {
 }
 
 function AuthenticatedView() {
-  const { signOut } = useAuthActions()
+  const { signOut } = useClerk()
   const profile = useQuery(api.userProfiles.me)
   const tenants = useQuery(api.userProfiles.myTenants)
   const ensureProfile = useMutation(api.userProfiles.getOrCreateUserProfile)
@@ -57,8 +57,8 @@ function AuthenticatedView() {
           {profile === undefined ? (
             <p className="mt-1 text-sm text-zinc-500">Profile laden…</p>
           ) : profile === null ? (
-            <p className="mt-1 text-sm text-amber-600">
-              Geen profile gevonden. Probeer opnieuw in te loggen.
+            <p className="mt-1 text-sm text-zinc-500">
+              Profile wordt aangemaakt…
             </p>
           ) : (
             <>

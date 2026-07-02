@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./lib/identity";
 import {
   action,
   internalMutation,
@@ -18,7 +18,7 @@ import { decryptSecret } from "./lib/crypto";
  *
  * Auth-pattern: elke handler valideert dat de huidige user owner/admin is
  * van de org/workspace voor de gevraagde resource. Geen userId-args, alles
- * via `getAuthUserId(ctx)` per Convex-guidelines.
+ * via `getUserId(ctx)` per Convex-guidelines.
  *
  * Voidfix WA REST API base: https://wa.voidfix.com
  * Auth header: X-API-Key = process.env.VOIDFIX_API_KEY
@@ -42,7 +42,7 @@ async function requireOrgAccess(
   ctx: QueryCtx | MutationCtx,
   orgId: Id<"orgs">,
 ): Promise<{ userId: Id<"users">; role: "owner" | "admin" | "member" }> {
-  const userId = await getAuthUserId(ctx);
+  const userId = await getUserId(ctx);
   if (!userId) throw new Error("Niet ingelogd");
 
   const membership = await ctx.db
@@ -58,7 +58,7 @@ async function requireWorkspaceAccess(
   ctx: QueryCtx | MutationCtx,
   workspaceId: Id<"workspaces">,
 ): Promise<{ userId: Id<"users">; orgId: Id<"orgs"> }> {
-  const userId = await getAuthUserId(ctx);
+  const userId = await getUserId(ctx);
   if (!userId) throw new Error("Niet ingelogd");
 
   const workspace = await ctx.db.get(workspaceId);

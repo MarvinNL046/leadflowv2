@@ -8,7 +8,7 @@ import {
   query,
   type QueryCtx,
 } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./lib/identity";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { decryptSecret } from "./lib/crypto";
@@ -246,7 +246,7 @@ export const checkMembership = internalQuery({
     ctx: QueryCtx,
     { workspaceId }: { workspaceId: Id<"workspaces"> },
   ): Promise<{ ok: boolean; error?: string }> => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return { ok: false, error: "Not authenticated" };
     const workspace = await ctx.db.get(workspaceId);
     if (!workspace) return { ok: false, error: "Workspace not found" };
@@ -318,7 +318,7 @@ export const previewMessage = action({
 export const pendingForContact = query({
   args: { contactId: v.id("contacts") },
   handler: async (ctx, { contactId }) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return null;
     // Membership-check (voorkomt cross-workspace lekken van AI-concepten).
     // Graceful null i.p.v. throw — dit is een per-card widget-query.
@@ -350,7 +350,7 @@ export const pendingForContact = query({
 export const pendingConceptContactIds = query({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, { workspaceId }) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return [];
     const workspace = await ctx.db.get(workspaceId);
     if (!workspace) return [];
@@ -442,7 +442,7 @@ export const dismissSuggestion = mutation({
 
     // Membership-check — hergebruik checkMembership-logica inline
     // (mutations kunnen geen runQuery aanroepen; guard inline uitvoeren).
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const workspace = await ctx.db.get(suggestion.workspaceId);
     if (!workspace) throw new Error("Workspace niet gevonden");

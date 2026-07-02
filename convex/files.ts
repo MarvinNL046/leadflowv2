@@ -1,12 +1,12 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./lib/identity";
 
 /** Genereer een korte-levensduur upload-URL (Convex storage). Auth vereist. */
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     return await ctx.storage.generateUploadUrl();
   },
@@ -16,7 +16,7 @@ export const generateUploadUrl = mutation({
 export const resolveStorageUrl = mutation({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const url = await ctx.storage.getUrl(args.storageId);
     if (!url) throw new Error("Upload niet gevonden");

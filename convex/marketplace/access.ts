@@ -1,4 +1,4 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "../lib/identity";
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import {
@@ -35,7 +35,7 @@ export interface MarketplaceContext {
 export async function requireMarketplaceAccess(
 	ctx: QueryCtx,
 ): Promise<MarketplaceContext> {
-	const userId = await getAuthUserId(ctx);
+	const userId = await getUserId(ctx);
 	if (!userId) {
 		throw new Error("Not authenticated");
 	}
@@ -77,7 +77,7 @@ export async function requireOrgMembership(
 	ctx: QueryCtx,
 	orgId: Id<"orgs">,
 ) {
-	const userId = await getAuthUserId(ctx);
+	const userId = await getUserId(ctx);
 	if (!userId) {
 		throw new Error("Not authenticated");
 	}

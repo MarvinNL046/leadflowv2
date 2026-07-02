@@ -1,5 +1,5 @@
 import { useQuery } from 'convex/react'
-import { useAuthActions } from '@convex-dev/auth/react'
+import { useClerk } from '@clerk/clerk-react'
 import { Menu } from 'lucide-react'
 import { Avatar, AvatarFallback } from '#/components/ui/avatar.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
@@ -11,7 +11,7 @@ export function CrmTopbar({
 }: {
   onMenuClick?: () => void
 }) {
-  const { signOut } = useAuthActions()
+  const { signOut } = useClerk()
   const profile = useQuery(api.userProfiles.me)
   const tenants = useQuery(api.userProfiles.myTenants)
 

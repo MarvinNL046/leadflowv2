@@ -39,9 +39,30 @@ export default defineSchema({
   // CONVEX AUTH — built-in tables (users, authSessions, authAccounts,
   // authRefreshTokens, authVerificationCodes, authVerifiers,
   // authRateLimits). authTables.users heeft email + name + image + phone
-  // + verificationTimes. Niet zelf overschrijven.
+  // + verificationTimes.
+  //
+  // CLERK-MIGRATIE-BRUG: `users` wordt hieronder overschreven met exact
+  // dezelfde velden + `clerkUserId` (index by_clerk_user). Convex Auth
+  // blijft er tijdens de brugfase gewoon op schrijven; lib/identity.ts
+  // resolvet Clerk-tokens via by_clerk_user. Na de cutover kunnen de zes
+  // auth*-tabellen weg — `users` zelf blijft (17 FK-velden wijzen ernaar).
   // ════════════════════════════════════════════════════════════════════
   ...authTables,
+  users: defineTable({
+    name: v.optional(v.string()),
+    image: v.optional(v.string()),
+    email: v.optional(v.string()),
+    emailVerificationTime: v.optional(v.number()),
+    phone: v.optional(v.string()),
+    phoneVerificationTime: v.optional(v.number()),
+    isAnonymous: v.optional(v.boolean()),
+    // Clerk user-id (identity.subject, "user_..."); gezet bij eerste
+    // Clerk-login via lib/identity.ensureUserId.
+    clerkUserId: v.optional(v.string()),
+  })
+    .index("email", ["email"])
+    .index("phone", ["phone"])
+    .index("by_clerk_user", ["clerkUserId"]),
 
   // ════════════════════════════════════════════════════════════════════
   // APP-LEVEL USER PROFILE — extra velden die niet in authTables.users

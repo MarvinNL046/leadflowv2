@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./lib/identity";
 import {
   query,
   mutation,
@@ -22,7 +22,7 @@ const BATCH_SIZE = 100;
 const BATCH_DELAY_MS = 10_000;
 
 async function requireWorkspace(ctx: QueryCtx, workspaceId: Id<"workspaces">) {
-  const userId = await getAuthUserId(ctx);
+  const userId = await getUserId(ctx);
   if (!userId) throw new Error("Not authenticated");
   const workspace = await ctx.db.get(workspaceId);
   if (!workspace) throw new Error("Workspace not found");
