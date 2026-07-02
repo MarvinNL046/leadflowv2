@@ -2351,6 +2351,59 @@ export const relinkAuthAccount = internalMutation({
   handler: async () => ({ removed: true }),
 });
 
+/** Clerk prod-cutover reparatie: een race in het token-grace-venster
+ * (open tab met dev-token her-linkte user A aan het oude id) forkte de
+ * eerste prod-login naar een verse users-rij. Deze mutation ruimt de fork
+ * (rij + profile + memberships, guarded op leeftijd/eigendom) op en zet
+ * het nieuwe Clerk-id op de canonieke user. */
+export const repairClerkFork = internalMutation({
+  args: {
+    forkUserId: v.id("users"),
+    canonicalUserId: v.id("users"),
+    clerkUserId: v.string(),
+  },
+  handler: async (ctx, { forkUserId, canonicalUserId, clerkUserId }) => {
+    const fork = await ctx.db.get(forkUserId);
+    if (!fork) throw new Error("fork-user niet gevonden");
+    if (fork.clerkUserId !== clerkUserId) {
+      throw new Error("fork draagt een ander clerkUserId — verkeerde rij?");
+    }
+    const canonical = await ctx.db.get(canonicalUserId);
+    if (!canonical) throw new Error("canonieke user niet gevonden");
+
+    let profilesDeleted = 0;
+    const profiles = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", forkUserId))
+      .collect();
+    for (const p of profiles) {
+      await ctx.db.delete(p._id);
+      profilesDeleted++;
+    }
+
+    let membershipsDeleted = 0;
+    const memberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_org", (q) => q.eq("userId", forkUserId))
+      .collect();
+    for (const m of memberships) {
+      await ctx.db.delete(m._id);
+      membershipsDeleted++;
+    }
+
+    await ctx.db.delete(forkUserId);
+    await ctx.db.patch(canonicalUserId, { clerkUserId });
+
+    return {
+      forkDeleted: forkUserId,
+      profilesDeleted,
+      membershipsDeleted,
+      canonical: canonicalUserId,
+      clerkUserId,
+    };
+  },
+});
+
 /** Clerk production-instance-cutover (2026-07): wis het oude dev-instance
  * Clerk-id van een users-rij, zodat de eerstvolgende login op de nieuwe
  * production-instance zichzelf weer linkt via ensureUserId's geverifieerde
