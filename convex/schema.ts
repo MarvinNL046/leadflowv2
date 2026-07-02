@@ -26,7 +26,6 @@
 
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { authTables } from "@convex-dev/auth/server";
 import {
   marketplaceLeadScore,
   marketplaceNiche,
@@ -36,18 +35,13 @@ import {
 
 export default defineSchema({
   // ════════════════════════════════════════════════════════════════════
-  // CONVEX AUTH — built-in tables (users, authSessions, authAccounts,
-  // authRefreshTokens, authVerificationCodes, authVerifiers,
-  // authRateLimits). authTables.users heeft email + name + image + phone
-  // + verificationTimes.
-  //
-  // CLERK-MIGRATIE-BRUG: `users` wordt hieronder overschreven met exact
-  // dezelfde velden + `clerkUserId` (index by_clerk_user). Convex Auth
-  // blijft er tijdens de brugfase gewoon op schrijven; lib/identity.ts
-  // resolvet Clerk-tokens via by_clerk_user. Na de cutover kunnen de zes
-  // auth*-tabellen weg — `users` zelf blijft (17 FK-velden wijzen ernaar).
+  // USERS — identiteit komt van Clerk (gedeelde wetry-instance); deze
+  // tabel spiegelt de Clerk-user via `clerkUserId` (index by_clerk_user,
+  // resolutie in lib/identity.ts). De velden volgen nog de oude Convex
+  // Auth-shape omdat 17 FK-velden in andere tabellen naar users wijzen;
+  // rijen worden aangemaakt/gelinkt door lib/identity.ensureUserId.
+  // (De zes Convex Auth-tabellen zijn per 2026-07 verwijderd.)
   // ════════════════════════════════════════════════════════════════════
-  ...authTables,
   users: defineTable({
     name: v.optional(v.string()),
     image: v.optional(v.string()),

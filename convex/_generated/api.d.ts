@@ -11,7 +11,6 @@
 import type * as aiAgentConfig from "../aiAgentConfig.js";
 import type * as aiLeadResponse from "../aiLeadResponse.js";
 import type * as aiLeadResponse_helpers from "../aiLeadResponse/helpers.js";
-import type * as auth from "../auth.js";
 import type * as broadcasts from "../broadcasts.js";
 import type * as broadcastsLogic from "../broadcastsLogic.js";
 import type * as callAttemptStage from "../callAttemptStage.js";
@@ -41,6 +40,8 @@ import type * as http from "../http.js";
 import type * as integrations from "../integrations.js";
 import type * as lib_crypto from "../lib/crypto.js";
 import type * as lib_env from "../lib/env.js";
+import type * as lib_identity from "../lib/identity.js";
+import type * as lib_identityLogic from "../lib/identityLogic.js";
 import type * as lib_phone from "../lib/phone.js";
 import type * as marketplace_access from "../marketplace/access.js";
 import type * as marketplace_adminCli from "../marketplace/adminCli.js";
@@ -93,7 +94,6 @@ declare const fullApi: ApiFromModules<{
   aiAgentConfig: typeof aiAgentConfig;
   aiLeadResponse: typeof aiLeadResponse;
   "aiLeadResponse/helpers": typeof aiLeadResponse_helpers;
-  auth: typeof auth;
   broadcasts: typeof broadcasts;
   broadcastsLogic: typeof broadcastsLogic;
   callAttemptStage: typeof callAttemptStage;
@@ -123,6 +123,8 @@ declare const fullApi: ApiFromModules<{
   integrations: typeof integrations;
   "lib/crypto": typeof lib_crypto;
   "lib/env": typeof lib_env;
+  "lib/identity": typeof lib_identity;
+  "lib/identityLogic": typeof lib_identityLogic;
   "lib/phone": typeof lib_phone;
   "marketplace/access": typeof marketplace_access;
   "marketplace/adminCli": typeof marketplace_adminCli;

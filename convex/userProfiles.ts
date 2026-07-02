@@ -12,8 +12,8 @@ import { ensureUserId, getUserId } from "./lib/identity";
  * Haalt de app-level userProfile voor de huidig ingelogde gebruiker op,
  * of maakt 'm aan als die nog niet bestaat (eerste sign-in).
  *
- * Convex Auth's `authTables.users` houdt de identity (email, name, etc.)
- * bij; `userProfiles` houdt LeadFlow-specifieke velden (locale,
+ * De users-tabel spiegelt de Clerk-identity (email, name, etc.);
+ * `userProfiles` houdt LeadFlow-specifieke velden (locale,
  * isSuperAdmin, lastLoginAt) bij in een aparte tabel met FK.
  *
  * Roep aan vanaf de client direct na een succesvolle sign-in. Idempotent.
@@ -29,12 +29,11 @@ import { ensureUserId, getUserId } from "./lib/identity";
  * owner van dezelfde tenant. Non-super-admins krijgen géén auto-tenant
  * (wachten op invite of admin-toewijzing later).
  *
- * BELANGRIJK: gebruik de brug-helpers uit lib/identity.ts (getUserId /
- * ensureUserId), NIET `identity.subject` direct. Convex Auth's subject is
- * een composiet "<userId>|<sessionId>"; Clerk's subject is "user_..." —
- * de brug resolvet beide naar een plain Id<"users">. ensureUserId maakt
- * of linkt bij een eerste Clerk-login ook de users-rij (e-mail-match naar
- * de rij mét profile, dus nooit naar het bekende duplicaat).
+ * BELANGRIJK: gebruik de helpers uit lib/identity.ts (getUserId /
+ * ensureUserId), NIET `identity.subject` direct — de resolutie naar een
+ * plain Id<"users"> woont op één plek. ensureUserId maakt of linkt bij
+ * een eerste Clerk-login ook de users-rij (e-mail-match alleen op
+ * geverifieerd adres, en alleen naar de rij mét profile).
  */
 // Super-admin e-mails uit env (SUPER_ADMIN_EMAILS, comma-gescheiden);
 // fallback op de bekende set zodat het nooit stilvalt.
@@ -70,9 +69,8 @@ export const getOrCreateUserProfile = mutation({
       return existing;
     }
 
-    // Eerste login: maak profile aan. Email haal je via Convex Auth's
-    // users-table (authTables.users), niet via identity (die heeft
-    // dezelfde data maar via een aparte fetch — duurder).
+    // Eerste login: maak profile aan. Email komt uit de users-rij (door
+    // ensureUserId net gespiegeld vanuit de Clerk-identity).
     const authUser = await ctx.db.get(userId);
     const email = authUser?.email ?? "";
     // Lowercase vóór de match: getSuperAdminEmails() lowercased de

@@ -1,31 +1,22 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { isConvexAuthSubject, pickLinkableUser } from "./identityLogic";
+import { pickLinkableUser } from "./identityLogic";
 
 /**
- * Identiteits-brug tijdens de Convex Auth → Clerk migratie.
+ * Identiteits-resolutie: Clerk (gedeelde wetry-instance) → users-rij.
  *
- * auth.config.ts accepteert tijdelijk BEIDE issuers (Convex Auth self-issued
- * + de gedeelde wetry-Clerk-instance). Deze helper resolvet welk token er
- * binnenkomt en geeft altijd hetzelfde terug als het oude
- * `getAuthUserId(ctx)`: een `Id<"users">` of null. Daardoor hoeven de
- * call-sites (41 stuks in 21 files) alleen de import + functienaam te
- * wisselen — nul gedragsverandering verder.
+ * `identity.subject` is het Clerk user-id ("user_..."); de users-tabel
+ * spiegelt dat via `clerkUserId` (index by_clerk_user). Alle call-sites
+ * gebruiken deze helper i.p.v. direct ctx.auth, zodat het contract
+ * (Id<"users"> of null) op één plek woont.
  *
- * Na de cutover (Convex Auth eruit) blijft alleen het Clerk-pad over en
- * kan de brug versimpeld worden.
+ * (De Convex Auth-brugfase is per 2026-07 opgeruimd — dit is het
+ * Clerk-only eindstation.)
  */
 export async function getUserId(ctx: QueryCtx): Promise<Id<"users"> | null> {
   const identity = await ctx.auth.getUserIdentity();
   if (identity === null) return null;
 
-  if (isConvexAuthSubject(identity.subject)) {
-    // Convex Auth-token: library resolvet "<userId>|<sessionId>".
-    return await getAuthUserId(ctx);
-  }
-
-  // Clerk-token: lookup via de gespiegelde users-rij.
   const user = await ctx.db
     .query("users")
     .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
@@ -35,29 +26,22 @@ export async function getUserId(ctx: QueryCtx): Promise<Id<"users"> | null> {
 
 /**
  * Mutation-variant die de users-rij ook AANMAAKT of LINKT (eerste
- * Clerk-login). Aan te roepen vanuit getOrCreateUserProfile zodat het
- * bestaande client-flow (login → getOrCreateUserProfile) ongewijzigd
- * blijft.
+ * Clerk-login). Aangeroepen vanuit getOrCreateUserProfile zodat het
+ * client-flow (login → getOrCreateUserProfile) simpel blijft.
  *
- * Link-regels (zelf-migrerend, geen handmatige cutover-stap nodig):
+ * Link-regels:
  *  1. Bestaat er al een users-rij met dit Clerk-subject → die.
  *  2. Anders: match op e-mail, maar ALLEEN als Clerk het adres geverifieerd
  *     heeft (de gedeelde instance heeft open sign-up; zonder deze check kan
  *     een vreemde met een onbevestigd adres een bestaand account kapen) —
- *     en alleen naar de rij mét userProfile (pickLinkableUser), zodat het
- *     bekende e-mail-duplicaat in prod nooit het linkdoel wordt.
- *  3. Anders: nieuwe users-rij (vers Clerk-account zonder CRM-historie).
+ *     en alleen naar de rij mét userProfile (pickLinkableUser).
+ *  3. Anders: nieuwe users-rij (vers account zonder CRM-historie).
  */
 export async function ensureUserId(
   ctx: MutationCtx,
 ): Promise<Id<"users"> | null> {
   const identity = await ctx.auth.getUserIdentity();
   if (identity === null) return null;
-
-  if (isConvexAuthSubject(identity.subject)) {
-    // Convex Auth beheert z'n eigen users-rijen; niets te ensuren.
-    return await getAuthUserId(ctx);
-  }
 
   const existing = await ctx.db
     .query("users")

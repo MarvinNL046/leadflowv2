@@ -1,17 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isConvexAuthSubject, pickLinkableUser } from "./identityLogic";
-
-describe("isConvexAuthSubject", () => {
-  it("herkent Convex Auth's composiet subject", () => {
-    expect(isConvexAuthSubject("qs7aw3sdwn3787xz8fk5jea295870y8v|js71abc")).toBe(
-      true,
-    );
-  });
-
-  it("herkent Clerk-subjects als niet-Convex-Auth", () => {
-    expect(isConvexAuthSubject("user_2yGabcDEF123")).toBe(false);
-  });
-});
+import { pickLinkableUser } from "./identityLogic";
 
 describe("pickLinkableUser", () => {
   const A = "userA_met_profile";

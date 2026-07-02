@@ -4,7 +4,6 @@ import { httpAction } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { auth } from "./auth";
 import { verifyStateToken } from "./metaOauth";
 import { getSiteUrl } from "./lib/env";
 import { encryptSecret } from "./lib/crypto";
@@ -12,8 +11,6 @@ import { verifyUnsubToken } from "./unsubscribeToken";
 import { hashApiKey } from "./marketplace/apiKeys";
 
 const http = httpRouter();
-
-auth.addHttpRoutes(http);
 
 // ════════════════════════════════════════════════════════════════════
 // META OAUTH CALLBACK

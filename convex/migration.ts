@@ -2343,77 +2343,12 @@ export const getStageDistribution = internalQuery({
   },
 });
 
-/** Herlink een provider-authAccount naar een andere user. Nodig omdat
- * Convex Auth providers NIET automatisch op e-mail koppelt → een 2e login-
- * methode (bv. Google) maakt een duplicate user los van de tenant-eigenaar.
- * Repoint het account naar de originele user; daarna log-uit + opnieuw in. */
+/** Historisch (Convex Auth-tijdperk, verwijderd 2026-07): repointte een
+ * provider-authAccount naar een andere user. No-op sinds de Clerk-
+ * migratie; export blijft staan zodat oude run-referenties niet breken. */
 export const relinkAuthAccount = internalMutation({
-  args: {
-    accountId: v.id("authAccounts"),
-    toUserId: v.id("users"),
-  },
-  handler: async (ctx, { accountId, toUserId }) => {
-    const acc = await ctx.db.get(accountId);
-    if (!acc) throw new Error("authAccount niet gevonden");
-    const target = await ctx.db.get(toUserId);
-    if (!target) throw new Error("doel-user niet gevonden");
-    const from = acc.userId;
-    await ctx.db.patch(accountId, { userId: toUserId });
-    return { accountId, provider: acc.provider, from, to: toUserId };
-  },
-});
-
-/** Clerk-cleanup stap 1 (draaien VÓÓR de schema-wijziging die de
- * auth*-tabellen verwijdert): leeg de zes Convex Auth-tabellen en
- * verwijder het bekende duplicaat-user (google-account zonder data).
- * Zwaar geguard: weigert als het duplicaat tóch data blijkt te hebben.
- * Na de cleanup-deploy wordt deze mutation zelf ook verwijderd. */
-export const cleanupConvexAuthData = internalMutation({
-  args: { duplicateUserId: v.id("users") },
-  handler: async (ctx, { duplicateUserId }) => {
-    let dupDeleted = false;
-    const dup = await ctx.db.get(duplicateUserId);
-    if (dup) {
-      if (dup.clerkUserId) {
-        throw new Error("duplicaat heeft clerkUserId — verkeerde user?");
-      }
-      const profile = await ctx.db
-        .query("userProfiles")
-        .withIndex("by_user", (q) => q.eq("userId", duplicateUserId))
-        .unique();
-      if (profile) throw new Error("duplicaat heeft een userProfile");
-      const memberships = await ctx.db
-        .query("memberships")
-        .withIndex("by_user_org", (q) => q.eq("userId", duplicateUserId))
-        .collect();
-      if (memberships.length) throw new Error("duplicaat heeft memberships");
-      const ownedOrgs = await ctx.db
-        .query("orgs")
-        .withIndex("by_owner", (q) => q.eq("ownerId", duplicateUserId))
-        .collect();
-      if (ownedOrgs.length) throw new Error("duplicaat is org-owner");
-      await ctx.db.delete(duplicateUserId);
-      dupDeleted = true;
-    }
-
-    const tables = [
-      "authSessions",
-      "authAccounts",
-      "authRefreshTokens",
-      "authVerificationCodes",
-      "authVerifiers",
-      "authRateLimits",
-    ] as const;
-    const removed: Record<string, number> = {};
-    for (const table of tables) {
-      const rows = await ctx.db.query(table).collect();
-      for (const row of rows) {
-        await ctx.db.delete(row._id);
-      }
-      removed[table] = rows.length;
-    }
-    return { dupDeleted, removed };
-  },
+  args: {},
+  handler: async () => ({ removed: true }),
 });
 
 /** Clerk-cutover: cement de link tussen een bestaande users-rij en het
