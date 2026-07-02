@@ -2351,6 +2351,21 @@ export const relinkAuthAccount = internalMutation({
   handler: async () => ({ removed: true }),
 });
 
+/** Clerk production-instance-cutover (2026-07): wis het oude dev-instance
+ * Clerk-id van een users-rij, zodat de eerstvolgende login op de nieuwe
+ * production-instance zichzelf weer linkt via ensureUserId's geverifieerde
+ * e-mail-match (de rij mét userProfile wint). */
+export const clearClerkUserId = internalMutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("user niet gevonden");
+    const old = user.clerkUserId;
+    await ctx.db.patch(userId, { clerkUserId: undefined });
+    return { userId, oldClerkUserId: old };
+  },
+});
+
 /** Clerk-cutover: cement de link tussen een bestaande users-rij en het
  * Clerk-account op de gedeelde wetry-instance, VÓÓR de frontend-cutover.
  * Zo landt lib/identity's by_clerk_user-lookup gegarandeerd op de juiste

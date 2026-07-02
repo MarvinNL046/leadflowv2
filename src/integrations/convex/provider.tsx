@@ -16,14 +16,14 @@ if (!CONVEX_URL) {
 }
 const convexQueryClient = new ConvexQueryClient(CONVEX_URL)
 
-// Clerk publishable key — de gedeelde wetry-instance (zelfde als cashflow +
-// frostwork = één login over de suite). pk-keys zijn publiek (ze zitten in
-// elke client-bundle), dus een hardcoded fallback is veilig; via
-// VITE_CLERK_PUBLISHABLE_KEY overridebaar (bv. bij de latere upgrade naar
-// de Clerk production-instance).
+// Clerk publishable key — de gedeelde wetry-PRODUCTION-instance
+// (clerk.wetry.app; zelfde als cashflow + frostwork = één login + SSO over
+// de suite). pk-keys zijn publiek (ze zitten in elke client-bundle), dus
+// een hardcoded fallback is veilig; via VITE_CLERK_PUBLISHABLE_KEY
+// overridebaar.
 const CLERK_PUBLISHABLE_KEY =
   (import.meta as any).env.VITE_CLERK_PUBLISHABLE_KEY ??
-  'pk_test_ZGFybGluZy1tYWdwaWUtNTguY2xlcmsuYWNjb3VudHMuZGV2JA'
+  'pk_live_Y2xlcmsud2V0cnkuYXBwJA'
 
 /**
  * Root-level bootstrap-vangnet: zodra Convex het Clerk-token accepteert
