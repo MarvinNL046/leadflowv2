@@ -19,7 +19,7 @@ import {
  */
 
 /** Magere projectie die we cross-app teruggeven (geen interne CRM-velden). */
-function publicContact(c: Doc<"contacts">) {
+export function publicContact(c: Doc<"contacts">) {
   return {
     id: c._id,
     firstName: c.firstName ?? null,

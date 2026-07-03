@@ -836,6 +836,89 @@ http.route({
 });
 
 // ══════════════════════════════════════════════════════════════════════
+// CROSS-APP CONTACT-CREATE — suite-apps (cashflow / frostwork) mogen een
+// NIEUW contact aanmaken wanneer een klant telefonisch binnenkwam en dus
+// nog niet in de CRM stond. Leadflow blijft de bron; dit is de enige
+// write-poort. Auth = WEBSITE_API_KEY (zelfde write-key als /webhooks/leads,
+// los van de READ_API_KEY). Server-to-server, geen CORS. Dedup + merge in
+// contactsWrite.createContactFromApp.
+// ══════════════════════════════════════════════════════════════════════
+http.route({
+  path: "/api/contacts/create",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const expected = process.env.WEBSITE_API_KEY;
+    if (!expected) return jsonResponse({ error: "Server misconfigured" }, 500);
+    const key = request.headers.get("x-api-key");
+    if (!key || !timingSafeStringEqual(key, expected)) {
+      return jsonResponse({ error: "Invalid API key" }, 401);
+    }
+
+    let payload: {
+      firstName?: string;
+      lastName?: string;
+      company?: string;
+      email?: string;
+      phone?: string;
+      street?: string;
+      houseNumber?: string;
+      postalCode?: string;
+      city?: string;
+      country?: string;
+      source?: string;
+    };
+    try {
+      payload = JSON.parse(await request.text());
+    } catch {
+      return jsonResponse({ error: "Invalid JSON" }, 400);
+    }
+
+    const clean = (s?: string) => {
+      const t = s?.trim();
+      return t ? t : undefined;
+    };
+    const email = clean(payload.email);
+    const phone = clean(payload.phone);
+    const firstName = clean(payload.firstName);
+    const lastName = clean(payload.lastName);
+    const company = clean(payload.company);
+    if (!email && !phone && !firstName && !lastName && !company) {
+      return jsonResponse(
+        { error: "minstens één van naam/e-mail/telefoon vereist" },
+        400,
+      );
+    }
+
+    const workspaceId = await ctx.runQuery(
+      internal.messaging.getStaycoolWorkspaceIdInternal,
+      {},
+    );
+    if (!workspaceId) {
+      return jsonResponse({ error: "Workspace not provisioned" }, 500);
+    }
+
+    const result = await ctx.runMutation(
+      internal.contactsWrite.createContactFromApp,
+      {
+        workspaceId,
+        firstName,
+        lastName,
+        company,
+        email,
+        phone,
+        street: clean(payload.street),
+        houseNumber: clean(payload.houseNumber),
+        postalCode: clean(payload.postalCode),
+        city: clean(payload.city),
+        country: clean(payload.country),
+        source: clean(payload.source) ?? "cashflow",
+      },
+    );
+    return jsonResponse(result, 200);
+  }),
+});
+
+// ══════════════════════════════════════════════════════════════════════
 // CONTACT READ-API — leadflow-contacten lezen vanuit de andere wetry-apps
 // (cashflow / frostwork). Leadflow blijft de bron; dit is READ-ONLY.
 // Auth = READ_API_KEY via X-API-Key (apart van de write-key WEBSITE_API_KEY,
