@@ -40,10 +40,10 @@ type FrostworkSummary = {
 
 const CASHFLOW_SUMMARY_URL =
   process.env.CASHFLOW_SUMMARY_URL ??
-  'https://good-ibex-522.eu-west-1.convex.site/api/summary/contact'
+  'https://sleek-giraffe-933.eu-west-1.convex.site/api/summary/contact'
 const FROSTWORK_SUMMARY_URL =
   process.env.FROSTWORK_SUMMARY_URL ??
-  'https://fine-skunk-171.eu-west-1.convex.site/api/summary/contact'
+  'https://wooden-jellyfish-458.eu-west-1.convex.site/api/summary/contact'
 
 async function fetchSummary<T>(
   base: string,
