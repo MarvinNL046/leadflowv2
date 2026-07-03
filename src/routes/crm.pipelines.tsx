@@ -209,7 +209,7 @@ function PipelineStatsBar({ pipelineId }: { pipelineId: Id<'pipelines'> }) {
       {items.map((it) => (
         <div
           key={it.label}
-          className="rounded-lg border border-zinc-200 bg-white px-4 py-3"
+          className="rounded-lg border border-zinc-200 bg-card px-4 py-3 shadow-sm"
         >
           <div className="text-xs text-zinc-500">{it.label}</div>
           <div className={cn('mt-0.5 text-xl font-semibold', it.tone)}>

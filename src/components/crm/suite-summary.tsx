@@ -130,7 +130,7 @@ function AppCard({
 	children: ReactNode;
 }) {
 	return (
-		<div className="rounded-lg border border-zinc-200 p-3">
+		<div className="rounded-lg border border-zinc-200 bg-card p-3 shadow-xs">
 			<div className="mb-2 flex items-center justify-between">
 				<div className="flex items-center gap-2 text-sm font-medium text-zinc-800">
 					{icon}

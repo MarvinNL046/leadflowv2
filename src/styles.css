@@ -27,7 +27,9 @@
   --hero-a: rgba(79, 184, 178, 0.36);
   --hero-b: rgba(47, 106, 74, 0.2);
 
-  --background: oklch(1 0 0);
+  /* Moneybird-achtige diepte: content-achtergrond warm creme (#FAFAF9,
+     Tailwind stone-50), cards/panelen puur wit (--card). */
+  --background: oklch(0.985 0.001 106.423);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.141 0.005 285.823);
