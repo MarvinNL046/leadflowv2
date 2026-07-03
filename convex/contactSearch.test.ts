@@ -45,6 +45,26 @@ describe("contactMatchesSearch", () => {
   it("geen match → false", () => {
     expect(contactMatchesSearch(base, normalizeForSearch("rotterdam"))).toBe(false);
   });
+  it("matcht op adresvelden (straat, huisnummer, postcode)", () => {
+    const c = { ...base, street: "Dorpstraat", houseNumber: "12a", postalCode: "6049 AD" };
+    expect(contactMatchesSearch(c, normalizeForSearch("dorpstraat"))).toBe(true);
+    expect(contactMatchesSearch(c, normalizeForSearch("6049"))).toBe(true);
+  });
+  it("postcode notatie-tolerant: '6049ad' matcht '6049 AD'", () => {
+    const c = { ...base, postalCode: "6049 AD" };
+    expect(contactMatchesSearch(c, normalizeForSearch("6049ad"))).toBe(true);
+  });
+  it("telefoon met spaties/streepjes matcht compacte invoer", () => {
+    const c = { ...base, phone: "06 12 34 56 78" };
+    expect(contactMatchesSearch(c, normalizeForSearch("0612345678"))).toBe(true);
+  });
+  it("telefoon +31-notatie matcht 06-opslag (laatste 9 cijfers)", () => {
+    expect(contactMatchesSearch(base, normalizeForSearch("+31612345678"))).toBe(true);
+    expect(contactMatchesSearch(base, normalizeForSearch("0031612345678"))).toBe(true);
+  });
+  it("korte cijferreeks matcht niet zomaar overal (min. 5 cijfers)", () => {
+    expect(contactMatchesSearch(base, normalizeForSearch("9999"))).toBe(false);
+  });
 });
 
 describe("contactMatchesFilters", () => {

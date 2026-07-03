@@ -10,6 +10,9 @@ type ContactLike = {
   phone?: string | null;
   company?: string | null;
   city?: string | null;
+  street?: string | null;
+  houseNumber?: string | null;
+  postalCode?: string | null;
 };
 
 export type ContactSort = "newest" | "oldest" | "name_asc" | "name_desc";
@@ -22,7 +25,12 @@ export function normalizeForSearch(s: string): string {
     .replace(/\p{Diacritic}/gu, "");
 }
 
-/** Substring-match van een (reeds genormaliseerde) term over de tekstvelden. */
+/** Substring-match van een (reeds genormaliseerde) term over de tekstvelden.
+ * Notatie-tolerant: spaties/streepjes tellen niet mee (postcode "6049 AD"
+ * matcht "6049ad", telefoon "06 12 34 56 78" matcht "0612345678"), en
+ * telefoonnummers matchen over +31/0031↔06-notaties heen (laatste 9
+ * cijfers). Veel klanten staan als "Fam. Achternaam" in de CRM — zoeken op
+ * e-mail, telefoon of postcode+huisnummer is dan de snelste route. */
 export function contactMatchesSearch(
   contact: ContactLike,
   termNormalized: string,
@@ -36,11 +44,26 @@ export function contactMatchesSearch(
       contact.phone,
       contact.company,
       contact.city,
+      contact.street,
+      contact.houseNumber,
+      contact.postalCode,
     ]
       .filter(Boolean)
       .join(" "),
   );
-  return haystack.includes(termNormalized);
+  if (haystack.includes(termNormalized)) return true;
+
+  const compact = (s: string) => s.replace(/[\s-]/g, "");
+  if (compact(haystack).includes(compact(termNormalized))) return true;
+
+  const termDigits = termNormalized.replace(/\D/g, "");
+  if (termDigits.length >= 5) {
+    const hayDigits = haystack.replace(/\D/g, "");
+    if (hayDigits.includes(termDigits)) return true;
+    const tail = termDigits.slice(-9);
+    if (tail.length === 9 && hayDigits.includes(tail)) return true;
+  }
+  return false;
 }
 
 export function contactMatchesFilters(
