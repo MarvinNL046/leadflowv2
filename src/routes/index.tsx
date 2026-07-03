@@ -156,8 +156,8 @@ function UnauthenticatedView() {
     <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
       <h2 className="text-xl font-semibold">Log in om te beginnen</h2>
       <p className="mt-1 text-sm text-zinc-500">
-        Convex Auth met email + wachtwoord. Google OAuth volgt zodra de
-        credentials gezet zijn.
+        Eén wetry-login voor de hele suite — met Google of e-mail +
+        wachtwoord.
       </p>
       <Link
         to="/login"
