@@ -207,6 +207,9 @@ export default defineSchema({
     .index("by_workspace_phone", ["workspaceId", "phone"])
     .index("by_messengerPsid", ["messengerPsid"])
     .index("by_legacyContactId", ["legacyContactId"])
+    // Idempotency-key voor externe imports (bv. "moneybird:<id>"): laat de
+    // backfill-mutation een reeds-geïmporteerd contact vinden zonder full scan.
+    .index("by_externalId", ["externalId"])
     // Voor de follow-up-cron: due-leads efficiënt vinden (range op
     // nextFollowUpAt binnen workspace).
     .index("by_workspace_nextFollowUp", ["workspaceId", "nextFollowUpAt"])

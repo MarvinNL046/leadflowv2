@@ -5,11 +5,18 @@ import {
   internalQuery,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
 import {
   insertContactWithSearchText,
   refreshContactSearchText,
 } from "./lib/contactWrite";
+import {
+  normalizeEmail,
+  normalizePhone,
+  phoneLast9,
+  resolveMatch,
+} from "./lib/moneybirdMatch";
 
 /**
  * ⚠ ETL helpers — INTERNAL (internalMutation/internalQuery), GEEN publiek endpoint.
@@ -916,6 +923,234 @@ export const countMoneybirdContacts = internalQuery({
   handler: async (ctx) => {
     const rows = await ctx.db.query("contacts").collect();
     return rows.filter((r) => r.externalId?.startsWith("moneybird:")).length;
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// MONEYBIRD-BACKFILL (fase A cutover-aanvulling, 2026-07)
+//
+// Doel: ALLE Moneybird-contacten met facturen/offertes die NÓG NIET via een
+// eerdere ronde in leadflow staan (486 stuks) toevoegen — maar EERST dedup-en
+// tegen de live workspace, want sommige staan er al via een andere herkomst.
+//
+// Dedup-strategie (spiegelt contactsWrite.createContactFromApp + de
+// notatie-tolerantie van contactSearch.buildSearchText):
+//   1. externalId "moneybird:<id>"  → idempotent rerun (zelfde import)
+//   2. e-mail (lowercased/trimmed)  → by_workspace_email
+//   3. telefoon (laatste-9-cijfers) → notatie-tolerant, over alle notaties heen
+// De pure logica zit in lib/moneybirdMatch.ts (unit-getest).
+// ──────────────────────────────────────────────────────────────────────
+
+const moneybirdBackfillDocValidator = v.object({
+  moneybirdId: v.string(),
+  firstName: v.optional(v.string()),
+  lastName: v.optional(v.string()),
+  company: v.optional(v.string()),
+  email: v.optional(v.string()),
+  phone: v.optional(v.string()),
+  street: v.optional(v.string()),
+  postalCode: v.optional(v.string()),
+  city: v.optional(v.string()),
+  country: v.optional(v.string()),
+});
+
+/**
+ * Bouw de dedup-lookup-maps uit de LIVE workspace (één scan). Actieve én
+ * soft-deleted contacten tellen mee: een dubbel op een soft-deleted contact
+ * is nog steeds een dubbel. externalId "moneybird:<id>" is de idempotency-key;
+ * e-mail en laatste-9-telefoon zijn de dedup-sleutels. Bij botsende sleutels
+ * wint het eerst-geziene contact (deterministisch via by_workspace_created).
+ */
+async function buildWorkspaceLookupMaps(
+  ctx: QueryCtx,
+  workspaceId: Id<"workspaces">,
+): Promise<{
+  byExternalId: Map<string, string>;
+  byEmail: Map<string, string>;
+  byPhoneLast9: Map<string, string>;
+  contactsById: Map<string, Doc<"contacts">>;
+}> {
+  const rows = await ctx.db
+    .query("contacts")
+    .withIndex("by_workspace_created", (q) => q.eq("workspaceId", workspaceId))
+    .collect();
+
+  const byExternalId = new Map<string, string>();
+  const byEmail = new Map<string, string>();
+  const byPhoneLast9 = new Map<string, string>();
+  const contactsById = new Map<string, Doc<"contacts">>();
+
+  for (const c of rows) {
+    contactsById.set(c._id, c);
+    if (c.externalId && !byExternalId.has(c.externalId)) {
+      byExternalId.set(c.externalId, c._id);
+    }
+    const email = normalizeEmail(c.email);
+    if (email && !byEmail.has(email)) byEmail.set(email, c._id);
+    const last9 = phoneLast9(c.phone);
+    if (last9 && !byPhoneLast9.has(last9)) byPhoneLast9.set(last9, c._id);
+  }
+
+  return { byExternalId, byEmail, byPhoneLast9, contactsById };
+}
+
+/**
+ * DRY-RUN read-only: geef per Moneybird-doc terug of het al in de live
+ * workspace bestaat (met matchReason email/phone/externalId) of echt nieuw is
+ * (existingContactId === null). Schrijft NIETS. De caller (dry-run script) telt
+ * hiermee al-in-leadflow vs echt-nieuw zonder de CRM aan te raken.
+ */
+export const matchMoneybirdContacts = internalQuery({
+  args: {
+    workspaceId: v.id("workspaces"),
+    batch: v.array(moneybirdBackfillDocValidator),
+  },
+  handler: async (ctx, args) => {
+    const maps = await buildWorkspaceLookupMaps(ctx, args.workspaceId);
+    return args.batch.map((doc) => {
+      const match = resolveMatch(doc, maps);
+      return {
+        moneybirdId: doc.moneybirdId,
+        existingContactId: match?.contactId ?? null,
+        matchReason: match?.reason ?? null,
+      };
+    });
+  },
+});
+
+/**
+ * BACKFILL (idempotent write). Per Moneybird-doc:
+ *  - bestaat al (externalId / e-mail / telefoon-dedup) → return bestaande id,
+ *    vul lege velden aan (merge-empty, net als createContactFromApp), en zet
+ *    de externalId "moneybird:<id>" als die nog ontbrak (zodat een rerun 'm
+ *    idempotent op externalId hervindt).
+ *  - anders → CREATE met tag/source "moneybird-import", externalId,
+ *    workspace-gepind, searchText gevuld. GEEN opportunity / speed-to-lead /
+ *    notificatie-trigger — dit is stille archief-backfill (net als
+ *    insertMoneybirdContacts).
+ *
+ * De lookup-maps worden één keer per chunk uit de live workspace opgebouwd en
+ * binnen de chunk bijgewerkt bij elke create, zodat twee docs in dezelfde
+ * chunk die naar hetzelfde (nieuwe) contact wijzen niet dubbelen.
+ */
+export const backfillMoneybirdContact = internalMutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    batch: v.array(moneybirdBackfillDocValidator),
+  },
+  handler: async (ctx, args) => {
+    const maps = await buildWorkspaceLookupMaps(ctx, args.workspaceId);
+
+    let created = 0;
+    let matched = 0;
+    let mergedFields = 0;
+    const results: Array<{
+      moneybirdId: string;
+      contactId: Id<"contacts">;
+      created: boolean;
+      matchReason: "email" | "phone" | "externalId" | null;
+    }> = [];
+
+    for (const doc of args.batch) {
+      const externalId = `moneybird:${doc.moneybirdId}`;
+      const match = resolveMatch(doc, maps);
+
+      if (match) {
+        const contactId = match.contactId as Id<"contacts">;
+        const existing = maps.contactsById.get(contactId);
+        const normalizedEmail = normalizeEmail(doc.email);
+        const normalizedPhone = normalizePhone(doc.phone);
+
+        // Merge-empty: alleen lege velden invullen, nooit overschrijven.
+        const merged: Record<string, string> = {};
+        if (existing) {
+          if (!existing.firstName && doc.firstName)
+            merged.firstName = doc.firstName;
+          if (!existing.lastName && doc.lastName)
+            merged.lastName = doc.lastName;
+          if (!existing.company && doc.company) merged.company = doc.company;
+          if (!existing.email && normalizedEmail)
+            merged.email = normalizedEmail;
+          if (!existing.phone && normalizedPhone)
+            merged.phone = normalizedPhone;
+          if (!existing.street && doc.street) merged.street = doc.street;
+          if (!existing.postalCode && doc.postalCode)
+            merged.postalCode = doc.postalCode;
+          if (!existing.city && doc.city) merged.city = doc.city;
+          if (!existing.country && doc.country) merged.country = doc.country;
+        }
+        // externalId zetten als 'm nog ontbrak → idempotente rerun-anchor.
+        if (existing && !existing.externalId) merged.externalId = externalId;
+
+        if (Object.keys(merged).length > 0) {
+          await ctx.db.patch(contactId, merged);
+          await refreshContactSearchText(ctx, contactId);
+          mergedFields++;
+          // Houd de in-memory maps consistent voor latere docs in deze chunk.
+          const fresh = await ctx.db.get(contactId);
+          if (fresh) {
+            maps.contactsById.set(contactId, fresh);
+            if (merged.externalId)
+              maps.byExternalId.set(merged.externalId, contactId);
+            const e = normalizeEmail(fresh.email);
+            if (e && !maps.byEmail.has(e)) maps.byEmail.set(e, contactId);
+            const l9 = phoneLast9(fresh.phone);
+            if (l9 && !maps.byPhoneLast9.has(l9))
+              maps.byPhoneLast9.set(l9, contactId);
+          }
+        }
+
+        matched++;
+        results.push({
+          moneybirdId: doc.moneybirdId,
+          contactId,
+          created: false,
+          matchReason: match.reason,
+        });
+        continue;
+      }
+
+      // Echt nieuw → CREATE (stille archief-backfill, geen opp/trigger).
+      const normalizedEmail = normalizeEmail(doc.email);
+      const normalizedPhone = normalizePhone(doc.phone);
+      const contactId = await insertContactWithSearchText(ctx, {
+        workspaceId: args.workspaceId,
+        firstName: doc.firstName,
+        lastName: doc.lastName,
+        company: doc.company,
+        email: normalizedEmail,
+        phone: normalizedPhone,
+        street: doc.street,
+        postalCode: doc.postalCode,
+        city: doc.city,
+        country: doc.country,
+        callCount: 0,
+        tags: ["moneybird-import"],
+        externalId,
+      });
+
+      // Nieuwe row in de in-memory maps → dedup binnen dezelfde chunk.
+      const fresh = await ctx.db.get(contactId);
+      if (fresh) {
+        maps.contactsById.set(contactId, fresh);
+        maps.byExternalId.set(externalId, contactId);
+        if (normalizedEmail && !maps.byEmail.has(normalizedEmail))
+          maps.byEmail.set(normalizedEmail, contactId);
+        const l9 = phoneLast9(normalizedPhone);
+        if (l9 && !maps.byPhoneLast9.has(l9))
+          maps.byPhoneLast9.set(l9, contactId);
+      }
+
+      created++;
+      results.push({
+        moneybirdId: doc.moneybirdId,
+        contactId,
+        created: true,
+        matchReason: null,
+      });
+    }
+
+    return { created, matched, mergedFields, total: args.batch.length, results };
   },
 });
 
