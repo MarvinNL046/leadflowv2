@@ -187,6 +187,16 @@ export default defineSchema({
     // Gesprek-archief voor de inbox: timestamp = gearchiveerd (verbergen uit
     // listConversations), undefined = actief. Reversibel; raakt opp/dashboard niet.
     messagesArchivedAt: v.optional(v.number()),
+    // Gedenormaliseerd zoekveld voor snelle per-rij substring-matching in
+    // searchContacts: genormaliseerde tokens (naam, e-mail, telefoon-digits +
+    // laatste-9, bedrijf, straat, huisnummer, compacte postcode, plaats) — zie
+    // buildSearchText in contactSearch.ts. Onderhouden op ALLE schrijfpaden
+    // via lib/contactWrite.ts; backfill via
+    // contactsBackfill.backfillSearchTextAll. GEEN Convex-searchIndex: zoeken
+    // gaat via substring-match (matchesHaystack) zodat e-mail-midden,
+    // mid-woord en telefoon-fragmenten vindbaar blijven (BM25 tokeniseert en
+    // brak die).
+    searchText: v.optional(v.string()),
     // Migration breadcrumb: integer-id van de bron-row in v1 Neon.
     // Idempotency-key voor de Neon→Convex ETL; rerun van migratie
     // detecteert bestaande row en doet patch i.p.v. duplicate insert.
@@ -201,6 +211,10 @@ export default defineSchema({
     // nextFollowUpAt binnen workspace).
     .index("by_workspace_nextFollowUp", ["workspaceId", "nextFollowUpAt"])
     .index("by_workspace_marketingStatus", ["workspaceId", "emailMarketingStatus"]),
+  // GEEN searchIndex op searchText: zoeken gaat via substring-match
+  // (searchContacts → matchesHaystack) i.p.v. BM25, zodat e-mail-midden,
+  // mid-woord en telefoon-fragmenten vindbaar blijven. searchText is puur
+  // een voorberekend haystack voor snelle per-rij matching.
 
   pipelines: defineTable({
     workspaceId: v.id("workspaces"),

@@ -2,6 +2,10 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { type MutationCtx, mutation, query } from "../_generated/server";
+import {
+	insertContactWithSearchText,
+	refreshContactSearchText,
+} from "../lib/contactWrite";
 import { requireMarketplaceAccess } from "./access";
 import { type Niche, NICHE_LABELS } from "./types";
 import { applyWalletDelta } from "./wallet";
@@ -229,11 +233,13 @@ async function copyLeadToContact(
 		if (mergedTags.length !== existingTags.length) merged.tags = mergedTags;
 		if (Object.keys(merged).length > 0) {
 			await ctx.db.patch(contact._id, merged);
+			// Merge kan zoekvelden gevuld hebben → searchText bijwerken.
+			await refreshContactSearchText(ctx, contact._id);
 		}
 		contactId = contact._id;
 	} else {
 		// 3b. Insert a fresh contact.
-		contactId = await ctx.db.insert("contacts", {
+		contactId = await insertContactWithSearchText(ctx, {
 			workspaceId,
 			firstName: lead.firstName,
 			lastName: lead.lastName,

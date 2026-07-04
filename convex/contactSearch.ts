@@ -25,12 +25,43 @@ export function normalizeForSearch(s: string): string {
     .replace(/\p{Diacritic}/gu, "");
 }
 
+/**
+ * Substring-match van een (reeds genormaliseerde) term tegen een REEDS
+ * genormaliseerde haystack-string. Notatie-tolerant: spaties/streepjes tellen
+ * niet mee (postcode "6049 AD" matcht "6049ad", telefoon "06 12 34 56 78"
+ * matcht "0612345678"), en telefoonnummers matchen over +31/0031↔06-notaties
+ * heen (laatste 9 cijfers).
+ *
+ * Dit is de kern van de zoeklogica; searchContacts geeft hier per rij het
+ * gedenormaliseerde `searchText`-veld (of live buildSearchText-fallback) aan
+ * door, zodat de haystack niet per toetsaanslag opnieuw genormaliseerd wordt.
+ */
+export function matchesHaystack(
+  haystackNormalized: string,
+  termNormalized: string,
+): boolean {
+  if (!termNormalized) return true;
+  if (haystackNormalized.includes(termNormalized)) return true;
+
+  const compact = (s: string) => s.replace(/[\s-]/g, "");
+  if (compact(haystackNormalized).includes(compact(termNormalized))) return true;
+
+  const termDigits = termNormalized.replace(/\D/g, "");
+  if (termDigits.length >= 5) {
+    const hayDigits = haystackNormalized.replace(/\D/g, "");
+    if (hayDigits.includes(termDigits)) return true;
+    const tail = termDigits.slice(-9);
+    if (tail.length === 9 && hayDigits.includes(tail)) return true;
+  }
+  return false;
+}
+
 /** Substring-match van een (reeds genormaliseerde) term over de tekstvelden.
- * Notatie-tolerant: spaties/streepjes tellen niet mee (postcode "6049 AD"
- * matcht "6049ad", telefoon "06 12 34 56 78" matcht "0612345678"), en
- * telefoonnummers matchen over +31/0031↔06-notaties heen (laatste 9
- * cijfers). Veel klanten staan als "Fam. Achternaam" in de CRM — zoeken op
- * e-mail, telefoon of postcode+huisnummer is dan de snelste route. */
+ * Bouwt de haystack live uit de contactvelden en delegeert naar
+ * matchesHaystack. Gebruikt door de cross-app read-API (contactsRead.ts);
+ * searchContacts matcht tegen het gedenormaliseerde searchText-veld. Veel
+ * klanten staan als "Fam. Achternaam" in de CRM — zoeken op e-mail, telefoon
+ * of postcode+huisnummer is dan de snelste route. */
 export function contactMatchesSearch(
   contact: ContactLike,
   termNormalized: string,
@@ -51,19 +82,44 @@ export function contactMatchesSearch(
       .filter(Boolean)
       .join(" "),
   );
-  if (haystack.includes(termNormalized)) return true;
+  return matchesHaystack(haystack, termNormalized);
+}
 
-  const compact = (s: string) => s.replace(/[\s-]/g, "");
-  if (compact(haystack).includes(compact(termNormalized))) return true;
-
-  const termDigits = termNormalized.replace(/\D/g, "");
-  if (termDigits.length >= 5) {
-    const hayDigits = haystack.replace(/\D/g, "");
-    if (hayDigits.includes(termDigits)) return true;
-    const tail = termDigits.slice(-9);
-    if (tail.length === 9 && hayDigits.includes(tail)) return true;
+/**
+ * Gedenormaliseerd zoekveld voor snelle per-rij substring-matching in
+ * searchContacts (spatie-gescheiden, reeds genormaliseerde tokens). Zelfde
+ * notatie-tolerantie als contactMatchesSearch: compacte postcode ("6049 AD" →
+ * "6049ad") en telefoon als digits ("+31 6 12 34 56 78" → "31612345678") plus
+ * de laatste-9-variant ("612345678") zodat +31/0031/06-notaties elkaar vinden.
+ *
+ * Onderhoud: op ALLE schrijfpaden van contacts via de helpers in
+ * lib/contactWrite.ts. Nieuw zoekveld? Hier toevoegen + backfill draaien
+ * (contactsBackfill.backfillSearchTextAll).
+ */
+export function buildSearchText(contact: ContactLike): string {
+  const tokens: string[] = [];
+  const add = (value?: string | null) => {
+    const trimmed = value?.trim();
+    if (trimmed) tokens.push(normalizeForSearch(trimmed));
+  };
+  add(contact.firstName);
+  add(contact.lastName);
+  add(contact.email);
+  add(contact.company);
+  add(contact.street);
+  add(contact.houseNumber);
+  add(contact.city);
+  const postalCode = contact.postalCode?.trim();
+  if (postalCode) {
+    tokens.push(normalizeForSearch(postalCode).replace(/[\s-]/g, ""));
   }
-  return false;
+  const phoneDigits = contact.phone?.replace(/\D/g, "") ?? "";
+  if (phoneDigits) {
+    tokens.push(phoneDigits);
+    const tail = phoneDigits.slice(-9);
+    if (tail.length === 9 && tail !== phoneDigits) tokens.push(tail);
+  }
+  return tokens.join(" ");
 }
 
 export function contactMatchesFilters(

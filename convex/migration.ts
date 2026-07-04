@@ -6,6 +6,10 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import {
+  insertContactWithSearchText,
+  refreshContactSearchText,
+} from "./lib/contactWrite";
 
 /**
  * ⚠ ETL helpers — INTERNAL (internalMutation/internalQuery), GEEN publiek endpoint.
@@ -581,6 +585,8 @@ export const adminMergeContacts = internalMutation({
     }
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(args.winnerId, patch);
+      // Merge kan zoekvelden op de winner gevuld hebben → searchText bij.
+      await refreshContactSearchText(ctx, args.winnerId);
     }
 
     await ctx.db.patch(args.loserId, { deletedAt: Date.now() });
@@ -834,9 +840,11 @@ export const upsertContactsBatch = internalMutation({
           outsideArea: doc.outsideArea,
           externalId: doc.externalId,
         });
+        // ETL-patch raakt zoekvelden → searchText bijwerken.
+        await refreshContactSearchText(ctx, existing._id);
         updated++;
       } else {
-        await ctx.db.insert("contacts", {
+        await insertContactWithSearchText(ctx, {
           ...doc,
           workspaceId: args.workspaceId,
         });
@@ -881,7 +889,7 @@ export const insertMoneybirdContacts = internalMutation({
   handler: async (ctx, args) => {
     let inserted = 0;
     for (const doc of args.docs) {
-      await ctx.db.insert("contacts", {
+      await insertContactWithSearchText(ctx, {
         workspaceId: args.workspaceId,
         firstName: doc.firstName,
         lastName: doc.lastName,

@@ -1,6 +1,10 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { publicContact } from "./contactsRead";
+import {
+  insertContactWithSearchText,
+  refreshContactSearchText,
+} from "./lib/contactWrite";
 
 /**
  * Write-kant van de cross-app contact-API. De suite-apps (cashflow /
@@ -80,12 +84,14 @@ export const createContactFromApp = internalMutation({
       if (!contact.country && args.country) merged.country = args.country;
       if (Object.keys(merged).length > 0) {
         await ctx.db.patch(contact._id, merged);
+        // Merge kan zoekvelden gevuld hebben → searchText bijwerken.
+        await refreshContactSearchText(ctx, contact._id);
       }
       const fresh = await ctx.db.get(contact._id);
       return { contact: publicContact(fresh!), created: false };
     }
 
-    const contactId = await ctx.db.insert("contacts", {
+    const contactId = await insertContactWithSearchText(ctx, {
       workspaceId: workspace._id,
       firstName: args.firstName,
       lastName: args.lastName,

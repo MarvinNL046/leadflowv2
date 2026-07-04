@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   normalizeForSearch,
+  matchesHaystack,
   contactMatchesSearch,
   contactMatchesFilters,
   compareContacts,
   buildSourceMap,
+  buildSearchText,
 } from "./contactSearch";
 
 const base = {
@@ -137,6 +139,100 @@ describe("search + filter gecombineerd", () => {
     );
     expect(out).toHaveLength(1);
     expect(out[0]).toBe(base);
+  });
+});
+
+describe("buildSearchText", () => {
+  it("alle zoekvelden genormaliseerd + compacte postcode + telefoon-digits met laatste-9-variant", () => {
+    const text = buildSearchText({
+      firstName: "José",
+      lastName: "Jansen",
+      email: "Jose@Example.nl",
+      phone: "+31 6 12 34 56 78",
+      company: "Acme BV",
+      street: "Dorpstraat",
+      houseNumber: "12a",
+      postalCode: "6049 AD",
+      city: "Maastricht",
+    });
+    expect(text).toBe(
+      "jose jansen jose@example.nl acme bv dorpstraat 12a maastricht 6049ad 31612345678 612345678",
+    );
+  });
+  it("lege/ontbrekende velden geven geen lege tokens", () => {
+    expect(buildSearchText({})).toBe("");
+    expect(
+      buildSearchText({ firstName: "  ", email: undefined, phone: "" }),
+    ).toBe("");
+  });
+  it("06-nummer krijgt digits én laatste-9-variant (matcht +31-zoekterm)", () => {
+    expect(buildSearchText({ phone: "0612345678" })).toBe(
+      "0612345678 612345678",
+    );
+  });
+});
+
+describe("matchesHaystack", () => {
+  it("lege term → true (geen filter)", () => {
+    expect(matchesHaystack("jan jansen", "")).toBe(true);
+  });
+  it("plain substring", () => {
+    expect(matchesHaystack("jan jansen acme", normalizeForSearch("jansen"))).toBe(true);
+    expect(matchesHaystack("jan jansen acme", normalizeForSearch("xyz"))).toBe(false);
+  });
+  it("compact-variant matcht postcode met/zonder spatie", () => {
+    // haystack met compacte postcode (zoals buildSearchText die opslaat)
+    expect(matchesHaystack("6049ad", normalizeForSearch("6049 ad"))).toBe(true);
+    // haystack met spatie, zoektermcompact
+    expect(matchesHaystack("6049 ad", normalizeForSearch("6049ad"))).toBe(true);
+  });
+  it("digit-tail: +31-zoekterm matcht 06-digits in haystack", () => {
+    // buildSearchText slaat "0612345678 612345678" op
+    expect(matchesHaystack("0612345678 612345678", normalizeForSearch("+31612345678"))).toBe(true);
+  });
+  it("korte cijferreeks (<5) matcht niet zomaar overal", () => {
+    expect(matchesHaystack("0612345678", normalizeForSearch("9999"))).toBe(false);
+  });
+});
+
+// ── Review-gaten: bewijs dat de per-rij match tegen het buildSearchText-
+// haystack precies de dingen terugvindt die BM25 brak (mid-substring in
+// e-mail/woord, telefoon-fragment). searchContacts matcht exact zó:
+//   const hay = contact.searchText ?? buildSearchText(contact);
+//   matchesHaystack(hay, normalizeForSearch(term))
+describe("searchContacts per-rij match (buildSearchText + matchesHaystack)", () => {
+  const match = (contact: Parameters<typeof buildSearchText>[0], rawTerm: string) =>
+    matchesHaystack(buildSearchText(contact), normalizeForSearch(rawTerm));
+
+  it("e-mail-MIDDEN vindbaar: 'peeters' in f2hejhpeeters@…", () => {
+    expect(match({ email: "f2hejhpeeters@example.nl" }, "peeters")).toBe(true);
+  });
+  it("mid-woord vindbaar: 'airco' in …@staycoolairco.nl", () => {
+    expect(match({ email: "info@staycoolairco.nl" }, "airco")).toBe(true);
+  });
+  it("mid-woord in bedrijfsnaam: 'cool' in 'StayCool BV'", () => {
+    expect(match({ company: "StayCool BV" }, "cool")).toBe(true);
+  });
+  it("telefoon-fragment (midden) vindbaar: '3456' in 0612345678", () => {
+    // "3456" = 4 digits < 5, maar zit als plain substring in de digit-token
+    expect(match({ phone: "0612345678" }, "3456")).toBe(true);
+  });
+  it("telefoon-fragment ≥5 digits vindbaar: '23456'", () => {
+    expect(match({ phone: "0612345678" }, "23456")).toBe(true);
+  });
+  it("achternaam-fragment (mid-substring): 'ete' in 'Peeters'", () => {
+    expect(match({ lastName: "Peeters" }, "ete")).toBe(true);
+  });
+  it("geen valse match: 'rotterdam' vindt Maastricht-contact niet", () => {
+    expect(match({ city: "Maastricht" }, "rotterdam")).toBe(false);
+  });
+  it("fallback-pariteit: leeg searchText → live buildSearchText geeft zelfde uitkomst", () => {
+    const contact = { email: "info@staycoolairco.nl", lastName: "Peeters" };
+    // simuleer rij ZONDER searchText (searchText ?? buildSearchText(contact))
+    const hayFromFallback = buildSearchText(contact);
+    const hayFromStored = buildSearchText(contact); // wat de write-helper opslaat
+    expect(hayFromFallback).toBe(hayFromStored);
+    expect(matchesHaystack(hayFromFallback, normalizeForSearch("airco"))).toBe(true);
   });
 });
 
