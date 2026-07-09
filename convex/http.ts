@@ -984,7 +984,7 @@ http.route({
 
     const result = await ctx.runQuery(
       internal.contactsRead.getDetailForStaycool,
-      { workspaceId, contactId: id as Id<"contacts"> },
+      { workspaceId, contactId: id },
     );
     if (!result) return jsonResponse({ error: "Not found" }, 404);
     return jsonResponse(result, 200);

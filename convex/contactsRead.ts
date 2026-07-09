@@ -77,16 +77,23 @@ export const searchForStaycool = internalQuery({
 export const getDetailForStaycool = internalQuery({
   args: {
     workspaceId: v.id("workspaces"),
-    contactId: v.id("contacts"),
+    // Bewust v.string(), NIET v.id("contacts"): frostwork's 360-view kan een
+    // verouderd/ongeldig leadflowContactId sturen (bv. uit de installed-base-
+    // afleiding). Met v.id() faalt de arg-validatie hard → HTTP 500. We
+    // normaliseren zelf en behandelen een onbekend/ongeldig id als "niet
+    // gevonden" (→ 404), zodat de klantpagina netjes degradeert.
+    contactId: v.string(),
   },
   handler: async (ctx, args) => {
-    const c = await ctx.db.get(args.contactId);
+    const contactId = ctx.db.normalizeId("contacts", args.contactId);
+    if (!contactId) return null;
+    const c = await ctx.db.get(contactId);
     if (!c || c.workspaceId !== args.workspaceId || c.deletedAt !== undefined) {
       return null;
     }
     const attribution = await ctx.db
       .query("leadAttribution")
-      .withIndex("by_contact", (q) => q.eq("contactId", args.contactId))
+      .withIndex("by_contact", (q) => q.eq("contactId", contactId))
       .order("desc")
       .first();
     return { contact: publicContact(c), source: attribution?.source ?? null };
