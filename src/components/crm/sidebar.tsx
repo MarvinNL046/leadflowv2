@@ -97,6 +97,30 @@ export function SidebarContent({
         </Link>
       </div>
 
+      {/* Externe apps — bovenaan, zelfde plek als de switcher in
+          frostwork/cashflow zodat de suite overal gelijk voelt */}
+      <div className="shrink-0 border-b border-zinc-200 p-2">
+        <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+          Apps
+        </p>
+        {EXTERNAL_NAV.map((app) => {
+          const Icon = app.icon
+          return (
+            <a
+              key={app.href}
+              href={app.href}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
+            >
+              <Icon className="h-4 w-4" />
+              {app.label}
+              <ExternalLink className="ml-auto h-3 w-3 text-zinc-400" />
+            </a>
+          )
+        })}
+      </div>
+
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {NAV.map((item) => {
@@ -133,28 +157,6 @@ export function SidebarContent({
           )
         })}
 
-        {/* Externe apps — losse SaaS-producten, hier snel bereikbaar */}
-        <div className="pt-4">
-          <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            Apps
-          </p>
-          {EXTERNAL_NAV.map((app) => {
-            const Icon = app.icon
-            return (
-              <a
-                key={app.href}
-                href={app.href}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
-              >
-                <Icon className="h-4 w-4" />
-                {app.label}
-                <ExternalLink className="ml-auto h-3 w-3 text-zinc-400" />
-              </a>
-            )
-          })}
-        </div>
       </nav>
 
       {/* Footer */}
