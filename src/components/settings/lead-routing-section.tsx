@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { toast } from 'sonner'
-import { Euro, Loader2, Pencil, Plus, Route as RouteIcon, Trash2 } from 'lucide-react'
+import { Euro, Loader2, Pencil, Plus, Route as RouteIcon, Trash2 } from "@/components/icons"
 import {
   Card,
   CardContent,

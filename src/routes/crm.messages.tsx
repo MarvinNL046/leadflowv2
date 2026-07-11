@@ -17,7 +17,7 @@ import {
   Archive,
   ArchiveRestore,
   FileText,
-} from 'lucide-react'
+} from "@/components/icons"
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'

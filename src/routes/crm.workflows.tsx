@@ -16,7 +16,7 @@ import {
   Pencil,
   Trash2,
   ChevronDown,
-} from 'lucide-react'
+} from "@/components/icons"
 import {
   Card,
   CardContent,

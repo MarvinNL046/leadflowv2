@@ -9,7 +9,7 @@ import {
   Route as RouteIcon,
   Plus,
   Trash2,
-} from 'lucide-react'
+} from "@/components/icons"
 import {
   Card,
   CardContent,

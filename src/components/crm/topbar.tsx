@@ -1,6 +1,6 @@
 import { useQuery } from 'convex/react'
 import { useClerk } from '@clerk/clerk-react'
-import { Menu } from 'lucide-react'
+import { Menu } from "@/components/icons"
 import { Avatar, AvatarFallback } from '#/components/ui/avatar.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { Button } from '#/components/ui/button.tsx'

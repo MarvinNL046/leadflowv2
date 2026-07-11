@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from 'convex/react'
 import { Link } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
+import { Plus } from "@/components/icons"
 import { Button } from '#/components/ui/button.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { Card, CardContent } from '#/components/ui/card.tsx'

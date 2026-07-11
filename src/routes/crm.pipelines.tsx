@@ -11,7 +11,7 @@ import {
   useDroppable,
   type DragEndEvent,
 } from '@dnd-kit/core'
-import { Plus, MapPin, GripVertical, Kanban as KanbanIcon } from 'lucide-react'
+import { Plus, MapPin, GripVertical, Kanban as KanbanIcon } from "@/components/icons"
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'

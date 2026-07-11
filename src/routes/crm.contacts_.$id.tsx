@@ -22,7 +22,7 @@ import {
   MessageSquare,
   Snowflake,
   Trash2,
-} from 'lucide-react'
+} from "@/components/icons"
 import { LeadDialog } from '../components/crm/lead-dialog'
 import type { IncomingLead } from '../components/crm/lead-card'
 import {

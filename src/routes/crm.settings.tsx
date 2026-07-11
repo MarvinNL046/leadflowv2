@@ -9,7 +9,7 @@ import {
   Mail,
   Bot,
   Tags,
-} from 'lucide-react'
+} from "@/components/icons"
 import {
   Card,
   CardContent,

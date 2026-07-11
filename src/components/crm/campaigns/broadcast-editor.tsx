@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useAction } from 'convex/react'
 import { toast } from 'sonner'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from "@/components/icons"
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { humanizeConvexError } from '#/lib/errors.ts'

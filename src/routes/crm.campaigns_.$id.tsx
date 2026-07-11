@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation } from 'convex/react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from "@/components/icons"
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Badge } from '#/components/ui/badge.tsx'

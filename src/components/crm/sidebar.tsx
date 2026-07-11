@@ -10,7 +10,7 @@ import {
   ExternalLink,
   Snowflake,
   Receipt,
-} from 'lucide-react'
+} from "@/components/icons"
 import { useQuery } from 'convex/react'
 import { cn } from '#/lib/utils.ts'
 import { CASHFLOW_URL, FROSTWORK_URL } from '#/lib/external-apps.ts'

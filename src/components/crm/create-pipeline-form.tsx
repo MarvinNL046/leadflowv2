@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from 'convex/react'
 import { toast } from 'sonner'
-import { Plus } from 'lucide-react'
+import { Plus } from "@/components/icons"
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { humanizeConvexError } from '#/lib/errors.ts'

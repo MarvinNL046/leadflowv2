@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from 'convex/react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from "@/components/icons"
 import { Button } from '#/components/ui/button.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { Card, CardContent } from '#/components/ui/card.tsx'

@@ -12,7 +12,7 @@ import {
   Lock,
   Users,
   CheckCircle2,
-} from 'lucide-react'
+} from "@/components/icons"
 import {
   Card,
   CardContent,

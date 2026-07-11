@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useAction } from 'convex/react'
 import { toast } from 'sonner'
-import { ArrowLeft, Bot, Save, RotateCcw, Zap, Workflow } from 'lucide-react'
+import { ArrowLeft, Bot, Save, RotateCcw, Zap, Workflow } from "@/components/icons"
 import {
   Card,
   CardContent,

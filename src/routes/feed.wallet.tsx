@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useAction, useQuery } from 'convex/react'
 import { ConvexError } from 'convex/values'
-import { Wallet, Plus, ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
+import { Wallet, Plus, ArrowDownCircle, ArrowUpCircle } from "@/components/icons"
 import { Button } from '#/components/ui/button.tsx'
 import {
   Card,

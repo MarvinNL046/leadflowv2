@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from 'convex/react'
-import { Plus, Trash2, CheckCircle2, RotateCcw, Mail, Sparkles } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, RotateCcw, Mail, Sparkles } from "@/components/icons"
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'

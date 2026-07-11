@@ -1,4 +1,4 @@
-import { Info } from 'lucide-react'
+import { Info } from "@/components/icons"
 
 const COLOR_STYLES = {
   orange:

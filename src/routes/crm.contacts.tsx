@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation } from 'convex/react'
 import { toast } from 'sonner'
-import { Plus, ChevronDown, Search, Upload } from 'lucide-react'
+import { Plus, ChevronDown, Search, Upload } from "@/components/icons"
 import { Button } from '#/components/ui/button.tsx'
 import {
   Select,

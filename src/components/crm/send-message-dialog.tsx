@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAction } from 'convex/react'
 import { toast } from 'sonner'
-import { Send, Mail, MessageCircle, MessageSquare } from 'lucide-react'
+import { Send, Mail, MessageCircle, MessageSquare } from "@/components/icons"
 import {
   Dialog,
   DialogContent,

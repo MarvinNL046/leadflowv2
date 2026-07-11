@@ -10,7 +10,7 @@ import {
   Trash2,
   Kanban as KanbanIcon,
   Check,
-} from 'lucide-react'
+} from "@/components/icons"
 import {
   Card,
   CardContent,

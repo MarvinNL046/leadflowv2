@@ -1,5 +1,5 @@
 import { useAction } from "convex/react";
-import { ExternalLink, Receipt, Snowflake } from "lucide-react";
+import { ExternalLink, Receipt, Snowflake } from "@/components/icons";
 import { type ReactNode, useEffect, useState } from "react";
 import {
 	Card,

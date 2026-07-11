@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from 'convex/react'
-import { Mail, MessageSquare, Send } from 'lucide-react'
+import { Mail, MessageSquare, Send } from "@/components/icons"
 import { Button } from '#/components/ui/button.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'

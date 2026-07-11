@@ -4,7 +4,7 @@ import {
   MapPinOff,
   PhoneOff,
   X,
-} from 'lucide-react'
+} from "@/components/icons"
 import { Button } from '#/components/ui/button.tsx'
 import { ActionButton } from '../parts/action-button'
 import type { IncomingLead } from '../types'
