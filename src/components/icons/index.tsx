@@ -5,14 +5,14 @@
 // pas de accent-curatie in de generator aan en genereer opnieuw.
 //
 // Geometrie afgeleid van Lucide (ISC-licentie, © Lucide Contributors); per
-// icoon is één karakteristiek element in de merkkleur (#4fb8b2) gezet.
+// icoon is één karakteristiek element in de merkkleur (#a78bfa) gezet.
 // Hulp-glyphs (pijlen, chevrons, kruisjes, …) blijven bewust één kleur.
 // Drop-in vervanger voor lucide-react: zelfde namen, zelfde props.
 // ─────────────────────────────────────────────────────────────────────────────
 import * as React from "react";
 
 /** Merk-accentkleur van Leadflow. */
-const A = "#4fb8b2";
+const A = "#a78bfa";
 
 export type BrandIconProps = Omit<
   React.SVGProps<SVGSVGElement>,
