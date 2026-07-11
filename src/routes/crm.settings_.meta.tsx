@@ -483,7 +483,7 @@ function PagesSection({
             href="https://developers.facebook.com/docs/marketing-api/guides/lead-ads/retrieving"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-0.5 text-violet-600 hover:underline"
+            className="inline-flex items-center gap-0.5 text-[#328f97] hover:underline"
           >
             Graph API docs <ExternalLink className="h-3 w-3" />
           </a>

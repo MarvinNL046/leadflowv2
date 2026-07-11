@@ -31,7 +31,7 @@ export function EmailCanvas({ blocks, selectedId, onSelect, onMove, onDelete }: 
                 className={[
                   'relative cursor-pointer rounded p-1',
                   isSelected
-                    ? 'ring-2 ring-violet-500'
+                    ? 'ring-2 ring-[#4fb8b2]'
                     : 'hover:ring-1 hover:ring-zinc-300',
                 ].join(' ')}
               >

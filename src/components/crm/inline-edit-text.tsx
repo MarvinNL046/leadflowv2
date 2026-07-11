@@ -92,7 +92,7 @@ export function InlineEditText({
         placeholder={placeholder}
         aria-label={ariaLabel}
         className={cn(
-          'rounded border border-violet-400 bg-white px-1.5 py-0.5 outline-none ring-2 ring-violet-200 disabled:opacity-60',
+          'rounded border border-[#4fb8b2] bg-white px-1.5 py-0.5 outline-none ring-2 ring-[#bfe1dd] disabled:opacity-60',
           inputClassName ?? className,
         )}
       />

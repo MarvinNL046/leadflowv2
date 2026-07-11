@@ -48,7 +48,7 @@ function CampaignsPage() {
             className={cn(
               'border-b-2 px-4 py-2 text-sm font-medium',
               tab === t.key
-                ? 'border-violet-600 text-violet-900'
+                ? 'border-[#328f97] text-[#173a40]'
                 : 'border-transparent text-zinc-500 hover:text-zinc-800',
             )}
           >

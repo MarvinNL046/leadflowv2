@@ -65,7 +65,7 @@ export function LeadCard({ lead }: { lead: FeedLead }) {
       params={{ id: lead.id }}
       className="block"
     >
-      <Card className="transition-colors hover:border-violet-300">
+      <Card className="transition-colors hover:border-[#9dd3cd]">
         <CardHeader className="gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <Badge>{lead.nicheLabel}</Badge>

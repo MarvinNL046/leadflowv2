@@ -48,7 +48,7 @@ export function CrmTopbar({
             {profile?.isSuperAdmin && (
               <Badge
                 variant="secondary"
-                className="ml-1 hidden bg-violet-100 text-violet-800 sm:inline-flex"
+                className="ml-1 hidden bg-[#d7ece8] text-[#173a40] sm:inline-flex"
               >
                 super-admin
               </Badge>
@@ -62,7 +62,7 @@ export function CrmTopbar({
       {/* User + actions */}
       <div className="flex shrink-0 items-center gap-3">
         <Avatar className="h-8 w-8">
-          <AvatarFallback className="bg-violet-100 text-xs font-medium text-violet-800">
+          <AvatarFallback className="bg-[#d7ece8] text-xs font-medium text-[#173a40]">
             {userInitials}
           </AvatarFallback>
         </Avatar>

@@ -177,7 +177,7 @@ export function AnsweredDialog({
             <Button
               type="submit"
               disabled={submitting}
-              className="w-full bg-gradient-to-r from-violet-600 to-purple-600 text-white"
+              className="w-full bg-gradient-to-r from-[#328f97] to-[#173a40] text-white"
             >
               <Send className="h-4 w-4" />
               {submitting ? 'Inplannen…' : 'Afspraak inplannen'}
@@ -260,7 +260,7 @@ function OutcomeButton({
 }) {
   const colors = {
     violet:
-      'border-violet-200 hover:border-violet-400 hover:bg-violet-50 text-violet-700',
+      'border-[#bfe1dd] hover:border-[#4fb8b2] hover:bg-[#e9f5f3] text-[#173a40]',
     blue: 'border-blue-200 hover:border-blue-400 hover:bg-blue-50 text-blue-700',
     zinc: 'border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50 text-zinc-700',
   }

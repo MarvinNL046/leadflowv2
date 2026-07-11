@@ -140,7 +140,7 @@ export function LeadCard({ lead, isNew = false }: LeadCardProps) {
 
         <div className="flex items-start gap-3">
           {/* Avatar */}
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-500 text-sm font-medium text-white">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#4fb8b2] to-[#328f97] text-sm font-medium text-white">
             {initial}
           </div>
 

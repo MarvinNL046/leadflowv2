@@ -8,7 +8,7 @@ const COLOR_STYLES = {
     'border-amber-200 text-amber-700 hover:bg-amber-50 [&_svg]:text-amber-500',
   red: 'border-red-200 text-red-700 hover:bg-red-50 [&_svg]:text-red-500',
   violet:
-    'bg-gradient-to-r from-violet-600 to-blue-600 text-white hover:from-violet-700 hover:to-blue-700 [&_svg]:text-white',
+    'bg-gradient-to-r from-[#328f97] to-[#173a40] text-white hover:from-[#2a7a81] hover:to-[#12333a] [&_svg]:text-white',
   blue: 'border-blue-200 text-blue-700 hover:bg-blue-50 [&_svg]:text-blue-500',
   zinc: 'border-zinc-300 text-zinc-700 hover:bg-zinc-50 [&_svg]:text-zinc-500',
 } as const

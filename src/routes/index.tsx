@@ -71,7 +71,7 @@ function AuthenticatedView() {
                   locale: {profile.locale}
                 </span>
                 {profile.isSuperAdmin && (
-                  <span className="rounded bg-violet-100 px-2 py-0.5 font-medium text-violet-800">
+                  <span className="rounded bg-[#d7ece8] px-2 py-0.5 font-medium text-[#173a40]">
                     super-admin
                   </span>
                 )}
@@ -130,7 +130,7 @@ function AuthenticatedView() {
       <div className="mt-6">
         <Link
           to="/crm"
-          className="block rounded-md border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-violet-900 hover:bg-violet-100"
+          className="block rounded-md border border-[#bfe1dd] bg-[#e9f5f3] px-4 py-3 text-sm font-medium text-[#173a40] hover:bg-[#d7ece8]"
         >
           → CRM openen (contacts)
         </Link>
@@ -161,7 +161,7 @@ function UnauthenticatedView() {
       </p>
       <Link
         to="/login"
-        className="mt-4 inline-block rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
+        className="mt-4 inline-block rounded-md bg-[#173a40] px-4 py-2 text-sm font-medium text-white hover:bg-[#328f97]"
       >
         Naar inloggen →
       </Link>

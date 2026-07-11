@@ -48,7 +48,7 @@ export function AppointmentDateView({ processing, onSubmit }: Props) {
       <Button
         type="submit"
         disabled={processing !== null}
-        className="w-full bg-gradient-to-r from-violet-600 to-blue-600 text-white"
+        className="w-full bg-gradient-to-r from-[#328f97] to-[#173a40] text-white"
       >
         <Send className="h-4 w-4" />
         {processing !== null ? 'Inplannen…' : 'Afspraak inplannen'}

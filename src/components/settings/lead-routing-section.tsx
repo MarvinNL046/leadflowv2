@@ -160,8 +160,8 @@ function RouteRow({
     : route.sourceIdentifier
   return (
     <div className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3">
-      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-purple-100">
-        <RouteIcon className="h-4 w-4 text-purple-600" />
+      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#d7ece8]">
+        <RouteIcon className="h-4 w-4 text-[#328f97]" />
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-zinc-900">{source}</p>

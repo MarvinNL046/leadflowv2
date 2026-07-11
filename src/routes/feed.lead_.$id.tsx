@@ -284,7 +284,7 @@ function RevealedContact({ contact }: { contact: FullContact }) {
       {contact.phone && (
         <a
           href={`tel:${contact.phone}`}
-          className="inline-flex items-center gap-1 font-medium text-violet-700 hover:underline"
+          className="inline-flex items-center gap-1 font-medium text-[#2a7a81] hover:underline"
         >
           <Phone className="h-3.5 w-3.5" />
           {contact.phone}
@@ -293,7 +293,7 @@ function RevealedContact({ contact }: { contact: FullContact }) {
       {contact.email && (
         <a
           href={`mailto:${contact.email}`}
-          className="inline-flex items-center gap-1 font-medium text-violet-700 hover:underline"
+          className="inline-flex items-center gap-1 font-medium text-[#2a7a81] hover:underline"
         >
           <Mail className="h-3.5 w-3.5" />
           {contact.email}
@@ -326,7 +326,7 @@ function UnlockedCard({ contact }: { contact: FullContact }) {
         </p>
         <Link
           to="/feed"
-          className="text-sm font-medium text-violet-700 hover:underline"
+          className="text-sm font-medium text-[#2a7a81] hover:underline"
         >
           Terug naar de feed
         </Link>

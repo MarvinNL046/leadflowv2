@@ -170,8 +170,8 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
           Terug naar instellingen
         </Link>
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100">
-            <Bot className="h-4.5 w-4.5 text-violet-700" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#d7ece8]">
+            <Bot className="h-4.5 w-4.5 text-[#2a7a81]" />
           </div>
           <div>
             <h1 className="text-xl font-semibold text-zinc-900">
@@ -186,7 +186,7 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
       </div>
 
       {/* Aan de slag — starter-workflow */}
-      <Card className="border-violet-200 bg-violet-50/40">
+      <Card className="border-[#bfe1dd] bg-[#e9f5f3]/40">
         <CardHeader>
           <CardTitle className="text-base">Aan de slag</CardTitle>
         </CardHeader>

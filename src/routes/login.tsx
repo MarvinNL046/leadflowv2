@@ -59,7 +59,7 @@ function LoginPage() {
         </div>
       )}
       {statusMsg && !error && (
-        <div className="w-full max-w-sm rounded-md bg-violet-50 px-3 py-2 text-sm text-violet-700">
+        <div className="w-full max-w-sm rounded-md bg-[#e9f5f3] px-3 py-2 text-sm text-[#2a7a81]">
           {statusMsg}
         </div>
       )}

@@ -212,7 +212,7 @@ function Toggle({
       className={cn(
         'flex items-center justify-center rounded-md border px-3 py-2 text-sm font-medium transition-colors',
         active
-          ? 'border-violet-300 bg-violet-50 text-violet-800'
+          ? 'border-[#9dd3cd] bg-[#e9f5f3] text-[#173a40]'
           : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50',
       )}
     >
@@ -339,7 +339,7 @@ export function PreferencesForm({ mode, initial, onSaved }: Props) {
                   <button
                     type="button"
                     onClick={() => toggleCategory(cat.niches)}
-                    className="text-xs text-violet-600 hover:underline"
+                    className="text-xs text-[#328f97] hover:underline"
                   >
                     {allSelected ? 'Deselecteer alles' : 'Selecteer alles'}
                   </button>
@@ -418,7 +418,7 @@ export function PreferencesForm({ mode, initial, onSaved }: Props) {
               className={cn(
                 'flex w-full items-start gap-3 rounded-md border p-3 text-left transition-colors',
                 preferredMode === opt.value
-                  ? 'border-violet-300 bg-violet-50'
+                  ? 'border-[#9dd3cd] bg-[#e9f5f3]'
                   : 'border-zinc-200 hover:bg-zinc-50',
               )}
             >
@@ -426,7 +426,7 @@ export function PreferencesForm({ mode, initial, onSaved }: Props) {
                 className={cn(
                   'mt-1 h-4 w-4 shrink-0 rounded-full border-2',
                   preferredMode === opt.value
-                    ? 'border-violet-600 bg-violet-600'
+                    ? 'border-[#328f97] bg-[#328f97]'
                     : 'border-zinc-300',
                 )}
               />

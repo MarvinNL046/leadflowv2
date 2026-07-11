@@ -172,7 +172,7 @@ function ContactDetailPage() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-500 text-base font-medium text-white">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#4fb8b2] to-[#328f97] text-base font-medium text-white">
           {initials}
         </div>
         <div className="min-w-0 flex-1">
@@ -628,7 +628,7 @@ function MessageBubble({
     },
     messenger: {
       icon: MessageCircle,
-      bg: 'bg-violet-50 border-violet-200',
+      bg: 'bg-[#e9f5f3] border-[#bfe1dd]',
       label: 'Messenger',
     },
   }

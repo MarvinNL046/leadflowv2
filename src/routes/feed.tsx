@@ -61,7 +61,7 @@ function FeedShell() {
     <div className="min-h-screen w-full bg-zinc-50">
       <header className="border-b border-zinc-200 bg-white">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3 sm:px-6">
-          <Store className="h-5 w-5 text-violet-600" />
+          <Store className="h-5 w-5 text-[#328f97]" />
           <span className="font-semibold text-zinc-900">
             LeadFlow Marketplace
           </span>
@@ -77,7 +77,7 @@ function FeedShell() {
                   className={cn(
                     'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                     active
-                      ? 'bg-violet-50 text-violet-800'
+                      ? 'bg-[#e9f5f3] text-[#173a40]'
                       : 'text-zinc-600 hover:bg-zinc-100',
                   )}
                 >

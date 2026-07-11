@@ -306,7 +306,7 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                         params={{ id: c._id }}
                         className="-mx-2 flex items-center gap-3 rounded-md px-2 py-3 transition-colors first:pt-0 last:pb-0 hover:bg-zinc-50/60"
                       >
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-medium text-violet-800">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#d7ece8] text-xs font-medium text-[#173a40]">
                           {initials}
                         </div>
                         <div className="min-w-0 flex-1">

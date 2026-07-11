@@ -170,7 +170,7 @@ export function MessageComposeView({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={channel === 'sms' ? 4 : 8}
-              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-xs focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-200"
+              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-xs focus:border-[#4fb8b2] focus:outline-none focus:ring-2 focus:ring-[#bfe1dd]"
             />
             {channel === 'email' && (
               <p className="text-[10px] text-zinc-500">
