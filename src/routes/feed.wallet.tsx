@@ -84,7 +84,7 @@ function WalletPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <Wallet className="h-6 w-6 text-[#328f97]" />
+        <Wallet className="h-6 w-6 text-violet-600" />
         <h1 className="text-2xl font-bold text-zinc-900">Tegoed</h1>
       </div>
 

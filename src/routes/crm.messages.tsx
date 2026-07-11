@@ -360,11 +360,11 @@ function ConversationRow({
         onClick={onClick}
         className={cn(
           'flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-zinc-50',
-          active && 'bg-[#e9f5f3]/60',
+          active && 'bg-violet-50/60',
           conv.archived && 'opacity-60',
         )}
       >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#4fb8b2] to-[#328f97] text-xs font-medium text-white">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-500 text-xs font-medium text-white">
           {initials}
         </div>
         <div className="min-w-0 flex-1">
@@ -488,7 +488,7 @@ function ConversationView({
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#4fb8b2] to-[#328f97] text-xs font-medium text-white">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-500 text-xs font-medium text-white">
           {((contact.firstName?.[0] ?? '') +
             (contact.lastName?.[0] ?? '') ||
             contact.email?.[0] ||
@@ -592,7 +592,7 @@ function ChatBubble({
     },
     messenger: {
       icon: MessageCircle,
-      bg: 'bg-[#e9f5f3] border-[#bfe1dd]',
+      bg: 'bg-violet-50 border-violet-200',
       label: 'Messenger',
     },
   }

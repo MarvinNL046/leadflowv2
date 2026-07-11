@@ -107,9 +107,9 @@ export function PurchaseModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {isExclusive ? (
-              <Lock className="h-5 w-5 text-[#328f97]" />
+              <Lock className="h-5 w-5 text-violet-600" />
             ) : (
-              <Users className="h-5 w-5 text-[#328f97]" />
+              <Users className="h-5 w-5 text-violet-600" />
             )}
             {isExclusive ? 'Exclusief kopen' : 'Gedeeld kopen'}
           </DialogTitle>

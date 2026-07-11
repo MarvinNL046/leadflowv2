@@ -53,7 +53,7 @@ const SECTIONS: HubSection[] = [
         description:
           'Stages toevoegen, volgorde, kleuren en Gewonnen/Verloren-markering',
         icon: KanbanIcon,
-        iconColor: 'bg-[#d7ece8] text-[#2a7a81]',
+        iconColor: 'bg-violet-100 text-violet-700',
       },
       {
         to: '/crm/settings/templates',
@@ -69,7 +69,7 @@ const SECTIONS: HubSection[] = [
         description:
           'API-key, context, toon en guardrails voor de AI-reactie-nodes',
         icon: Bot,
-        iconColor: 'bg-[#d7ece8] text-[#2a7a81]',
+        iconColor: 'bg-violet-100 text-violet-700',
       },
       {
         to: '/crm/settings/custom-fields',
@@ -138,7 +138,7 @@ function SettingsHubPage() {
                     to={item.to}
                     className="group"
                   >
-                    <Card className="transition-colors hover:border-[#9dd3cd]">
+                    <Card className="transition-colors hover:border-violet-300">
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
                           <div
@@ -161,7 +161,7 @@ function SettingsHubPage() {
                               {item.description}
                             </p>
                           </div>
-                          <ChevronRight className="h-4 w-4 flex-shrink-0 text-zinc-400 transition-transform group-hover:translate-x-0.5 group-hover:text-[#4fb8b2]" />
+                          <ChevronRight className="h-4 w-4 flex-shrink-0 text-zinc-400 transition-transform group-hover:translate-x-0.5 group-hover:text-violet-500" />
                         </div>
                       </CardContent>
                     </Card>

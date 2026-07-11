@@ -250,7 +250,7 @@ function WhatsappConnector({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
               <span>
                 Voor nieuwe nummers: warm-up via{' '}
                 <a
-                  className="inline-flex items-center gap-1 text-[#328f97] hover:underline"
+                  className="inline-flex items-center gap-1 text-violet-600 hover:underline"
                   href="https://wa.voidfix.com/dashboard"
                   target="_blank"
                   rel="noopener noreferrer"

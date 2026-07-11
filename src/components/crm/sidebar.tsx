@@ -137,7 +137,7 @@ export function SidebarContent({
               className={cn(
                 'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-[#173a40] text-white shadow-sm'
+                  ? 'bg-violet-600 text-white shadow-sm'
                   : 'text-zinc-700 hover:bg-zinc-100',
               )}
             >
@@ -167,7 +167,7 @@ export function SidebarContent({
           className={cn(
             'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
             location.pathname.startsWith('/crm/settings')
-              ? 'bg-[#173a40] text-white shadow-sm'
+              ? 'bg-violet-600 text-white shadow-sm'
               : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700',
           )}
         >

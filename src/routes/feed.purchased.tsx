@@ -148,7 +148,7 @@ function PurchaseCard({ purchase: p }: { purchase: Purchase }) {
           {p.phone && (
             <a
               href={`tel:${p.phone}`}
-              className="inline-flex items-center gap-1 font-medium text-[#2a7a81] hover:underline"
+              className="inline-flex items-center gap-1 font-medium text-violet-700 hover:underline"
             >
               <Phone className="h-3.5 w-3.5" />
               {p.phone}
@@ -157,7 +157,7 @@ function PurchaseCard({ purchase: p }: { purchase: Purchase }) {
           {p.email && (
             <a
               href={`mailto:${p.email}`}
-              className="inline-flex items-center gap-1 font-medium text-[#2a7a81] hover:underline"
+              className="inline-flex items-center gap-1 font-medium text-violet-700 hover:underline"
             >
               <Mail className="h-3.5 w-3.5" />
               {p.email}

@@ -144,8 +144,8 @@ function PipelineEditor({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
           Terug naar instellingen
         </Link>
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#d7ece8]">
-            <KanbanIcon className="h-4.5 w-4.5 text-[#2a7a81]" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100">
+            <KanbanIcon className="h-4.5 w-4.5 text-violet-700" />
           </div>
           <div>
             <h1 className="text-xl font-semibold text-zinc-900">
@@ -530,7 +530,7 @@ function ColorSwatches({
             'relative rounded-full border transition-transform hover:scale-110',
             compact ? 'h-4 w-4' : 'h-6 w-6',
             value.toLowerCase() === c.toLowerCase()
-              ? 'border-zinc-800 ring-2 ring-[#9dd3cd]'
+              ? 'border-zinc-800 ring-2 ring-violet-300'
               : 'border-zinc-300',
           )}
           style={{ backgroundColor: c }}
