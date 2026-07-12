@@ -1352,4 +1352,66 @@ interface VoidfixWaEvent {
   mediaType?: string;
 }
 
+/**
+ * Suite-API: taak aanmaken (cashflow heractiveren-flow -> "offerte
+ * nabellen"). Zelfde WRITE-key als /api/contacts/create. Idempotent op
+ * `source` (tasks.createFromApi). contactId is optioneel maar moet, indien
+ * meegegeven, in de Staycool-workspace bestaan.
+ */
+http.route({
+  path: "/api/tasks/create",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const expected = process.env.WEBSITE_API_KEY;
+    if (!expected) return jsonResponse({ error: "Server misconfigured" }, 500);
+    const key = request.headers.get("x-api-key");
+    if (!key || !timingSafeStringEqual(key, expected)) {
+      return jsonResponse({ error: "Invalid API key" }, 401);
+    }
+
+    let payload: {
+      contactId?: string;
+      title?: string;
+      description?: string;
+      dueDate?: number;
+      source?: string;
+    };
+    try {
+      payload = JSON.parse(await request.text());
+    } catch {
+      return jsonResponse({ error: "Invalid JSON" }, 400);
+    }
+    const title = payload.title?.trim();
+    if (!title) return jsonResponse({ error: "title is required" }, 400);
+
+    const workspaceId = await ctx.runQuery(
+      internal.messaging.getStaycoolWorkspaceIdInternal,
+      {},
+    );
+    if (!workspaceId) {
+      return jsonResponse({ error: "Workspace not provisioned" }, 500);
+    }
+
+    let contactId: Id<"contacts"> | undefined;
+    if (payload.contactId) {
+      const detail = await ctx.runQuery(
+        internal.contactsRead.getDetailForStaycool,
+        { workspaceId, contactId: payload.contactId },
+      );
+      if (!detail) return jsonResponse({ error: "Contact not found" }, 404);
+      contactId = detail.contact.id as Id<"contacts">;
+    }
+
+    const result = await ctx.runMutation(internal.tasks.createFromApi, {
+      workspaceId,
+      contactId,
+      title,
+      description: payload.description,
+      dueDate: payload.dueDate,
+      source: payload.source,
+    });
+    return jsonResponse(result, result.created ? 201 : 200);
+  }),
+});
+
 export default http;

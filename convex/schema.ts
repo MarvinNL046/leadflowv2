@@ -282,6 +282,25 @@ export default defineSchema({
     .index("by_workspace", ["workspaceId"])
     .index("by_legacyId", ["legacyId"]),
 
+  // Taken (follow-ups) — o.a. gevoed door cashflow's heractiveren-flow
+  // (verlopen offerte nabellen). `source` is de idempotentie-sleutel voor
+  // API-aangemaakte taken (bv. "cashflow:quote:<id>"): nogmaals aanmaken
+  // met dezelfde source geeft de bestaande taak terug.
+  tasks: defineTable({
+    workspaceId: v.id("workspaces"),
+    contactId: v.optional(v.id("contacts")),
+    title: v.string(),
+    description: v.optional(v.string()),
+    dueDate: v.optional(v.number()),
+    status: v.union(v.literal("open"), v.literal("done")),
+    doneAt: v.optional(v.number()),
+    source: v.optional(v.string()),
+    createdById: v.optional(v.id("users")),
+  })
+    .index("by_workspace_status", ["workspaceId", "status"])
+    .index("by_contact", ["contactId"])
+    .index("by_workspace_source", ["workspaceId", "source"]),
+
   customFieldDefinitions: defineTable({
     workspaceId: v.id("workspaces"),
     entityType: v.union(v.literal("contact"), v.literal("opportunity")),

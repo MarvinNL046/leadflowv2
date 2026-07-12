@@ -6,6 +6,7 @@ import {
   MessageSquare,
   Zap,
   Send,
+  CheckCircle2,
   Settings,
   ExternalLink,
   Snowflake,
@@ -29,6 +30,7 @@ const NAV: NavItem[] = [
   { to: '/crm/messages', label: 'Messages', icon: MessageSquare },
   { to: '/crm/workflows', label: 'Workflows', icon: Zap },
   { to: '/crm/campaigns', label: 'Campagnes', icon: Send },
+  { to: '/crm/taken', label: 'Taken', icon: CheckCircle2 },
 ]
 
 const EXTERNAL_NAV = [
