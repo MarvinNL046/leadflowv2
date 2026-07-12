@@ -78,6 +78,21 @@ export const listOpen = query({
   },
 });
 
+/** Aantal open taken (sidebar-badge). Begrensde telling (cap 300). */
+export const countOpen = query({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    await requireMembershipForWorkspace(ctx, args.workspaceId);
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_workspace_status", (q) =>
+        q.eq("workspaceId", args.workspaceId).eq("status", "open"),
+      )
+      .take(300);
+    return tasks.length;
+  },
+});
+
 /** Taken van één contact (open eerst, dan afgeronde — max 50). */
 export const listByContact = query({
   args: { contactId: v.id("contacts") },

@@ -79,6 +79,13 @@ export function SidebarContent({
   )
   const unreadCount = unread?.total ?? 0
 
+  // Open-taken-teller — zelfde patroon als de inbox-badge.
+  const openTasks = useQuery(
+    api.tasks.countOpen,
+    workspaceId ? { workspaceId } : 'skip',
+  )
+  const openTaskCount = openTasks ?? 0
+
   return (
     <>
       {/* Brand */}
@@ -153,6 +160,11 @@ export function SidebarContent({
               {item.to === '/crm/messages' && unreadCount > 0 && (
                 <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1.5 text-xs font-semibold text-white">
                   {unreadCount}
+                </span>
+              )}
+              {item.to === '/crm/taken' && openTaskCount > 0 && (
+                <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-white">
+                  {openTaskCount}
                 </span>
               )}
             </Link>
