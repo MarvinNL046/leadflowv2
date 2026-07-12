@@ -1414,4 +1414,42 @@ http.route({
   }),
 });
 
+/**
+ * Suite-API: taak afronden op source — cashflow vinkt de nabel-taak
+ * automatisch af na heraanbieden/afschrijven. Zelfde write-key.
+ */
+http.route({
+  path: "/api/tasks/complete",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const expected = process.env.WEBSITE_API_KEY;
+    if (!expected) return jsonResponse({ error: "Server misconfigured" }, 500);
+    const key = request.headers.get("x-api-key");
+    if (!key || !timingSafeStringEqual(key, expected)) {
+      return jsonResponse({ error: "Invalid API key" }, 401);
+    }
+    let payload: { source?: string };
+    try {
+      payload = JSON.parse(await request.text());
+    } catch {
+      return jsonResponse({ error: "Invalid JSON" }, 400);
+    }
+    if (!payload.source) {
+      return jsonResponse({ error: "source is required" }, 400);
+    }
+    const workspaceId = await ctx.runQuery(
+      internal.messaging.getStaycoolWorkspaceIdInternal,
+      {},
+    );
+    if (!workspaceId) {
+      return jsonResponse({ error: "Workspace not provisioned" }, 500);
+    }
+    const result = await ctx.runMutation(internal.tasks.completeBySource, {
+      workspaceId,
+      source: payload.source,
+    });
+    return jsonResponse(result, 200);
+  }),
+});
+
 export default http;

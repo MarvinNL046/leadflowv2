@@ -193,3 +193,25 @@ export const createFromApi = internalMutation({
     return { taskId, created: true };
   },
 });
+
+/**
+ * API-pad: taak afronden op source (bv. "cashflow:quote:<id>") — de
+ * heractiveren-flow vinkt de nabel-taak automatisch af zodra de offerte
+ * opnieuw is aangeboden of afgeschreven. Idempotent: geen open taak met
+ * die source is gewoon { completed: false }.
+ */
+export const completeBySource = internalMutation({
+  args: { workspaceId: v.id("workspaces"), source: v.string() },
+  handler: async (ctx, args): Promise<{ completed: boolean }> => {
+    const task = await ctx.db
+      .query("tasks")
+      .withIndex("by_workspace_source", (q) =>
+        q.eq("workspaceId", args.workspaceId).eq("source", args.source),
+      )
+      .filter((q) => q.eq(q.field("status"), "open"))
+      .first();
+    if (task === null) return { completed: false };
+    await ctx.db.patch(task._id, { status: "done", doneAt: Date.now() });
+    return { completed: true };
+  },
+});
