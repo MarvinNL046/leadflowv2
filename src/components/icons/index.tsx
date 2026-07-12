@@ -556,6 +556,9 @@ const G_messageSquare = makeIcon(
   "LeadflowmessageSquare",
   <>
       <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" />
+      {/* merk-accent: chatregels in de bubbel */}
+      <path d="M7 8.5h10" stroke={A} />
+      <path d="M7 12.5h6" stroke={A} />
   </>
 );
 
@@ -941,6 +944,9 @@ const G_zap = makeIcon(
   "Leadflowzap",
   <>
       <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
+      {/* merk-accent: energiesparks naast de bliksem */}
+      <path d="M19.5 2.5 21 1" stroke={A} />
+      <path d="M21.5 6H23" stroke={A} />
   </>
 );
 
