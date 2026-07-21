@@ -155,6 +155,12 @@ export default defineSchema({
     nextFollowUpAt: v.optional(v.number()),
     // Tags as comma-separated of in een aparte tags-tabel — keuze
     tags: v.optional(v.array(v.string())),
+    // Zoek-hulpveld: genormaliseerde string (naam + e-mail + plaats + telefoon)
+    // voor de contact-zoeker. Gevuld door een backfill/migratie die buiten deze
+    // repo is gedraaid; geen functie in main schrijft of leest het. Als optioneel
+    // veld gedeclareerd zodat het schema de bestaande productiedata accepteert —
+    // anders faalt `convex deploy` op "extra field `searchText`".
+    searchText: v.optional(v.string()),
     // Source flags
     outsideArea: v.optional(v.boolean()),
     // Onbereikbaar na 3x niet opnemen — verbergt uit nieuwe-leads
