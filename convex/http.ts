@@ -919,6 +919,58 @@ http.route({
 });
 
 // ══════════════════════════════════════════════════════════════════════
+// CONTACT TAG-API — een suite-app (cashflow) tagt BESTAANDE leadflow-
+// contacten (bv. een marketing-segment). Auth = WEBSITE_API_KEY (write-key).
+// Maakt nooit nieuwe contacten; idempotent. Daarna maakt de eigenaar in
+// leadflow een segment op die tag en verstuurt een broadcast.
+// ══════════════════════════════════════════════════════════════════════
+http.route({
+  path: "/api/contacts/tag",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const expected = process.env.WEBSITE_API_KEY;
+    if (!expected) return jsonResponse({ error: "Server misconfigured" }, 500);
+    const key = request.headers.get("x-api-key");
+    if (!key || !timingSafeStringEqual(key, expected)) {
+      return jsonResponse({ error: "Invalid API key" }, 401);
+    }
+
+    let payload: { tag?: string; contactIds?: string[]; emails?: string[] };
+    try {
+      payload = JSON.parse(await request.text());
+    } catch {
+      return jsonResponse({ error: "Invalid JSON" }, 400);
+    }
+    const tag = payload.tag?.trim();
+    if (!tag) return jsonResponse({ error: "tag vereist" }, 400);
+    // Begrensd per call (de aanroeper batcht); voorkomt een te grote mutation.
+    const contactIds = Array.isArray(payload.contactIds)
+      ? payload.contactIds.slice(0, 500)
+      : [];
+    const emails = Array.isArray(payload.emails)
+      ? payload.emails.slice(0, 500)
+      : [];
+    if (contactIds.length === 0 && emails.length === 0) {
+      return jsonResponse({ error: "contactIds of emails vereist" }, 400);
+    }
+
+    const workspaceId = await ctx.runQuery(
+      internal.messaging.getStaycoolWorkspaceIdInternal,
+      {},
+    );
+    if (!workspaceId) {
+      return jsonResponse({ error: "Workspace not provisioned" }, 500);
+    }
+
+    const result = await ctx.runMutation(
+      internal.contactsWrite.tagContactsFromApp,
+      { workspaceId, tag, contactIds, emails },
+    );
+    return jsonResponse(result, 200);
+  }),
+});
+
+// ══════════════════════════════════════════════════════════════════════
 // CONTACT READ-API — leadflow-contacten lezen vanuit de andere wetry-apps
 // (cashflow / frostwork). Leadflow blijft de bron; dit is READ-ONLY.
 // Auth = READ_API_KEY via X-API-Key (apart van de write-key WEBSITE_API_KEY,
