@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
+import { internal } from "../_generated/api";
 import { isDuplicateWithin24h } from "./dedup";
 import { computeLeadScore } from "./leadScore";
 import { calculateLeadPrice, FALLBACK_RATE } from "./leadPricing";
@@ -197,6 +198,15 @@ export const insertLead = internalMutation({
 
 		// Fire-and-forget key-usage timestamp.
 		await ctx.db.patch(apiKey._id, { lastUsedAt: now });
+
+		// Waarschuw de super-admins dat er een lead binnen is. Zonder dit bleven
+		// in V1 leads onopgemerkt liggen. Fire-and-forget zodat de intake nooit
+		// op de mail wacht of erdoor faalt.
+		await ctx.scheduler.runAfter(
+			0,
+			internal.marketplace.notify.notifyNewLead,
+			{ leadId },
+		);
 
 		return { ok: true as const, leadId, duplicate: isDup, status };
 	},
