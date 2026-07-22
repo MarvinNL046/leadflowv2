@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from 'convex/react'
 import { toast } from 'sonner'
-import { Loader2, Save } from 'lucide-react'
+import { Loader2, Save } from "@/components/icons"
 import { Button } from '#/components/ui/button.tsx'
 import { Label } from '#/components/ui/label.tsx'
 import { Switch } from '#/components/ui/switch.tsx'

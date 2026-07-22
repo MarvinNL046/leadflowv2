@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { useMutation } from 'convex/react'
-import { AlignLeft, AlignCenter, AlignRight } from 'lucide-react'
+import { AlignLeft, AlignCenter, AlignRight } from "@/components/icons"
 import { toast } from 'sonner'
 import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'

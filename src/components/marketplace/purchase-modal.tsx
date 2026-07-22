@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMutation } from 'convex/react'
-import { Lock, Users } from 'lucide-react'
+import { Lock, Users } from "@/components/icons"
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button.tsx'
 import {

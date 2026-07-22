@@ -10,7 +10,7 @@ import {
   Zap,
   ChevronRight,
   AlertCircle,
-} from 'lucide-react'
+} from "@/components/icons"
 import {
   Card,
   CardContent,

@@ -43,7 +43,7 @@ function CrmShell() {
   }, [pathname])
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-zinc-50">
+    <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Desktop sidebar (md+) */}
       <CrmSidebar />
 
@@ -71,7 +71,7 @@ function UnauthenticatedRedirect() {
   const navigate = useNavigate()
   void navigate({ to: '/login' })
   return (
-    <div className="flex h-screen items-center justify-center bg-zinc-50">
+    <div className="flex h-screen items-center justify-center bg-background">
       <p className="text-sm text-zinc-500">Doorsturen naar login…</p>
     </div>
   )

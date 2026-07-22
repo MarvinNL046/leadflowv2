@@ -24,11 +24,15 @@ import {
 } from "./templateRender";
 import {
   normalizeForSearch,
-  contactMatchesSearch,
+  matchesHaystack,
+  buildSearchText,
   contactMatchesFilters,
   compareContacts,
-  buildSourceMap,
 } from "./contactSearch";
+import {
+  insertContactWithSearchText,
+  refreshContactSearchText,
+} from "./lib/contactWrite";
 
 /**
  * Contacts queries + mutations voor het CRM core.
@@ -120,8 +124,12 @@ export const listPaginated = query({
 });
 
 /**
- * Aantal contacts in een workspace — voor list-header counter.
- * Goedkoper dan list().length op grote datasets.
+ * Aantal actieve contacts in een workspace — voor de list-header counter in
+ * het bladerpad (searchContacts.total is daar null). Dit is een full-index
+ * scan (Convex heeft geen count-operator); de frontend roept 'm daarom LAZY
+ * aan (usePaginatedQuery-achtig "skip" tot de lijst er staat) zodat een kale
+ * page-load niet ~4.700 docs meetrekt. Bij verdere groei → denormalized
+ * counter overwegen.
  */
 export const count = query({
   args: {
@@ -142,9 +150,44 @@ export const count = query({
 });
 
 /**
- * Doorzoekbare/filterbare/sorteerbare contactlijst. Collect-all + in-memory
- * filter/sort (geen searchIndex). Leest de volledige workspace-set per call —
- * gelijk aan `count`; prima voor ~6k, herzien met searchIndex bij >~15k.
+ * Doorzoekbare/filterbare/sorteerbare contactlijst.
+ *
+ * TWEE paden (correctheid vóór snelheid — substring-vindbaarheid blijft 100%,
+ * maar we halveren het I/O door de attributie-join te begrenzen):
+ *
+ *  1. BLADERPAD — geen zoekterm, geen veldfilters, sort newest/oldest:
+ *     gepagineerde `.take(limit+1)` over de by_workspace_created-index met
+ *     `hasMore`. GEEN collect — dit is het pad bij een kale page-load, dus
+ *     de pagina opent met ~25 rijen + lichte meta, niet ~4.700 docs. `total`
+ *     is hier onbekend (null); de UI valt terug op de aparte count-query.
+ *
+ *  2. ZOEK/FILTER-PAD — zoekterm en/of veldfilters en/of naam-sort: één
+ *     `.collect()` over de by_workspace_created-index (soft-deleted
+ *     uitgesloten), dan in-memory. Per rij matchen we tegen
+ *     `contact.searchText ?? buildSearchText(contact)` — de fallback zorgt
+ *     dat rijen die (nog) geen searchText hebben (tussen deploy en backfill)
+ *     tóch live gematcht worden: GEEN kapot venster. Substring + digit-tail
+ *     (matchesHaystack) herstelt e-mail-midden, mid-woord en telefoon-
+ *     fragmenten. Daarna veldfilters + source-filter, sorteren, slicen;
+ *     `total`/`hasMore` zijn EERLIJKE counts (geen cap).
+ *
+ * SCHAAL: pad 2 is bewust O(workspace-grootte) en scale-safe tot ~enkele
+ * tienduizenden contacten in één workspace. De winst t.o.v. de oude code zit
+ * in (a) het wegvallen van de tweede collect (de HELE leadAttribution-tabel)
+ * en (b) een goedkope per-rij substring-match op het voorberekende searchText
+ * i.p.v. de haystack per rij opnieuw opbouwen/normaliseren. Bij verdere groei
+ * → echte tokenized/externe search heroverwegen (kost nu vindbaarheid, dus
+ * niet nu).
+ *
+ * Bron-badge (leadAttribution, oudste rij per contact wint = zelfde regel als
+ * buildSourceMap): per contact via de by_contact-index, ALLEEN voor de
+ * teruggegeven pagina-slice — nooit meer de hele tabel. Bij een actief
+ * source-FILTER moet de bron vóór het slicen bekend zijn, dus dan resolven we
+ * 'm per post-substring-kandidaat via dezelfde by_contact-lookup (oudste
+ * attributie mét workspaceId), niet via een full-table collect.
+ *
+ * Return: { contacts, total, hasMore }. `total` = echt aantal matches, of
+ * null in het bladerpad.
  */
 export const searchContacts = query({
   args: {
@@ -173,47 +216,118 @@ export const searchContacts = query({
   handler: async (ctx, args) => {
     await requireWorkspaceMembership(ctx, args.workspaceId);
 
-    const all = await ctx.db
-      .query("contacts")
-      .withIndex("by_workspace_created", (q) =>
-        q.eq("workspaceId", args.workspaceId),
-      )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
-
-    const termNormalized = args.search ? normalizeForSearch(args.search) : "";
     const filters = args.filters ?? {};
     const sort = args.sort ?? "newest";
+    // Geen bovengrens: pad 1 is index-gepagineerd (take(limit+1), stopt
+    // vanzelf) en pad 2 collect toch al de hele workspace, dus een grotere
+    // limit kost daar niets extra. Een cap maakte "Toon 25 meer" een dode
+    // knop voorbij de cap op grote workspaces.
+    const limit = Math.max(1, args.limit ?? 25);
+    const term = args.search ? normalizeForSearch(args.search.trim()) : "";
+    const hasFieldFilters = Boolean(
+      filters.hasEmail || filters.hasPhone || filters.city || filters.source,
+    );
 
-    // Bron per contact (oudste attributie wint). leadAttribution.workspaceId is
-    // gevuld via ingest + backfill; oude rijen zonder → niet in deze map.
-    const attributions = await ctx.db
-      .query("leadAttribution")
-      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
-      .collect();
-    const sourceMap = buildSourceMap(attributions);
-
-    const matched = all
-      .filter(
-        (c) =>
-          contactMatchesSearch(c, termNormalized) &&
-          contactMatchesFilters(c, filters) &&
-          (!filters.source || sourceMap.get(c._id) === filters.source),
-      )
-      .sort((a, b) => compareContacts(a, b, sort));
-
-    const limit = args.limit ?? 25;
-    return {
-      contacts: matched.slice(0, limit).map((c) => ({
-        ...c,
-        source: sourceMap.get(c._id) ?? null,
-      })),
-      total: matched.length,
+    // Oorspronkelijke bron van één contact: oudste attributie mét de juiste
+    // workspace-scope (spiegel van buildSourceMap). by_contact staat oplopend
+    // op _creationTime → de eerste rij met deze workspaceId is de oudste.
+    // Oude rijen zonder workspaceId tellen niet mee (identiek aan de oude
+    // buildSourceMap die op by_workspace draaide).
+    const sourceOf = async (contactId: Id<"contacts">) => {
+      const rows = await ctx.db
+        .query("leadAttribution")
+        .withIndex("by_contact", (q) => q.eq("contactId", contactId))
+        .collect();
+      let oldest: { source: string; _creationTime: number } | null = null;
+      for (const r of rows) {
+        if (r.workspaceId !== args.workspaceId) continue;
+        if (!oldest || r._creationTime < oldest._creationTime) {
+          oldest = { source: r.source, _creationTime: r._creationTime };
+        }
+      }
+      return oldest?.source ?? null;
     };
+
+    let matched: Array<Doc<"contacts">>;
+    let total: number | null;
+    let hasMore: boolean;
+    // Bron per contactId, hergebruikt tussen source-filter en badge-resolutie
+    // zodat we een contact hooguit één keer opzoeken.
+    const sourceCache = new Map<Id<"contacts">, string | null>();
+    const cachedSourceOf = async (contactId: Id<"contacts">) => {
+      if (sourceCache.has(contactId)) return sourceCache.get(contactId) ?? null;
+      const source = await sourceOf(contactId);
+      sourceCache.set(contactId, source);
+      return source;
+    };
+
+    if (term === "" && !hasFieldFilters && (sort === "newest" || sort === "oldest")) {
+      // Pad 1 — bladerlijst; index-volgorde = creatievolgorde. Geen collect.
+      const page = await ctx.db
+        .query("contacts")
+        .withIndex("by_workspace_created", (q) =>
+          q.eq("workspaceId", args.workspaceId),
+        )
+        .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        .order(sort === "newest" ? "desc" : "asc")
+        .take(limit + 1);
+      hasMore = page.length > limit;
+      matched = page.slice(0, limit);
+      total = null;
+    } else {
+      // Pad 2 — zoek/filter: één collect, per-rij substring-match tegen het
+      // voorberekende searchText (fallback op live buildSearchText).
+      const all = await ctx.db
+        .query("contacts")
+        .withIndex("by_workspace_created", (q) =>
+          q.eq("workspaceId", args.workspaceId),
+        )
+        .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        .collect();
+
+      let candidates = all.filter((c) => {
+        if (term !== "") {
+          const hay = c.searchText ?? buildSearchText(c);
+          if (!matchesHaystack(hay, term)) return false;
+        }
+        return contactMatchesFilters(c, filters);
+      });
+
+      if (filters.source) {
+        // Bron per kandidaat via by_contact (niet de hele tabel). Aantal
+        // lookups = post-substring-kandidaten, doorgaans klein. Resultaat
+        // blijft in sourceCache → geen tweede lookup voor de badge.
+        const withSource = await Promise.all(
+          candidates.map(async (c) => ({
+            c,
+            source: await cachedSourceOf(c._id),
+          })),
+        );
+        candidates = withSource
+          .filter((x) => x.source === filters.source)
+          .map((x) => x.c);
+      }
+
+      candidates.sort((a, b) => compareContacts(a, b, sort));
+      total = candidates.length;
+      hasMore = candidates.length > limit;
+      matched = candidates.slice(0, limit);
+    }
+
+    // Bron-badge alleen voor de teruggegeven pagina-slice (cache hergebruikt).
+    const contacts = await Promise.all(
+      matched.map(async (c) => ({ ...c, source: await cachedSourceOf(c._id) })),
+    );
+    return { contacts, total, hasMore };
   },
 });
 
-/** Distinct niet-lege plaatsen in de workspace, voor de filter-dropdown. */
+/**
+ * Distinct niet-lege plaatsen in de workspace, voor de filter-dropdown.
+ * Full-index scan (distinct city zonder eigen index) — daarom LAZY vanuit de
+ * frontend: pas gequeryd wanneer de gebruiker het plaats-filter opent, niet
+ * bij page-load. Zo trekt een kale contactenpagina niet ~4.700 docs mee.
+ */
 export const contactCities = query({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
@@ -494,6 +608,8 @@ export const update = mutation({
     if (typeof patch.email === "string") patch.email = patch.email.toLowerCase();
 
     await ctx.db.patch(contactId, patch);
+    // Zoekvelden geraakt → gedenormaliseerd searchText bijwerken.
+    await refreshContactSearchText(ctx, contactId);
   },
 });
 
@@ -1209,6 +1325,8 @@ export const mergeInto = mutation({
     }
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(args.winnerId, patch);
+      // Merge kan zoekvelden op de winner gevuld hebben → searchText bij.
+      await refreshContactSearchText(ctx, args.winnerId);
     }
 
     // 7. Soft-delete loser
@@ -1353,7 +1471,7 @@ export const create = mutation({
       }
     }
 
-    const contactId = await ctx.db.insert("contacts", {
+    const contactId = await insertContactWithSearchText(ctx, {
       workspaceId: args.workspaceId,
       firstName: args.firstName?.trim() || undefined,
       lastName: args.lastName?.trim() || undefined,
@@ -1458,7 +1576,7 @@ export const importContacts = mutation({
       if (normalizedEmail) seenEmail.add(normalizedEmail);
       if (normalizedPhone) seenPhone.add(normalizedPhone);
 
-      const contactId = await ctx.db.insert("contacts", {
+      const contactId = await insertContactWithSearchText(ctx, {
         workspaceId: args.workspaceId,
         firstName: c.firstName?.trim() || undefined,
         lastName: c.lastName?.trim() || undefined,

@@ -919,6 +919,58 @@ http.route({
 });
 
 // ══════════════════════════════════════════════════════════════════════
+// CONTACT TAG-API — een suite-app (cashflow) tagt BESTAANDE leadflow-
+// contacten (bv. een marketing-segment). Auth = WEBSITE_API_KEY (write-key).
+// Maakt nooit nieuwe contacten; idempotent. Daarna maakt de eigenaar in
+// leadflow een segment op die tag en verstuurt een broadcast.
+// ══════════════════════════════════════════════════════════════════════
+http.route({
+  path: "/api/contacts/tag",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const expected = process.env.WEBSITE_API_KEY;
+    if (!expected) return jsonResponse({ error: "Server misconfigured" }, 500);
+    const key = request.headers.get("x-api-key");
+    if (!key || !timingSafeStringEqual(key, expected)) {
+      return jsonResponse({ error: "Invalid API key" }, 401);
+    }
+
+    let payload: { tag?: string; contactIds?: string[]; emails?: string[] };
+    try {
+      payload = JSON.parse(await request.text());
+    } catch {
+      return jsonResponse({ error: "Invalid JSON" }, 400);
+    }
+    const tag = payload.tag?.trim();
+    if (!tag) return jsonResponse({ error: "tag vereist" }, 400);
+    // Begrensd per call (de aanroeper batcht); voorkomt een te grote mutation.
+    const contactIds = Array.isArray(payload.contactIds)
+      ? payload.contactIds.slice(0, 500)
+      : [];
+    const emails = Array.isArray(payload.emails)
+      ? payload.emails.slice(0, 500)
+      : [];
+    if (contactIds.length === 0 && emails.length === 0) {
+      return jsonResponse({ error: "contactIds of emails vereist" }, 400);
+    }
+
+    const workspaceId = await ctx.runQuery(
+      internal.messaging.getStaycoolWorkspaceIdInternal,
+      {},
+    );
+    if (!workspaceId) {
+      return jsonResponse({ error: "Workspace not provisioned" }, 500);
+    }
+
+    const result = await ctx.runMutation(
+      internal.contactsWrite.tagContactsFromApp,
+      { workspaceId, tag, contactIds, emails },
+    );
+    return jsonResponse(result, 200);
+  }),
+});
+
+// ══════════════════════════════════════════════════════════════════════
 // CONTACT READ-API — leadflow-contacten lezen vanuit de andere wetry-apps
 // (cashflow / frostwork). Leadflow blijft de bron; dit is READ-ONLY.
 // Auth = READ_API_KEY via X-API-Key (apart van de write-key WEBSITE_API_KEY,
@@ -984,7 +1036,7 @@ http.route({
 
     const result = await ctx.runQuery(
       internal.contactsRead.getDetailForStaycool,
-      { workspaceId, contactId: id as Id<"contacts"> },
+      { workspaceId, contactId: id },
     );
     if (!result) return jsonResponse({ error: "Not found" }, 404);
     return jsonResponse(result, 200);
@@ -1351,5 +1403,105 @@ interface VoidfixWaEvent {
   mediaUrl?: string;
   mediaType?: string;
 }
+
+/**
+ * Suite-API: taak aanmaken (cashflow heractiveren-flow -> "offerte
+ * nabellen"). Zelfde WRITE-key als /api/contacts/create. Idempotent op
+ * `source` (tasks.createFromApi). contactId is optioneel maar moet, indien
+ * meegegeven, in de Staycool-workspace bestaan.
+ */
+http.route({
+  path: "/api/tasks/create",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const expected = process.env.WEBSITE_API_KEY;
+    if (!expected) return jsonResponse({ error: "Server misconfigured" }, 500);
+    const key = request.headers.get("x-api-key");
+    if (!key || !timingSafeStringEqual(key, expected)) {
+      return jsonResponse({ error: "Invalid API key" }, 401);
+    }
+
+    let payload: {
+      contactId?: string;
+      title?: string;
+      description?: string;
+      dueDate?: number;
+      source?: string;
+    };
+    try {
+      payload = JSON.parse(await request.text());
+    } catch {
+      return jsonResponse({ error: "Invalid JSON" }, 400);
+    }
+    const title = payload.title?.trim();
+    if (!title) return jsonResponse({ error: "title is required" }, 400);
+
+    const workspaceId = await ctx.runQuery(
+      internal.messaging.getStaycoolWorkspaceIdInternal,
+      {},
+    );
+    if (!workspaceId) {
+      return jsonResponse({ error: "Workspace not provisioned" }, 500);
+    }
+
+    let contactId: Id<"contacts"> | undefined;
+    if (payload.contactId) {
+      const detail = await ctx.runQuery(
+        internal.contactsRead.getDetailForStaycool,
+        { workspaceId, contactId: payload.contactId },
+      );
+      if (!detail) return jsonResponse({ error: "Contact not found" }, 404);
+      contactId = detail.contact.id as Id<"contacts">;
+    }
+
+    const result = await ctx.runMutation(internal.tasks.createFromApi, {
+      workspaceId,
+      contactId,
+      title,
+      description: payload.description,
+      dueDate: payload.dueDate,
+      source: payload.source,
+    });
+    return jsonResponse(result, result.created ? 201 : 200);
+  }),
+});
+
+/**
+ * Suite-API: taak afronden op source — cashflow vinkt de nabel-taak
+ * automatisch af na heraanbieden/afschrijven. Zelfde write-key.
+ */
+http.route({
+  path: "/api/tasks/complete",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const expected = process.env.WEBSITE_API_KEY;
+    if (!expected) return jsonResponse({ error: "Server misconfigured" }, 500);
+    const key = request.headers.get("x-api-key");
+    if (!key || !timingSafeStringEqual(key, expected)) {
+      return jsonResponse({ error: "Invalid API key" }, 401);
+    }
+    let payload: { source?: string };
+    try {
+      payload = JSON.parse(await request.text());
+    } catch {
+      return jsonResponse({ error: "Invalid JSON" }, 400);
+    }
+    if (!payload.source) {
+      return jsonResponse({ error: "source is required" }, 400);
+    }
+    const workspaceId = await ctx.runQuery(
+      internal.messaging.getStaycoolWorkspaceIdInternal,
+      {},
+    );
+    if (!workspaceId) {
+      return jsonResponse({ error: "Workspace not provisioned" }, 500);
+    }
+    const result = await ctx.runMutation(internal.tasks.completeBySource, {
+      workspaceId,
+      source: payload.source,
+    });
+    return jsonResponse(result, 200);
+  }),
+});
 
 export default http;

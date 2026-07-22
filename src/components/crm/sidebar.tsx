@@ -6,11 +6,12 @@ import {
   MessageSquare,
   Zap,
   Send,
+  CheckCircle2,
   Settings,
   ExternalLink,
   Snowflake,
   Receipt,
-} from 'lucide-react'
+} from "@/components/icons"
 import { useQuery } from 'convex/react'
 import { cn } from '#/lib/utils.ts'
 import { CASHFLOW_URL, FROSTWORK_URL } from '#/lib/external-apps.ts'
@@ -29,6 +30,7 @@ const NAV: NavItem[] = [
   { to: '/crm/messages', label: 'Messages', icon: MessageSquare },
   { to: '/crm/workflows', label: 'Workflows', icon: Zap },
   { to: '/crm/campaigns', label: 'Campagnes', icon: Send },
+  { to: '/crm/taken', label: 'Taken', icon: CheckCircle2 },
 ]
 
 const EXTERNAL_NAV = [
@@ -77,6 +79,13 @@ export function SidebarContent({
   )
   const unreadCount = unread?.total ?? 0
 
+  // Open-taken-teller — zelfde patroon als de inbox-badge.
+  const openTasks = useQuery(
+    api.tasks.countOpen,
+    workspaceId ? { workspaceId } : 'skip',
+  )
+  const openTaskCount = openTasks ?? 0
+
   return (
     <>
       {/* Brand */}
@@ -97,6 +106,30 @@ export function SidebarContent({
         </Link>
       </div>
 
+      {/* Externe apps — bovenaan, zelfde plek als de switcher in
+          frostwork/cashflow zodat de suite overal gelijk voelt */}
+      <div className="shrink-0 border-b border-zinc-200 p-2">
+        <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+          Apps
+        </p>
+        {EXTERNAL_NAV.map((app) => {
+          const Icon = app.icon
+          return (
+            <a
+              key={app.href}
+              href={app.href}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
+            >
+              <Icon className="h-4 w-4" />
+              {app.label}
+              <ExternalLink className="ml-auto h-3 w-3 text-zinc-400" />
+            </a>
+          )
+        })}
+      </div>
+
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {NAV.map((item) => {
@@ -113,8 +146,8 @@ export function SidebarContent({
               className={cn(
                 'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-violet-50 text-violet-900'
-                  : 'text-zinc-700 hover:bg-zinc-100',
+                  ? 'bg-[#312e81] text-white shadow-sm'
+                  : 'text-zinc-700 hover:bg-[#ede9fe] hover:text-[#312e81]',
               )}
             >
               <Icon className="h-4 w-4" />
@@ -129,32 +162,15 @@ export function SidebarContent({
                   {unreadCount}
                 </span>
               )}
+              {item.to === '/crm/taken' && openTaskCount > 0 && (
+                <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-white">
+                  {openTaskCount}
+                </span>
+              )}
             </Link>
           )
         })}
 
-        {/* Externe apps — losse SaaS-producten, hier snel bereikbaar */}
-        <div className="pt-4">
-          <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            Apps
-          </p>
-          {EXTERNAL_NAV.map((app) => {
-            const Icon = app.icon
-            return (
-              <a
-                key={app.href}
-                href={app.href}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
-              >
-                <Icon className="h-4 w-4" />
-                {app.label}
-                <ExternalLink className="ml-auto h-3 w-3 text-zinc-400" />
-              </a>
-            )
-          })}
-        </div>
       </nav>
 
       {/* Footer */}
@@ -165,7 +181,7 @@ export function SidebarContent({
           className={cn(
             'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
             location.pathname.startsWith('/crm/settings')
-              ? 'bg-violet-50 text-violet-900'
+              ? 'bg-[#312e81] text-white shadow-sm'
               : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700',
           )}
         >

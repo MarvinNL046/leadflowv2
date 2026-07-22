@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { Pencil } from "@/components/icons"
 import { cn } from '#/lib/utils.ts'
 
 /**

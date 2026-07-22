@@ -13,6 +13,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { normalizeEmail, normalizePhone } from "./lib/phone";
+import { insertContactWithSearchText } from "./lib/contactWrite";
 
 /**
  * Unified messaging — één action `send` met channel-discriminator routes
@@ -521,7 +522,7 @@ export const recordInbound = internalMutation({
       if (args.channel === "email") {
         const normalized = normalizeEmail(args.from);
         if (normalized) {
-          contactId = await ctx.db.insert("contacts", {
+          contactId = await insertContactWithSearchText(ctx, {
             workspaceId: args.workspaceId,
             email: normalized,
             callCount: 0,
@@ -530,7 +531,7 @@ export const recordInbound = internalMutation({
       } else {
         const normalized = normalizePhone(args.from);
         if (normalized) {
-          contactId = await ctx.db.insert("contacts", {
+          contactId = await insertContactWithSearchText(ctx, {
             workspaceId: args.workspaceId,
             phone: normalized,
             callCount: 0,
@@ -627,7 +628,7 @@ export const recordOutbound = internalMutation({
       if (args.channel === "email") {
         const normalized = normalizeEmail(args.to);
         if (normalized) {
-          contactId = await ctx.db.insert("contacts", {
+          contactId = await insertContactWithSearchText(ctx, {
             workspaceId: args.workspaceId,
             email: normalized,
             callCount: 0,
@@ -636,7 +637,7 @@ export const recordOutbound = internalMutation({
       } else {
         const normalized = normalizePhone(args.to);
         if (normalized) {
-          contactId = await ctx.db.insert("contacts", {
+          contactId = await insertContactWithSearchText(ctx, {
             workspaceId: args.workspaceId,
             phone: normalized,
             callCount: 0,

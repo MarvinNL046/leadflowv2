@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useAction, useMutation, useQuery } from 'convex/react'
-import { ArrowLeft, MapPin, Phone } from 'lucide-react'
+import { ArrowLeft, MapPin, Phone } from "@/components/icons"
 import {
   Dialog,
   DialogContent,

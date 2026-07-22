@@ -6,6 +6,10 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
+import {
+  insertContactWithSearchText,
+  refreshContactSearchText,
+} from "./lib/contactWrite";
 
 /**
  * Meta lead processor — verwerkt metaLeadRaw rows tot contacts +
@@ -362,10 +366,12 @@ export const upsertContactFromMetaLead = internalMutation({
       if (!contact.country && f.country) merged.country = f.country;
       if (Object.keys(merged).length > 0) {
         await ctx.db.patch(contact._id, merged);
+        // Merge kan zoekvelden gevuld hebben → searchText bijwerken.
+        await refreshContactSearchText(ctx, contact._id);
       }
       contactId = contact._id;
     } else {
-      contactId = await ctx.db.insert("contacts", {
+      contactId = await insertContactWithSearchText(ctx, {
         workspaceId: workspace._id,
         firstName: f.firstName,
         lastName: f.lastName,

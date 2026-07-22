@@ -1,4 +1,4 @@
-import { Heading, Type, MousePointerClick, Image, Minus } from 'lucide-react'
+import { Heading, Type, MousePointerClick, Image, Minus } from "@/components/icons"
 import type { BlockType } from '../../../../../convex/emailBlocks'
 
 interface BlockSidebarProps {

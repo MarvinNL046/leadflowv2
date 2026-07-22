@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { toast } from 'sonner'
-import { Search, Plus } from 'lucide-react'
+import { Search, Plus } from "@/components/icons"
 import {
   Dialog,
   DialogContent,

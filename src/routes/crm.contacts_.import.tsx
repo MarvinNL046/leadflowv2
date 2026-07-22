@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation } from 'convex/react'
 import { toast } from 'sonner'
-import { ArrowLeft, Upload, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Upload, CheckCircle2 } from "@/components/icons"
 import {
   Card,
   CardContent,

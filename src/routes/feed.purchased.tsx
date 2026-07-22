@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
-import { MapPin, Phone, Mail, User, Clock } from 'lucide-react'
+import { MapPin, Phone, Mail, User, Clock } from "@/components/icons"
 import { Badge } from '#/components/ui/badge.tsx'
 import { Card, CardContent, CardHeader } from '#/components/ui/card.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'

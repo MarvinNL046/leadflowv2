@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation } from 'convex/react'
 import { toast } from 'sonner'
-import { Plus, ChevronDown, Search, Upload } from 'lucide-react'
+import { Plus, ChevronDown, Search, Upload } from "@/components/icons"
 import { Button } from '#/components/ui/button.tsx'
 import {
   Select,
@@ -84,6 +84,10 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
   const [source, setSource] = useState<string>(ALL_SOURCES)
   const [sort, setSort] = useState<SortValue>('newest')
   const [limit, setLimit] = useState(PAGE_SIZE)
+  // Plaats-dropdown is LAZY: contactCities scant de hele workspace, dus we
+  // vragen 'm pas op zodra de gebruiker het filter opent (of al een plaats
+  // gekozen heeft). Zo trekt een kale page-load niet ~4.700 docs mee.
+  const [citiesWanted, setCitiesWanted] = useState(false)
 
   // Debounce de zoekterm (voorkomt een query per toetsaanslag).
   useEffect(() => {
@@ -113,7 +117,11 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
     [hasEmail, hasPhone, city, source],
   )
 
-  const cities = useQuery(api.contacts.contactCities, { workspaceId })
+  // Lazy: pas laden als het plaats-filter geopend is of al een stad actief is.
+  const cities = useQuery(
+    api.contacts.contactCities,
+    citiesWanted || city !== ALL_CITIES ? { workspaceId } : 'skip',
+  )
   const data = useQuery(api.contacts.searchContacts, {
     workspaceId,
     search: debouncedSearch || undefined,
@@ -124,8 +132,21 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
 
   const isLoading = data === undefined
   const contacts = data?.contacts ?? []
-  const total = data?.total ?? 0
-  const hasMore = contacts.length < total
+  const hasMore = data?.hasMore ?? false
+  // Workspace-totaal voor de header van de ongefilterde lijst. searchContacts
+  // kent het totaal alleen in het zoek/filter-pad (echte count); in het
+  // bladerpad is total null. We laden de aparte count-query dan LAZY — pas
+  // nadat de lijst er staat — zodat een kale page-load niet ~4.700 docs scant
+  // vóór de eerste paint. Bij zoeken/filteren is data.total al exact, dus dan
+  // slaan we de count-query over ('skip').
+  const needsWorkspaceCount = data !== undefined && data.total === null
+  const workspaceCount = useQuery(
+    api.contacts.count,
+    needsWorkspaceCount ? { workspaceId } : 'skip',
+  )
+  // total: exact bij zoeken/filteren; anders de (lazy) workspace-count.
+  const total =
+    data === undefined ? null : (data.total ?? workspaceCount ?? null)
   const filtersActive =
     debouncedSearch !== '' ||
     hasEmail ||
@@ -141,7 +162,11 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
           <p className="mt-1 text-sm text-zinc-500">
             {isLoading
               ? '…'
-              : `${contacts.length} van ${total.toLocaleString('nl-NL')} ${total === 1 ? 'contact' : 'contacts'}`}
+              : total === null
+                ? // Grand total wordt lazy geladen (count-query); toon vast de
+                  // reeds geladen rijen zodat de header niet op '…' blijft hangen.
+                  `${contacts.length} ${contacts.length === 1 ? 'contact' : 'contacts'}`
+                : `${contacts.length} van ${total.toLocaleString('nl-NL')} ${total === 1 ? 'contact' : 'contacts'}`}
           </p>
         </div>
         <Link
@@ -182,17 +207,30 @@ function ContactsContent({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
               </SelectContent>
             </Select>
 
-            <Select value={city} onValueChange={setCity}>
+            <Select
+              value={city}
+              onValueChange={setCity}
+              onOpenChange={(open) => {
+                // Trigger de lazy contactCities-query pas bij het openen.
+                if (open) setCitiesWanted(true)
+              }}
+            >
               <SelectTrigger className="w-[170px]">
                 <SelectValue placeholder="Alle plaatsen" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_CITIES}>Alle plaatsen</SelectItem>
-                {(cities ?? []).map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
+                {cities === undefined && citiesWanted ? (
+                  <div className="px-2 py-1.5 text-xs text-zinc-400">
+                    Plaatsen laden…
+                  </div>
+                ) : (
+                  (cities ?? []).map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
 

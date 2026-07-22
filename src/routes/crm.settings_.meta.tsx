@@ -12,7 +12,7 @@ import {
   Loader2,
   Plug,
   RefreshCw,
-} from 'lucide-react'
+} from "@/components/icons"
 import {
   Card,
   CardContent,

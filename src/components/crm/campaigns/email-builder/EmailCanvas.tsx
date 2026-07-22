@@ -1,4 +1,4 @@
-import { ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
+import { ChevronUp, ChevronDown, Trash2 } from "@/components/icons"
 import type { EmailBlock } from '../../../../../convex/emailBlocks'
 import { renderBlockToHtml } from '../../../../../convex/emailBlocks'
 

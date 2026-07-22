@@ -7,7 +7,7 @@ import {
   useRouterState,
 } from '@tanstack/react-router'
 import { Authenticated, Unauthenticated, useQuery } from 'convex/react'
-import { Store } from 'lucide-react'
+import { Store } from "@/components/icons"
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { cn } from '#/lib/utils.ts'
 import { api } from '../../convex/_generated/api'

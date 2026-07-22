@@ -155,12 +155,6 @@ export default defineSchema({
     nextFollowUpAt: v.optional(v.number()),
     // Tags as comma-separated of in een aparte tags-tabel — keuze
     tags: v.optional(v.array(v.string())),
-    // Zoek-hulpveld: genormaliseerde string (naam + e-mail + plaats + telefoon)
-    // voor de contact-zoeker. Gevuld door een backfill/migratie die buiten deze
-    // repo is gedraaid; geen functie in main schrijft of leest het. Als optioneel
-    // veld gedeclareerd zodat het schema de bestaande productiedata accepteert —
-    // anders faalt `convex deploy` op "extra field `searchText`".
-    searchText: v.optional(v.string()),
     // Source flags
     outsideArea: v.optional(v.boolean()),
     // Onbereikbaar na 3x niet opnemen — verbergt uit nieuwe-leads
@@ -193,6 +187,16 @@ export default defineSchema({
     // Gesprek-archief voor de inbox: timestamp = gearchiveerd (verbergen uit
     // listConversations), undefined = actief. Reversibel; raakt opp/dashboard niet.
     messagesArchivedAt: v.optional(v.number()),
+    // Gedenormaliseerd zoekveld voor snelle per-rij substring-matching in
+    // searchContacts: genormaliseerde tokens (naam, e-mail, telefoon-digits +
+    // laatste-9, bedrijf, straat, huisnummer, compacte postcode, plaats) — zie
+    // buildSearchText in contactSearch.ts. Onderhouden op ALLE schrijfpaden
+    // via lib/contactWrite.ts; backfill via
+    // contactsBackfill.backfillSearchTextAll. GEEN Convex-searchIndex: zoeken
+    // gaat via substring-match (matchesHaystack) zodat e-mail-midden,
+    // mid-woord en telefoon-fragmenten vindbaar blijven (BM25 tokeniseert en
+    // brak die).
+    searchText: v.optional(v.string()),
     // Migration breadcrumb: integer-id van de bron-row in v1 Neon.
     // Idempotency-key voor de Neon→Convex ETL; rerun van migratie
     // detecteert bestaande row en doet patch i.p.v. duplicate insert.
@@ -203,10 +207,17 @@ export default defineSchema({
     .index("by_workspace_phone", ["workspaceId", "phone"])
     .index("by_messengerPsid", ["messengerPsid"])
     .index("by_legacyContactId", ["legacyContactId"])
+    // Idempotency-key voor externe imports (bv. "moneybird:<id>"): laat de
+    // backfill-mutation een reeds-geïmporteerd contact vinden zonder full scan.
+    .index("by_externalId", ["externalId"])
     // Voor de follow-up-cron: due-leads efficiënt vinden (range op
     // nextFollowUpAt binnen workspace).
     .index("by_workspace_nextFollowUp", ["workspaceId", "nextFollowUpAt"])
     .index("by_workspace_marketingStatus", ["workspaceId", "emailMarketingStatus"]),
+  // GEEN searchIndex op searchText: zoeken gaat via substring-match
+  // (searchContacts → matchesHaystack) i.p.v. BM25, zodat e-mail-midden,
+  // mid-woord en telefoon-fragmenten vindbaar blijven. searchText is puur
+  // een voorberekend haystack voor snelle per-rij matching.
 
   pipelines: defineTable({
     workspaceId: v.id("workspaces"),
@@ -270,6 +281,25 @@ export default defineSchema({
   }).index("by_contact", ["contactId"])
     .index("by_workspace", ["workspaceId"])
     .index("by_legacyId", ["legacyId"]),
+
+  // Taken (follow-ups) — o.a. gevoed door cashflow's heractiveren-flow
+  // (verlopen offerte nabellen). `source` is de idempotentie-sleutel voor
+  // API-aangemaakte taken (bv. "cashflow:quote:<id>"): nogmaals aanmaken
+  // met dezelfde source geeft de bestaande taak terug.
+  tasks: defineTable({
+    workspaceId: v.id("workspaces"),
+    contactId: v.optional(v.id("contacts")),
+    title: v.string(),
+    description: v.optional(v.string()),
+    dueDate: v.optional(v.number()),
+    status: v.union(v.literal("open"), v.literal("done")),
+    doneAt: v.optional(v.number()),
+    source: v.optional(v.string()),
+    createdById: v.optional(v.id("users")),
+  })
+    .index("by_workspace_status", ["workspaceId", "status"])
+    .index("by_contact", ["contactId"])
+    .index("by_workspace_source", ["workspaceId", "source"]),
 
   customFieldDefinitions: defineTable({
     workspaceId: v.id("workspaces"),

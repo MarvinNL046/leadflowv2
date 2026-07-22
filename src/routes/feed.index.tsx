@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
-import { Search } from 'lucide-react'
+import { Search } from "@/components/icons"
 import { Input } from '#/components/ui/input.tsx'
 import { Card, CardContent } from '#/components/ui/card.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'

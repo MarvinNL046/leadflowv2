@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation } from 'convex/react'
 import { toast } from 'sonner'
-import { ArrowLeft, Save, Mail, FileText, Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, Save, Mail, FileText, Eye, EyeOff } from "@/components/icons"
 import {
   Card,
   CardContent,

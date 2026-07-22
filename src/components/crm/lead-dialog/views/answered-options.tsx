@@ -1,4 +1,4 @@
-import { CalendarPlus, Clock, PhoneIncoming, ThumbsDown } from 'lucide-react'
+import { CalendarPlus, Clock, PhoneIncoming, ThumbsDown } from "@/components/icons"
 import { ActionButton } from '../parts/action-button'
 
 interface Props {

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { MapPin, Phone, Mail, User, Clock } from 'lucide-react'
+import { MapPin, Phone, Mail, User, Clock } from "@/components/icons"
 import { Badge } from '#/components/ui/badge.tsx'
 import {
   Card,

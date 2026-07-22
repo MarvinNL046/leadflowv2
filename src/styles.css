@@ -27,8 +27,10 @@
   --hero-a: rgba(79, 184, 178, 0.36);
   --hero-b: rgba(47, 106, 74, 0.2);
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
+  /* Moneybird-achtige diepte: content-achtergrond warm creme (#FAFAF9,
+     Tailwind stone-50), cards/panelen puur wit (--card). */
+  --background: oklch(0.985 0.001 106.423);
+  --foreground: oklch(0.269 0.006 34.3);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
@@ -38,7 +40,7 @@
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
+  --muted-foreground: oklch(0.44 0.012 40);
   --accent: oklch(0.967 0.001 286.375);
   --accent-foreground: oklch(0.21 0.006 285.885);
   --destructive: oklch(0.577 0.245 27.325);
@@ -205,15 +207,20 @@ body::after {
   mask-image: radial-gradient(circle at 50% 30%, black, transparent 78%);
 }
 
-a {
-  color: var(--lagoon-deep);
-  text-decoration-color: rgba(50, 143, 151, 0.4);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-}
+/* In @layer base zodat Tailwind-utilities (text-white op de actieve
+   sidebar-pill e.d.) deze marketing-linkkleur kunnen overrulen — een
+   ongelaagde regel verslaat in Tailwind v4 ALLE utilities. */
+@layer base {
+  a {
+    color: var(--lagoon-deep);
+    text-decoration-color: rgba(50, 143, 151, 0.4);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+  }
 
-a:hover {
-  color: #246f76;
+  a:hover {
+    color: #246f76;
+  }
 }
 
 code {

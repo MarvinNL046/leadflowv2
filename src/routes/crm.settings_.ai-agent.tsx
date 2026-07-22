@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useAction } from 'convex/react'
 import { toast } from 'sonner'
-import { ArrowLeft, Bot, Save, RotateCcw, Zap, Workflow } from 'lucide-react'
+import { ArrowLeft, Bot, Save, RotateCcw, Zap, Workflow } from "@/components/icons"
 import {
   Card,
   CardContent,
@@ -279,7 +279,7 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                 onChange={(e) => setBusinessContext(e.target.value)}
                 rows={3}
                 placeholder="bv. StayCool Airconditioning — specialist in airco-installatie in Limburg, F-gas gecertificeerd, partners: Daikin, Mitsubishi, Toshiba"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
               />
               <p className="text-xs text-zinc-500">
                 Korte omschrijving van het bedrijf die het AI-model als context
@@ -295,7 +295,7 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                 onChange={(e) => setTone(e.target.value)}
                 rows={2}
                 placeholder="bv. vriendelijk, professioneel, kort, Nederlands"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
               />
             </div>
 
@@ -307,7 +307,7 @@ function AiAgentForm({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
                 onChange={(e) => setSignature(e.target.value)}
                 rows={2}
                 placeholder="bv. Met vriendelijke groet, StayCool Airconditioning"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
               />
             </div>
           </CardContent>

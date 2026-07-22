@@ -20,7 +20,7 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
-} from 'lucide-react'
+} from "@/components/icons"
 import { toast } from 'sonner'
 
 interface RichTextEditorProps {
