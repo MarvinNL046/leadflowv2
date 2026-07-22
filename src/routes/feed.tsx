@@ -7,7 +7,7 @@ import {
   useRouterState,
 } from '@tanstack/react-router'
 import { Authenticated, Unauthenticated, useQuery } from 'convex/react'
-import { Store } from "@/components/icons"
+import { ArrowLeft, Store } from "@/components/icons"
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { cn } from '#/lib/utils.ts'
 import { api } from '../../convex/_generated/api'
@@ -86,6 +86,15 @@ function FeedShell() {
               )
             })}
           </nav>
+          {/* Terugweg naar het CRM — zonder deze link zit je vast op de
+              marketplace (de feed heeft een eigen layout buiten /crm). */}
+          <Link
+            to="/crm"
+            className="ml-auto flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Naar CRM
+          </Link>
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">

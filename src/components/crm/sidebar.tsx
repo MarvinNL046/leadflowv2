@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Snowflake,
   Receipt,
+  Store,
 } from "@/components/icons"
 import { useQuery } from 'convex/react'
 import { cn } from '#/lib/utils.ts'
@@ -85,6 +86,12 @@ export function SidebarContent({
     workspaceId ? { workspaceId } : 'skip',
   )
   const openTaskCount = openTasks ?? 0
+
+  // Marketplace-item alleen tonen mét toegang — /feed heeft een server-side
+  // gate die zonder toegang terug naar /crm stuurt, dus een altijd-zichtbare
+  // link zou een dode knop zijn.
+  const marketplaceAccess = useQuery(api.marketplace.access.marketplaceAccess)
+  const hasMarketplace = marketplaceAccess?.ok === true
 
   return (
     <>
@@ -171,6 +178,23 @@ export function SidebarContent({
           )
         })}
 
+        {/* Marketplace (leadfeed) — eigen sectie onder /feed, buiten de
+            CRM-layout. Zelfde stijl als de NAV-items; alleen mét toegang. */}
+        {hasMarketplace && (
+          <Link
+            to="/feed"
+            onClick={onNavigate}
+            className={cn(
+              'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              location.pathname.startsWith('/feed')
+                ? 'bg-[#312e81] text-white shadow-sm'
+                : 'text-zinc-700 hover:bg-[#ede9fe] hover:text-[#312e81]',
+            )}
+          >
+            <Store className="h-4 w-4" />
+            Marketplace
+          </Link>
+        )}
       </nav>
 
       {/* Footer */}
