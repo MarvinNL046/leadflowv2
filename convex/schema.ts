@@ -914,6 +914,36 @@ export default defineSchema({
     .index("by_active", ["isActive"])
     .index("by_legacyId", ["legacyId"]),
 
+  // OTP-verificaties voor de wizard-intake (v1: lead_verifications).
+  // De SEO-sites praten tegen /api/intake/wizard/{start,send-code,verify};
+  // pas na een geldige code wordt de payload gepromoveerd naar
+  // marketplaceLeads (via intake.insertLead). Codes staan alleen als
+  // sha256-hash opgeslagen.
+  leadVerifications: defineTable({
+    token: v.string(), // uuid, uitgereikt door /start
+    apiKeyId: v.id("marketplaceApiKeys"),
+    niche: v.string(),
+    phone: v.string(), // genormaliseerd +316…
+    email: v.string(),
+    codeHash: v.string(), // sms-kanaal (sha256 hex)
+    emailCodeHash: v.optional(v.string()),
+    payload: v.any(), // volledige wizard-payload; gepromoveerd bij verify
+    metadata: v.optional(v.any()), // site-metadata (source-domein etc.)
+    expiresAt: v.number(),
+    attempts: v.number(),
+    resends: v.number(),
+    lastSentAt: v.optional(v.number()),
+    emailCodeSentAt: v.optional(v.number()),
+    verifiedAt: v.optional(v.number()),
+    phoneVerifiedAt: v.optional(v.number()),
+    emailVerifiedAt: v.optional(v.number()),
+    promotedLeadId: v.optional(v.id("marketplaceLeads")),
+    ip: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+  })
+    .index("by_token", ["token"])
+    .index("by_ip", ["ip"]), // rate-limit: max 5 starts/uur per IP
+
   // Platform-owned lead inventory. PII stored in clear at rest; the FEED
   // query masks it until purchase. v1: marketplace_leads.
   marketplaceLeads: defineTable({

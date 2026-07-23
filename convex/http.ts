@@ -9,6 +9,17 @@ import { getSiteUrl } from "./lib/env";
 import { encryptSecret } from "./lib/crypto";
 import { verifyUnsubToken } from "./unsubscribeToken";
 import { hashApiKey } from "./marketplace/apiKeys";
+import { isValidNlPhone, normalizePhone } from "./marketplace/phone";
+import { ALL_NICHES } from "./marketplace/types";
+import {
+  OTP_MAX_ATTEMPTS,
+  OTP_MAX_RESENDS,
+  OTP_RESEND_COOLDOWN_SECONDS,
+  OTP_TTL_MINUTES,
+  deriveJobSize,
+  generateCode,
+  hashCode,
+} from "./marketplace/wizard";
 
 const http = httpRouter();
 
@@ -1203,6 +1214,387 @@ http.route({
         leadId: result.leadId,
         duplicate: result.duplicate,
         status: result.status,
+      },
+      200,
+    );
+  }),
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// WIZARD-INTAKE (v1-compat) — de SEO-sites (LEADFLOW_BASE_URL) praten
+// tegen exact deze paden met Bearer <lmk_…>. Drie stappen:
+//   POST /api/intake/wizard/start      → verificatierij + token
+//   GET  /api/intake/wizard/send-code  → OTP via SMS (VoidFix) + e-mail
+//   POST /api/intake/wizard/verify     → code checken → intake.insertLead
+// Response-shapes zijn 1:1 v1 zodat de site-frontends niets merken.
+// ══════════════════════════════════════════════════════════════════════
+
+const wizardJson = (body: unknown, status: number) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+
+async function wizardAuth(ctx: ActionCtx, request: Request) {
+  const m = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i);
+  const rawKey = m?.[1]?.trim();
+  if (!rawKey) return null;
+  const keyHash = await hashApiKey(rawKey);
+  return ctx.runQuery(internal.marketplace.apiKeys.findActiveByHash, {
+    keyHash,
+  });
+}
+
+/** SMS via de VoidFix-gateway (zelfde wire-format als messaging.ts). */
+async function wizardSendSms(to: string, message: string): Promise<boolean> {
+  const key = process.env.VOIDFIX_SMS_API_SECRET;
+  const devices = process.env.VOIDFIX_SMS_DEVICE_ID;
+  if (!key || !devices) return false;
+  const form = new URLSearchParams();
+  form.set("key", key);
+  form.set("number", to);
+  form.set("message", message);
+  form.set("devices", devices);
+  form.set("type", "sms");
+  form.set("prioritize", "1");
+  try {
+    const res = await fetch("https://sms.voidfix.com/services/send.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+    if (!res.ok) return false;
+    const json = (await res.json()) as { success?: boolean };
+    return !!json.success;
+  } catch {
+    return false;
+  }
+}
+
+/** OTP-mail via Resend (simpele HTML; v1 gebruikte een React-template). */
+async function wizardSendEmail(to: string, code: string): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+  const from = process.env.EMAIL_FROM ?? "LeadFlow <noreply@wetryleadflow.com>";
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to,
+        subject: `Verificatiecode: ${code}`,
+        html: `<p>Uw verificatiecode is:</p><p style="font-size:28px;font-weight:bold;letter-spacing:4px">${code}</p><p>De code is ${OTP_TTL_MINUTES} minuten geldig.</p><p>Vroeg u geen code aan? Dan kunt u deze e-mail negeren.</p>`,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+http.route({
+  path: "/api/intake/wizard/start",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const apiKey = await wizardAuth(ctx, request);
+    if (!apiKey) return wizardJson({ error: "invalid_api_key" }, 401);
+
+    let body: {
+      niche?: string;
+      payload?: Record<string, unknown>;
+      honeypot?: string;
+      metadata?: Record<string, unknown>;
+    };
+    try {
+      body = await request.json();
+    } catch {
+      return wizardJson({ error: "invalid_json" }, 400);
+    }
+
+    if (typeof body.honeypot === "string" && body.honeypot.trim() !== "") {
+      return wizardJson({ error: "honeypot_filled" }, 400);
+    }
+
+    // Niche-validatie (fail fast, zoals v1's /start).
+    const niche = body.niche ?? "";
+    if (!(ALL_NICHES as string[]).includes(niche)) {
+      return wizardJson({ error: "invalid_niche", niche }, 400);
+    }
+    const allowed =
+      apiKey.allowedNiches.length > 0
+        ? apiKey.allowedNiches
+        : [apiKey.defaultNiche];
+    if (!allowed.includes(niche)) {
+      return wizardJson({ error: "niche_not_allowed", allowed }, 403);
+    }
+
+    if (!body.payload || typeof body.payload !== "object") {
+      return wizardJson({ error: "missing_payload" }, 400);
+    }
+    const phoneNormalized = normalizePhone(String(body.payload.phone ?? ""));
+    if (!phoneNormalized || !isValidNlPhone(phoneNormalized)) {
+      return wizardJson({ error: "invalid_phone", field: "phone" }, 400);
+    }
+    const rawEmail =
+      typeof body.payload.email === "string" ? body.payload.email.trim() : "";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
+      return wizardJson({ error: "invalid_email", field: "email" }, 400);
+    }
+    const emailNormalized = rawEmail.toLowerCase();
+
+    const clientIp =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
+
+    const result = await ctx.runMutation(internal.marketplace.wizard.start, {
+      apiKeyId: apiKey._id,
+      niche,
+      phone: phoneNormalized,
+      email: emailNormalized,
+      payload: {
+        ...body.payload,
+        phone: phoneNormalized,
+        email: emailNormalized,
+      },
+      metadata: body.metadata,
+      ip: clientIp || undefined,
+      userAgent: request.headers.get("user-agent") ?? undefined,
+    });
+
+    if (result.rateLimited) {
+      return wizardJson(
+        { error: "rate_limit_ip", retryAfterSeconds: 3600 },
+        429,
+      );
+    }
+
+    return wizardJson(
+      {
+        token: result.token,
+        verifyUrl: `/aanvragen/${niche}/verify?v=${result.token}`,
+        expiresAt: new Date(result.expiresAt).toISOString(),
+      },
+      200,
+    );
+  }),
+});
+
+http.route({
+  path: "/api/intake/wizard/send-code",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const apiKey = await wizardAuth(ctx, request);
+    if (!apiKey) return wizardJson({ error: "invalid_api_key" }, 401);
+
+    const token = new URL(request.url).searchParams.get("v");
+    if (!token) return wizardJson({ error: "missing_token" }, 400);
+
+    const verification = await ctx.runQuery(
+      internal.marketplace.wizard.getByToken,
+      { token },
+    );
+    if (!verification || verification.apiKeyId !== apiKey._id) {
+      return wizardJson({ error: "verification_not_found" }, 404);
+    }
+    if (verification.expiresAt <= Date.now()) {
+      return wizardJson({ error: "verification_expired" }, 410);
+    }
+    if (verification.verifiedAt) {
+      return wizardJson({ error: "already_verified" }, 410);
+    }
+
+    // Cooldown (60s over beide kanalen heen, v1-parity).
+    const now = Date.now();
+    const lastSent = verification.lastSentAt ?? 0;
+    const cooldownEnds = lastSent + OTP_RESEND_COOLDOWN_SECONDS * 1000;
+    if (lastSent > 0 && now < cooldownEnds) {
+      return wizardJson(
+        {
+          sent: false,
+          cooldownActive: true,
+          expiresAt: new Date(verification.expiresAt).toISOString(),
+          attemptsLeft: Math.max(0, OTP_MAX_ATTEMPTS - verification.attempts),
+          resendsLeft: Math.max(0, OTP_MAX_RESENDS - verification.resends),
+          nextResendAt: new Date(cooldownEnds).toISOString(),
+        },
+        200,
+      );
+    }
+    if (verification.resends >= OTP_MAX_RESENDS) {
+      return wizardJson({ error: "too_many_resends", resendsLeft: 0 }, 429);
+    }
+
+    // Per-kanaal verse codes.
+    const phoneCode = generateCode();
+    const emailCode = generateCode();
+    const smsOk = await wizardSendSms(
+      verification.phone,
+      `Je verificatiecode: ${phoneCode} (geldig ${OTP_TTL_MINUTES} min)`,
+    );
+    const emailOk = verification.email
+      ? await wizardSendEmail(verification.email, emailCode)
+      : false;
+
+    if (!smsOk && !emailOk) {
+      return wizardJson({ error: "dispatch_failed" }, 502);
+    }
+
+    await ctx.runMutation(internal.marketplace.wizard.recordDispatch, {
+      verificationId: verification._id,
+      phoneCodeHash: await hashCode(phoneCode),
+      emailCodeHash: await hashCode(emailCode),
+      smsOk,
+      emailOk,
+    });
+
+    const sentAt = Date.now();
+    return wizardJson(
+      {
+        sent: true,
+        cooldownActive: false,
+        smsSent: smsOk,
+        emailSent: emailOk,
+        expiresAt: new Date(verification.expiresAt).toISOString(),
+        attemptsLeft: Math.max(0, OTP_MAX_ATTEMPTS - verification.attempts),
+        resendsLeft: Math.max(
+          0,
+          OTP_MAX_RESENDS - (verification.resends + 1),
+        ),
+        nextResendAt: new Date(
+          sentAt + OTP_RESEND_COOLDOWN_SECONDS * 1000,
+        ).toISOString(),
+        // Alleen met WIZARD_DEBUG=1 (dev): klare codes voor flow-tests.
+        ...(process.env.WIZARD_DEBUG === "1"
+          ? { _debugPhoneCode: phoneCode, _debugEmailCode: emailCode }
+          : {}),
+      },
+      200,
+    );
+  }),
+});
+
+http.route({
+  path: "/api/intake/wizard/verify",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const apiKey = await wizardAuth(ctx, request);
+    if (!apiKey) return wizardJson({ error: "invalid_api_key" }, 401);
+
+    let body: { token?: string; code?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return wizardJson({ error: "invalid_json" }, 400);
+    }
+    if (!body.token || !body.code) {
+      return wizardJson(
+        { error: "missing_field", fields: ["token", "code"] },
+        400,
+      );
+    }
+
+    const attempt = await ctx.runMutation(
+      internal.marketplace.wizard.attemptVerify,
+      {
+        token: body.token,
+        apiKeyId: apiKey._id,
+        codeHash: await hashCode(body.code.trim()),
+      },
+    );
+
+    switch (attempt.outcome) {
+      case "not_found":
+        return wizardJson({ error: "verification_not_found" }, 404);
+      case "already_verified":
+        return wizardJson({ error: "already_verified" }, 410);
+      case "expired":
+        return wizardJson({ error: "verification_expired" }, 410);
+      case "too_many_attempts":
+        return wizardJson({ error: "too_many_attempts", attemptsLeft: 0 }, 429);
+      case "invalid_code":
+        return wizardJson(
+          { error: "invalid_code", attemptsLeft: attempt.attemptsLeft },
+          400,
+        );
+      case "second_channel":
+        return wizardJson(
+          {
+            success: true,
+            leadId: attempt.leadId,
+            thanksUrl: `/aanvragen/${attempt.niche}/thanks`,
+            duplicate: false,
+            matchedChannel: attempt.matchedChannel,
+            addedSecondChannel: true,
+          },
+          200,
+        );
+    }
+
+    // outcome === "match" → promoveren via de single-source intake-mutatie.
+    const payload = attempt.payload;
+    const str = (x: unknown) => (typeof x === "string" ? x : undefined);
+
+    // Wizard-verrijking: jobSize afleiden uit nicheData.amount_rooms.
+    let jobSize = str(payload.jobSize);
+    if (!jobSize) {
+      const nd = payload.nicheData as Record<string, unknown> | undefined;
+      jobSize = deriveJobSize(nd?.amount_rooms) ?? undefined;
+    }
+
+    let result: { ok: true; leadId: string; duplicate: boolean };
+    try {
+      result = await ctx.runMutation(internal.marketplace.intake.insertLead, {
+        apiKeyId: apiKey._id,
+        niche: attempt.niche,
+        serviceType: str(payload.serviceType),
+        segment: str(payload.segment),
+        firstName: str(payload.firstName) ?? "",
+        lastName: str(payload.lastName) ?? "",
+        phone: str(payload.phone) ?? "",
+        postalCode: str(payload.postalCode) ?? "",
+        email: str(payload.email),
+        projectType: str(payload.projectType),
+        projectDescription: str(payload.projectDescription),
+        jobSize,
+        buyerIntention: str(payload.buyerIntention),
+        nicheData:
+          payload.nicheData && typeof payload.nicheData === "object"
+            ? payload.nicheData
+            : undefined,
+        photos: Array.isArray(payload.photos)
+          ? (payload.photos as string[])
+          : undefined,
+        urgency: str(payload.urgency),
+        message: str(payload.message),
+        city: str(payload.city),
+        metadata: {
+          ...((payload.metadata as Record<string, unknown>) ?? {}),
+          ...(attempt.metadata ?? {}),
+          via: "wizard",
+        },
+      });
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "promotion_failed";
+      console.warn("[wizard-verify] promotie mislukt:", code);
+      return wizardJson({ error: "promotion_failed", detail: code }, 500);
+    }
+
+    await ctx.runMutation(internal.marketplace.wizard.markPromoted, {
+      verificationId: attempt.verificationId,
+      leadId: result.leadId as Id<"marketplaceLeads">,
+      matchedChannel: attempt.matchedChannel,
+    });
+
+    return wizardJson(
+      {
+        success: true,
+        leadId: result.leadId,
+        thanksUrl: `/aanvragen/${attempt.niche}/thanks`,
+        duplicate: result.duplicate,
+        matchedChannel: attempt.matchedChannel,
       },
       200,
     );
