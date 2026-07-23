@@ -1271,8 +1271,60 @@ async function wizardSendSms(to: string, message: string): Promise<boolean> {
   }
 }
 
-/** OTP-mail via Resend (simpele HTML; v1 gebruikte een React-template). */
-async function wizardSendEmail(to: string, code: string): Promise<boolean> {
+/**
+ * OTP-mail via Resend. Ontwerp = v1's IntakeOtpEmail (kaart op slate-
+ * achtergrond, mono codeblok), opgebouwd met tabellen + inline styles
+ * zodat het in alle mailclients (Outlook incl.) heel blijft. Nieuw t.o.v.
+ * v1: de site waar de aanvraag vandaan komt staat in de mail, zodat de
+ * consument de afzender herkent.
+ */
+function wizardOtpEmailHtml(code: string, siteName?: string): string {
+  const via = siteName
+    ? `U vroeg net een offerte aan via <strong>${siteName}</strong>. `
+    : "";
+  const preheader = `Uw verificatiecode is ${code} — geldig voor ${OTP_TTL_MINUTES} minuten.`;
+  return `<!DOCTYPE html>
+<html lang="nl">
+<body style="margin:0;padding:0;background-color:#f8fafc;">
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${preheader}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;padding:24px 0;">
+    <tr>
+      <td align="center" style="padding:24px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:12px;border:1px solid #e2e8f0;">
+          <tr>
+            <td style="padding:32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+              <h1 style="font-size:20px;font-weight:600;color:#0f172a;margin:0 0 12px 0;">Bevestig uw aanvraag</h1>
+              <p style="font-size:14px;color:#334155;margin:0 0 20px 0;line-height:1.6;">
+                ${via}Vul onderstaande code in om uw aanvraag te bevestigen. Daarna nemen vakmensen uit uw regio contact met u op.
+              </p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="background-color:#f1f5f9;border-radius:8px;padding:20px;">
+                    <span style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:32px;font-weight:700;letter-spacing:8px;color:#0f172a;">${code}</span>
+                  </td>
+                </tr>
+              </table>
+              <p style="font-size:12px;color:#64748b;margin:24px 0 0 0;line-height:1.6;">
+                De code is ${OTP_TTL_MINUTES} minuten geldig. Vroeg u deze code niet zelf aan? Dan kunt u deze e-mail veilig negeren — er gebeurt dan niets.
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:11px;color:#94a3b8;margin:16px 0 0 0;">
+          Dit is een automatisch bericht${siteName ? ` naar aanleiding van uw aanvraag op ${siteName}` : ""}.
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+async function wizardSendEmail(
+  to: string,
+  code: string,
+  siteName?: string,
+): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return false;
   const from = process.env.EMAIL_FROM ?? "LeadFlow <noreply@wetryleadflow.com>";
@@ -1286,8 +1338,9 @@ async function wizardSendEmail(to: string, code: string): Promise<boolean> {
       body: JSON.stringify({
         from,
         to,
-        subject: `Verificatiecode: ${code}`,
-        html: `<p>Uw verificatiecode is:</p><p style="font-size:28px;font-weight:bold;letter-spacing:4px">${code}</p><p>De code is ${OTP_TTL_MINUTES} minuten geldig.</p><p>Vroeg u geen code aan? Dan kunt u deze e-mail negeren.</p>`,
+        subject: `Uw verificatiecode: ${code}`,
+        html: wizardOtpEmailHtml(code, siteName),
+        text: `Uw verificatiecode is: ${code}\n\nVul deze code in om uw aanvraag te bevestigen. De code is ${OTP_TTL_MINUTES} minuten geldig.\n\nVroeg u deze code niet zelf aan? Dan kunt u deze e-mail negeren.`,
       }),
     });
     return res.ok;
@@ -1430,12 +1483,17 @@ http.route({
     // Per-kanaal verse codes.
     const phoneCode = generateCode();
     const emailCode = generateCode();
+    const siteName =
+      typeof (verification.metadata as Record<string, unknown> | undefined)
+        ?.source === "string"
+        ? ((verification.metadata as Record<string, unknown>).source as string)
+        : undefined;
     const smsOk = await wizardSendSms(
       verification.phone,
       `Je verificatiecode: ${phoneCode} (geldig ${OTP_TTL_MINUTES} min)`,
     );
     const emailOk = verification.email
-      ? await wizardSendEmail(verification.email, emailCode)
+      ? await wizardSendEmail(verification.email, emailCode, siteName)
       : false;
 
     if (!smsOk && !emailOk) {
