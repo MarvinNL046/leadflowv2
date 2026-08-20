@@ -822,6 +822,10 @@ export default defineSchema({
     phoneNumber: v.string(),
     isActive: v.boolean(),
     lastSeenAt: v.optional(v.number()),
+    // Wanneer er voor het laatst een alarmmail is verstuurd omdat de sessie
+    // verbroken was. Houdt de bewaker (convex/whatsappHealth.ts) stil zolang
+    // een neerliggende sessie nog niet is hersteld. Additief + optioneel.
+    lastAlertAt: v.optional(v.number()),
   }).index("by_workspace", ["workspaceId"]),
 
   whatsappTemplates: defineTable({

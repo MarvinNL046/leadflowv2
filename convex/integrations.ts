@@ -12,6 +12,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { decryptSecret } from "./lib/crypto";
+import { VOIDFIX_WA_BASE } from "./lib/voidfix";
 
 /**
  * Integrations layer — Meta (Facebook Lead Ads) + WhatsApp via Voidfix.
@@ -31,7 +32,7 @@ import { decryptSecret } from "./lib/crypto";
  * Page-token gebruikt voor /forms en /subscribed_apps endpoints.
  */
 
-const VOIDFIX_WA_BASE = "https://wa.voidfix.com";
+// Basis-URL staat in convex/lib/voidfix.ts, zodat er maar één definitie is.
 const META_GRAPH_BASE = "https://graph.facebook.com/v21.0";
 
 // ──────────────────────────────────────────────────────────────────────

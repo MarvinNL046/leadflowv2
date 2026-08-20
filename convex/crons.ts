@@ -12,4 +12,15 @@ crons.interval(
   {},
 );
 
+// Elk kwartier: is de WhatsApp-sessie bij Voidfix nog verbonden? Zo niet, dan
+// komen berichten van leads niet meer binnen zonder dat iemand dat merkt — dat
+// is in juli 2026 vijf weken onopgemerkt gebleven. Stuurt hoogstens eens per
+// 12 uur een mail.
+crons.interval(
+  "whatsapp-sessie-bewaken",
+  { minutes: 15 },
+  internal.whatsappHealth.controleerSessies,
+  {},
+);
+
 export default crons;
