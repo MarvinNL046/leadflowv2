@@ -118,6 +118,86 @@ async function stuurAlarmmail(
   }
 }
 
+export const legStandVastOpSessie = internalMutation({
+  args: {
+    sessionId: v.string(),
+    isActive: v.boolean(),
+    phoneNumber: v.optional(v.string()),
+    alerted: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const rij = (await ctx.db.query("whatsappWebConfig").collect()).find(
+      (c) => c.sessionId === args.sessionId,
+    );
+    // Onbekende sessie: Voidfix kent negen sessies van vroegere koppelpogingen
+    // en stuurt daar ook events voor. Alleen de sessie die in LeadFlow staat
+    // telt; de rest negeren we stil.
+    if (!rij) return { bekend: false };
+    await ctx.db.patch(rij._id, {
+      isActive: args.isActive,
+      ...(args.isActive ? { lastSeenAt: Date.now() } : {}),
+      ...(args.phoneNumber ? { phoneNumber: args.phoneNumber } : {}),
+      ...(args.alerted ? { lastAlertAt: Date.now() } : {}),
+    });
+    return { bekend: true, lastAlertAt: rij.lastAlertAt ?? null };
+  },
+});
+
+/**
+ * Verwerkt een session-status-webhook van Voidfix.
+ *
+ * De kwartiercron is de vangnet-controle; deze route maakt het onmiddellijk.
+ * Statussen die Voidfix gebruikt: CONNECTED/WORKING = verbonden, STOPPED,
+ * FAILED en SCAN_QR_CODE = niet verbonden. Bij een status die we niet kennen
+ * doen we niets: liever een kwartier later goed dan nu verkeerd.
+ */
+export const meldSessieStatus = internalAction({
+  args: {
+    sessionId: v.string(),
+    status: v.optional(v.string()),
+    isConnected: v.optional(v.boolean()),
+    phoneNumber: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<{ verwerkt: boolean; gemaild: boolean }> => {
+    const st = (args.status ?? "").toUpperCase();
+    const verbonden = new Set(["CONNECTED", "WORKING", "AUTHENTICATED", "READY"]);
+    const verbroken = new Set(["STOPPED", "FAILED", "SCAN_QR_CODE", "DISCONNECTED", "TIMEOUT"]);
+
+    let isActive: boolean;
+    if (typeof args.isConnected === "boolean") isActive = args.isConnected;
+    else if (verbonden.has(st)) isActive = true;
+    else if (verbroken.has(st)) isActive = false;
+    else {
+      console.warn("[whatsapp-health] onbekende sessiestatus:", args.status);
+      return { verwerkt: false, gemaild: false };
+    }
+
+    const res: { bekend: boolean; lastAlertAt?: number | null } =
+      await ctx.runMutation(internal.whatsappHealth.legStandVastOpSessie, {
+        sessionId: args.sessionId,
+        isActive,
+        phoneNumber: args.phoneNumber,
+      });
+    if (!res.bekend) return { verwerkt: false, gemaild: false };
+
+    const magMailen =
+      !isActive &&
+      (res.lastAlertAt == null || Date.now() - res.lastAlertAt > ALERT_COOLDOWN_MS);
+    let gemaild = false;
+    if (magMailen) {
+      gemaild = await stuurAlarmmail(args.phoneNumber ?? "onbekend", st || "verbroken", null);
+      if (gemaild) {
+        await ctx.runMutation(internal.whatsappHealth.legStandVastOpSessie, {
+          sessionId: args.sessionId,
+          isActive,
+          alerted: true,
+        });
+      }
+    }
+    return { verwerkt: true, gemaild };
+  },
+});
+
 /**
  * Vraagt per workspace de sessiestatus op bij Voidfix, legt die vast en
  * alarmeert bij een overgang van verbonden naar verbroken.
@@ -152,10 +232,14 @@ export const controleerSessies = internalAction({
     for (const s of sessies) {
       let json: {
         success?: boolean;
-        data?: { isConnected?: boolean; phoneNumber?: string; status?: string };
+        data?: {
+          isConnected?: boolean;
+          phoneNumber?: string | null;
+          status?: string | null;
+        };
         isConnected?: boolean;
-        phoneNumber?: string;
-        status?: string;
+        phoneNumber?: string | null;
+        status?: string | null;
       };
       try {
         const res = await fetch(
@@ -178,6 +262,9 @@ export const controleerSessies = internalAction({
       const data = json.data ?? json;
       const isConnected = Boolean(data.isConnected);
       const status = data.status ?? (isConnected ? "CONNECTED" : "ONBEKEND");
+      // Voidfix stuurt null voor een sessie die nog niet gescand is; Convex
+      // accepteert bij v.optional() wel "afwezig" maar geen null.
+      const tel = data.phoneNumber ?? undefined;
 
       const magMailen =
         !isConnected &&
@@ -185,11 +272,7 @@ export const controleerSessies = internalAction({
 
       let gemaildNu = false;
       if (magMailen) {
-        gemaildNu = await stuurAlarmmail(
-          data.phoneNumber ?? s.phoneNumber,
-          status,
-          s.lastSeenAt,
-        );
+        gemaildNu = await stuurAlarmmail(tel ?? s.phoneNumber, status, s.lastSeenAt);
         if (gemaildNu) gemaild++;
       }
       if (!isConnected) verbroken++;
@@ -197,7 +280,7 @@ export const controleerSessies = internalAction({
       await ctx.runMutation(internal.whatsappHealth.legStandVast, {
         workspaceId: s.workspaceId,
         isActive: isConnected,
-        phoneNumber: data.phoneNumber,
+        phoneNumber: tel,
         alerted: gemaildNu,
       });
     }

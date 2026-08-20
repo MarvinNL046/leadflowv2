@@ -663,6 +663,28 @@ http.route({
       return jsonResponse({ error: "Invalid JSON" }, 400);
     }
 
+    // Session-status: de webhook heeft "Session Status" aangevinkt, maar dat
+    // event werd tot nu toe genegeerd. Juist dat event vertelt ons meteen dat
+    // de koppeling wegvalt — de kwartiercron in whatsappHealth is het vangnet.
+    // De payload-vorm van Voidfix staat niet in hun documentatie, dus we
+    // accepteren zowel platte velden als een genest data-object en loggen wat
+    // we niet herkennen.
+    if ((payload.event ?? "").toLowerCase().startsWith("session")) {
+      const d = payload.data ?? {};
+      const sessionId = d.sessionId ?? payload.sessionId;
+      if (!sessionId) {
+        console.warn("[voidfix-wa-webhook] session-event zonder sessionId:", payload.event);
+        return jsonResponse({ received: true, skipped: "no sessionId" }, 200);
+      }
+      const res = await ctx.runAction(internal.whatsappHealth.meldSessieStatus, {
+        sessionId,
+        status: d.status ?? (typeof payload.status === "string" ? payload.status : undefined),
+        isConnected: d.isConnected ?? payload.isConnected,
+        phoneNumber: d.phoneNumber ?? payload.phoneNumber ?? undefined,
+      });
+      return jsonResponse({ received: true, type: "session", ...res }, 200);
+    }
+
     // Outbound: bericht verstuurd vanaf de gekoppelde bedrijfstelefoon (of een
     // echo van een via-Leadflow verstuurd bericht). recordOutbound dedupt op
     // externalMessageId, dus API-verstuurde berichten worden niet dubbel opgeslagen.
@@ -1845,6 +1867,14 @@ interface VoidfixWaEvent {
   from?: string;
   to?: string;
   phoneNumber?: string;
+  sessionId?: string;
+  isConnected?: boolean;
+  data?: {
+    sessionId?: string;
+    status?: string | null;
+    isConnected?: boolean;
+    phoneNumber?: string | null;
+  };
   body?: string;
   message?: string;
   messageId?: string;
