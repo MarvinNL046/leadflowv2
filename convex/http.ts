@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import Stripe from "stripe";
 import { httpAction } from "./_generated/server";
+import { mcpEndpoint } from "./mcpWhatsapp";
 import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -1982,6 +1983,20 @@ http.route({
     });
     return jsonResponse(result, 200);
   }),
+});
+
+// MCP-connector: WhatsApp-gesprekken leesbaar voor Claude en ChatGPT.
+// pathPrefix omdat de geheime sleutel het laatste padsegment is; de handler
+// zelf controleert hem tegen MCP_WA_KEY.
+http.route({
+  pathPrefix: "/mcp/whatsapp/",
+  method: "POST",
+  handler: mcpEndpoint,
+});
+http.route({
+  pathPrefix: "/mcp/whatsapp/",
+  method: "GET",
+  handler: mcpEndpoint,
 });
 
 export default http;

@@ -71,6 +71,8 @@ import type * as marketplace_stripe from "../marketplace/stripe.js";
 import type * as marketplace_types from "../marketplace/types.js";
 import type * as marketplace_wallet from "../marketplace/wallet.js";
 import type * as marketplace_wizard from "../marketplace/wizard.js";
+import type * as mcpWhatsapp from "../mcpWhatsapp.js";
+import type * as mcpWhatsappData from "../mcpWhatsappData.js";
 import type * as messaging from "../messaging.js";
 import type * as metaIngest from "../metaIngest.js";
 import type * as metaOauth from "../metaOauth.js";
@@ -163,6 +165,8 @@ declare const fullApi: ApiFromModules<{
   "marketplace/types": typeof marketplace_types;
   "marketplace/wallet": typeof marketplace_wallet;
   "marketplace/wizard": typeof marketplace_wizard;
+  mcpWhatsapp: typeof mcpWhatsapp;
+  mcpWhatsappData: typeof mcpWhatsappData;
   messaging: typeof messaging;
   metaIngest: typeof metaIngest;
   metaOauth: typeof metaOauth;
