@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 
 /**
  * Eenmalige seeding van de abonnement-dripcampagne (aug 2026): één segment
@@ -60,12 +60,18 @@ const MAILS: Array<{ nr: number; name: string; subject: string; body: string }> 
     name: "Abonnement-drip 2/5 — zelf doen of laten doen",
     subject: "Dit kunt u zelf doen (en dit beter niet)",
     body:
-      beeld(2, "Filter uit de airco wordt schoongemaakt") +
+      // Echte foto uit de praktijk (27 aug): geopend binnendeel tijdens de beurt.
+      `<p><img src="${BEELD}/echt-onderhoud.jpg" alt="Onderhoudsbeurt aan een geopend binnendeel" width="536" style="width:100%;height:auto;border-radius:8px;"/></p>` +
       `<h2>Zelf doen of laten doen?</h2>` +
       `<p>Goedendag,</p>` +
       `<p><strong>Dit kunt u prima zelf:</strong> de stoffilters van het binnendeel elke paar weken even uitkloppen of afspoelen. Klep open, filters eruit schuiven, drogen, terugplaatsen. Vijf minuten werk, en uw airco blaast weer vrij.</p>` +
       `<p><strong>Dit is ons werk:</strong> alles met koudemiddel. Lekkages opsporen, druk meten en bijvullen mag wettelijk alleen door een gecertificeerd bedrijf — daar zijn wij voor opgeleid en gecertificeerd. Ook de grondige reiniging van de warmtewisselaar en de condensafvoer laat u beter aan een monteur over.</p>` +
-      `<p>Bij een onderhoudsbeurt doen we dat allemaal in één bezoek. U hoeft er niet aan te denken: met een abonnement plannen wij het elk jaar automatisch met u in.</p>` +
+      `<p>Bij een onderhoudsbeurt doen we dat allemaal in één bezoek. Zo ziet dat eruit:</p>` +
+      // Video kan niet ín een e-mail afspelen → thumbnail met play-knop naar
+      // de landingspagina (die daarna weer naar /direct doorverwijst).
+      `<p style="text-align:center;margin:8px 0 4px;"><a href="https://aanmelden.staycoolairco.nl/onderhoudsbeurt?utm_source=email&utm_medium=drip&utm_campaign=onderhoudsabonnement&utm_content=mail-2-video"><img src="${BEELD}/video-thumb.jpg" alt="Video: zo ziet een onderhoudsbeurt eruit" width="280" style="width:280px;max-width:80%;height:auto;border-radius:8px;"/></a></p>` +
+      `<p style="text-align:center;font-size:13px;color:#8a94a6;margin-bottom:18px;">▶ Bekijk in 9 seconden hoe zo'n beurt gaat</p>` +
+      `<p>U hoeft er niet aan te denken: met een abonnement plannen wij het elk jaar automatisch met u in.</p>` +
       cta(2, "Bekijk het onderhoudsabonnement") +
       `<p style="font-size:14px;color:#8a94a6;">Volgende keer: wat het kost als een airco jaren zonder onderhoud draait.</p>`,
   },
@@ -74,9 +80,12 @@ const MAILS: Array<{ nr: number; name: string; subject: string; body: string }> 
     name: "Abonnement-drip 3/5 — wat verwaarlozing kost",
     subject: "De duurste airco is er één zonder onderhoud",
     body:
-      beeld(3, "Warme woonkamer tijdens een hittegolf") +
+      // Echte foto uit de praktijk: zwaar vervuild binnendeel tijdens reiniging.
+      `<p><img src="${BEELD}/echt-vies.jpg" alt="Zwaar vervuild airco-binnendeel tijdens reiniging" width="536" style="width:100%;height:auto;border-radius:8px;"/></p>` +
+      `<p style="text-align:center;font-size:13px;color:#8a94a6;margin-top:-6px;">Uit onze eigen praktijk: dit binnendeel had jaren geen onderhoud gehad.</p>` +
       `<h2>Wat verwaarlozing echt kost</h2>` +
       `<p>Goedendag,</p>` +
+      `<p>De foto hierboven is niet in scène gezet — zo ziet een binnendeel eruit dat jaren stil zijn werk deed zonder onderhoud. Al dat vuil zit tussen de lamellen waar uw lucht doorheen blaast.</p>` +
       `<p>Een vervuilde airco moet harder werken voor hetzelfde resultaat. Dat betekent: meer stroom voor minder koelte, elke dag opnieuw.</p>` +
       `<p>En storingen komen zelden op een rustig moment. Ze komen tijdens de eerste hittegolf, als iedereen tegelijk belt en de wachttijden het langst zijn. Precies dan wilt u niet achteraan aansluiten.</p>` +
       `<p>Met een onderhoudsabonnement bent u dat voor: uw airco wordt elk jaar nagekeken vóórdat het seizoen begint, en bij een storing krijgt u <strong>voorrang</strong> — zonder voorrijkosten.</p>` +
@@ -88,7 +97,8 @@ const MAILS: Array<{ nr: number; name: string; subject: string; body: string }> 
     name: "Abonnement-drip 4/5 — het aanbod",
     subject: "Zo werkt ons onderhoudsabonnement",
     body:
-      beeld(4, "StayCool-monteur onderhoudt een airco") +
+      // Echte foto: eigen monteur (StayCool-shirt) aan het werk.
+      `<p style="text-align:center;"><img src="${BEELD}/echt-monteur.jpg" alt="StayCool-monteur voert een onderhoudsbeurt uit" width="400" style="width:400px;max-width:100%;height:auto;border-radius:8px;"/></p>` +
       `<h2>Alles geregeld, vanaf €13 per maand</h2>` +
       `<p>Goedendag,</p>` +
       `<p><strong>Basis — €13 per maand per airco.</strong> Elk jaar een volledige onderhoudsbeurt, inclusief arbeidsloon en materialen. Voorrang bij storingen, geen voorrijkosten, en opzegbaar per maand.</p>` +
@@ -133,6 +143,88 @@ export const restyleDripCta = internalMutation({
       bijgewerkt.push(b.name);
     }
     return { bijgewerkt };
+  },
+});
+
+/** Zet de body van nog niet verzonden dripmails opnieuw vanuit MAILS —
+ *  gebruikt om de campagne-inhoud bij te werken (bijv. echte foto's i.p.v.
+ *  AI-beelden) zonder aan planning of status te komen. Alleen broadcasts
+ *  in draft/scheduled worden geraakt; al verzonden mails blijven zoals ze
+ *  waren verstuurd. */
+export const refreshDripBodies = internalMutation({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    const broadcasts = await ctx.db
+      .query("broadcasts")
+      .withIndex("by_workspace_status", (q) => q.eq("workspaceId", args.workspaceId))
+      .collect();
+    const bijgewerkt: string[] = [];
+    for (const mail of MAILS) {
+      const b = broadcasts.find((x) => x.name === mail.name);
+      if (!b) continue;
+      if (b.status !== "draft" && b.status !== "scheduled") continue;
+      if (b.body === mail.body) continue;
+      await ctx.db.patch(b._id, { body: mail.body, subject: mail.subject });
+      bijgewerkt.push(mail.name);
+    }
+    return { bijgewerkt };
+  },
+});
+
+/** Analyse-hulpjes (CLI): contact-ids met een GEWONNEN deal, en een
+ *  gepagineerde minimale contactendump — samen genoeg om buiten Convex te
+ *  tellen welke leadflow-contacten legitiem bij de campagne zouden mogen
+ *  (klant via won-deal, of expliciete marketing-opt-in). Read-only. */
+export const wonContactIds = internalQuery({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    const pipelines = await ctx.db
+      .query("pipelines")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
+      .collect();
+    const ids = new Set<string>();
+    for (const pipeline of pipelines) {
+      const stages = await ctx.db
+        .query("pipelineStages")
+        .withIndex("by_pipeline_order", (q) => q.eq("pipelineId", pipeline._id))
+        .collect();
+      for (const stage of stages) {
+        if (!stage.isWonStage) continue;
+        const opps = await ctx.db
+          .query("opportunities")
+          .withIndex("by_workspace_stage", (q) =>
+            q.eq("workspaceId", args.workspaceId).eq("stageId", stage._id),
+          )
+          .collect();
+        for (const opp of opps) ids.add(opp.contactId);
+      }
+    }
+    return [...ids];
+  },
+});
+
+export const contactenPagina = internalQuery({
+  args: {
+    workspaceId: v.id("workspaces"),
+    cursor: v.union(v.string(), v.null()),
+    numItems: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query("contacts")
+      .withIndex("by_workspace_created", (q) => q.eq("workspaceId", args.workspaceId))
+      .paginate({ cursor: args.cursor, numItems: Math.min(args.numItems, 500) });
+    return {
+      isDone: page.isDone,
+      continueCursor: page.continueCursor,
+      rows: page.page.map((c) => ({
+        id: c._id,
+        email: c.email ?? null,
+        tags: c.tags ?? [],
+        marketing: c.emailMarketingStatus ?? null,
+        deleted: c.deletedAt !== undefined,
+      })),
+    };
   },
 });
 
