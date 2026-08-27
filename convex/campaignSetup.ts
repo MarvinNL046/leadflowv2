@@ -40,7 +40,7 @@ function beeld(nr: number, alt: string): string {
   return `<p><img src="${BEELD}/mail-${nr}.jpg" alt="${alt}" width="536" style="width:100%;height:auto;border-radius:8px;"/></p>`;
 }
 
-const MAILS: Array<{ nr: number; name: string; subject: string; body: string }> = [
+export const MAILS: Array<{ nr: number; name: string; subject: string; body: string }> = [
   {
     nr: 1,
     name: "Abonnement-drip 1/5 — waarom onderhoud",
