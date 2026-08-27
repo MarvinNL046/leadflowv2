@@ -21,11 +21,17 @@ export const CAMPAIGN_TAG = "abbo-campagne-2026";
 const SEGMENT_NAME = "Abonnement-campagne (zonder abonnement)";
 const BEELD = "https://aanmelden.staycoolairco.nl/campagne";
 
+// Knopkleur: bewust ORANJE in een verder blauwe mail (shell-header, links) —
+// contrast met de omgeving is de enige knopkleur-vondst die A/B-tests
+// consistent overeind houden. Wit op #EA580C haalt de 3:1 die voor grote,
+// vette knoptekst geldt.
+const CTA_KLEUR = "#EA580C";
+
 function cta(nr: number, label: string): string {
   const url = `https://aanmelden.staycoolairco.nl/direct?utm_source=email&utm_medium=drip&utm_campaign=onderhoudsabonnement&utm_content=mail-${nr}`;
   return (
     `<p style="margin:8px 0 18px;text-align:center;">` +
-    `<a data-cta href="${url}" style="display:inline-block;background:#2080C0;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-family:Arial,Helvetica,sans-serif;">${label}</a>` +
+    `<a data-cta href="${url}" style="display:inline-block;background:${CTA_KLEUR};color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-family:Arial,Helvetica,sans-serif;">${label}</a>` +
     `</p><p style="text-align:center;font-size:12px;color:#8a94a6;">Online afsluiten — veilig betalen via iDEAL</p>`
   );
 }
@@ -106,6 +112,29 @@ const MAILS: Array<{ nr: number; name: string; subject: string; body: string }> 
       `<p style="font-size:14px;color:#8a94a6;">PS: het abonnement is gewoon per maand opzegbaar. U zit dus nergens aan vast.</p>`,
   },
 ];
+
+/** Eenmalig (27 aug 2026): de CTA-knoppen van de al-ingeplande dripmails van
+ *  shell-blauw naar CTA_KLEUR. Alleen de knop-achtergrond wordt vervangen;
+ *  idempotent (een her-run vindt niets meer om te vervangen). */
+export const restyleDripCta = internalMutation({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, args) => {
+    const broadcasts = await ctx.db
+      .query("broadcasts")
+      .withIndex("by_workspace_status", (q) => q.eq("workspaceId", args.workspaceId))
+      .collect();
+    const bijgewerkt: string[] = [];
+    for (const b of broadcasts) {
+      if (!b.name.startsWith("Abonnement-drip")) continue;
+      if (b.body === undefined || !b.body.includes("background:#2080C0")) continue;
+      await ctx.db.patch(b._id, {
+        body: b.body.split("background:#2080C0").join(`background:${CTA_KLEUR}`),
+      });
+      bijgewerkt.push(b.name);
+    }
+    return { bijgewerkt };
+  },
+});
 
 export const setupAbboCampagne = internalMutation({
   args: {
