@@ -1597,3 +1597,68 @@ export const importContacts = mutation({
     return { imported, skipped };
   },
 });
+
+/**
+ * Campagne-doelgroep laden (server-to-server, bijv. de cashflow-klantlijst
+ * voor de abonnement-campagne): upsert op e-mail. Bestaat het contact al,
+ * dan wordt alleen de campagne-tag toegevoegd; anders wordt een minimaal
+ * contact aangemaakt (mét tag en attribution "manual"). Net als bij de
+ * CSV-import wordt er GEEN opportunity/workflow afgevuurd. Max 400 per call.
+ */
+export const importCampaignAudience = internalMutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    tag: v.string(),
+    contacts: v.array(
+      v.object({
+        email: v.string(),
+        firstName: v.optional(v.string()),
+        lastName: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    if (args.contacts.length > 400) {
+      throw new Error("Maximaal 400 contacten per batch");
+    }
+    let created = 0;
+    let tagged = 0;
+    let unchanged = 0;
+    for (const c of args.contacts) {
+      const email = normalizeEmail(c.email);
+      if (!email) continue;
+      const existing = await ctx.db
+        .query("contacts")
+        .withIndex("by_workspace_email", (q) =>
+          q.eq("workspaceId", args.workspaceId).eq("email", email),
+        )
+        .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        .first();
+      if (existing) {
+        const tags = existing.tags ?? [];
+        if (tags.includes(args.tag)) {
+          unchanged++;
+        } else {
+          await ctx.db.patch(existing._id, { tags: [...tags, args.tag] });
+          tagged++;
+        }
+        continue;
+      }
+      const contactId = await insertContactWithSearchText(ctx, {
+        workspaceId: args.workspaceId,
+        firstName: c.firstName?.trim() || undefined,
+        lastName: c.lastName?.trim() || undefined,
+        email,
+        tags: [args.tag],
+        callCount: 0,
+      });
+      await ctx.db.insert("leadAttribution", {
+        contactId,
+        workspaceId: args.workspaceId,
+        source: "manual",
+      });
+      created++;
+    }
+    return { created, tagged, unchanged };
+  },
+});

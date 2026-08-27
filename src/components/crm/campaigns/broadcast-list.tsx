@@ -62,6 +62,16 @@ export function BroadcastList({
               <div>
                 <p className="font-medium">{b.name}</p>
                 <p className="text-xs text-zinc-500">{b.subject}</p>
+                {b.status === 'scheduled' && b.scheduledAt !== undefined && (
+                  <p className="text-xs font-medium text-violet-700">
+                    Gepland:{' '}
+                    {new Intl.DateTimeFormat('nl-NL', {
+                      timeZone: 'Europe/Amsterdam',
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    }).format(new Date(b.scheduledAt))}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-3 text-xs text-zinc-500">
                 <span>{b.stats.sent}/{b.stats.total} verzonden</span>

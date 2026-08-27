@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { getUserId } from "./lib/identity";
 import {
   query,
@@ -7,6 +8,7 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
+  type ActionCtx,
   type QueryCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -55,6 +57,58 @@ export const get = query({
     if (!b) return null;
     await requireWorkspace(ctx, b.workspaceId);
     return b;
+  },
+});
+
+/** Ontvangers van een broadcast, gepagineerd, verrijkt met de bezorgstatus
+ *  uit de messages-tabel (gevoed door de Resend-webhook): zo toont de
+ *  detailpagina per adres verzonden/afgeleverd/gebounced/geopend. */
+export const recipientsPage = query({
+  args: {
+    broadcastId: v.id("broadcasts"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const b = await ctx.db.get(args.broadcastId);
+    if (!b) throw new Error("Broadcast niet gevonden");
+    await requireWorkspace(ctx, b.workspaceId);
+    const page = await ctx.db
+      .query("broadcastRecipients")
+      .withIndex("by_broadcast_status", (q) => q.eq("broadcastId", args.broadcastId))
+      .paginate({
+        ...args.paginationOpts,
+        numItems: Math.min(args.paginationOpts.numItems, 100),
+      });
+    const rows = await Promise.all(
+      page.page.map(async (r) => {
+        let delivery: "delivered" | "bounced" | "read" | null = null;
+        let bounceReason: string | undefined;
+        if (r.externalMessageId !== undefined) {
+          const message = await ctx.db
+            .query("messages")
+            .withIndex("by_external_id", (q) =>
+              q.eq("externalMessageId", r.externalMessageId as string),
+            )
+            .first();
+          if (message?.status === "delivered" || message?.status === "bounced" || message?.status === "read") {
+            delivery = message.status;
+          }
+          if (message?.status === "bounced") {
+            bounceReason = message.errorMessage ?? undefined;
+          }
+        }
+        return {
+          _id: r._id,
+          email: r.email,
+          name: [r.firstName, r.lastName].filter(Boolean).join(" "),
+          status: r.status,
+          delivery,
+          bounceReason,
+          errorMessage: r.errorMessage,
+        };
+      }),
+    );
+    return { ...page, page: rows };
   },
 });
 
@@ -121,6 +175,66 @@ export const sendTest = action({
   },
 });
 
+/** Gedeelde verzendpijplijn (na de status-flip naar "sending"): ontvangers
+ *  resolven uit het segment, recipient-rijen schrijven en de eerste batch
+ *  inplannen. Gebruikt door sendNow (direct) en runScheduled (ingepland). */
+async function runSendPipeline(
+  ctx: { runQuery: ActionCtx["runQuery"]; runMutation: ActionCtx["runMutation"]; scheduler: ActionCtx["scheduler"] },
+  broadcastId: Id<"broadcasts">,
+): Promise<{ total: number }> {
+  const b = await ctx.runQuery(internal.broadcasts.loadForSend, { broadcastId });
+  if (!b) throw new Error("Broadcast niet gevonden");
+
+  // Stap 1: haal alle ontvangers op via gepagineerde internalQuery
+  const seg = await ctx.runQuery(internal.broadcasts.loadSegment, { segmentId: b.segmentId });
+  if (!seg) throw new Error("Segment niet gevonden");
+
+  const allRecipients: Array<{
+    contactId: Id<"contacts">;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+  }> = [];
+  let cursor: string | null = null;
+  let isDone = false;
+  while (!isDone) {
+    const result: {
+      recipients: Array<{ contactId: Id<"contacts">; email: string; firstName?: string; lastName?: string }>;
+      continueCursor: string;
+      isDone: boolean;
+    } = await ctx.runQuery(internal.segments.resolvePage, {
+      workspaceId: b.workspaceId,
+      rules: seg.rules,
+      cursor,
+      numItems: 500,
+    });
+    allRecipients.push(...result.recipients);
+    cursor = result.continueCursor;
+    isDone = result.isDone;
+  }
+
+  // Stap 2: dedupe op lowercased email
+  const deduped = dedupeByEmail(allRecipients);
+
+  // Stap 3: schrijf broadcastRecipients-rijen in chunks van ≤ 500
+  const CHUNK = 500;
+  for (let i = 0; i < deduped.length; i += CHUNK) {
+    await ctx.runMutation(internal.broadcasts.addRecipients, {
+      broadcastId,
+      workspaceId: b.workspaceId,
+      rows: deduped.slice(i, i + CHUNK),
+    });
+  }
+
+  // Stap 4: sla totaal op en plan eerste batch in
+  await ctx.runMutation(internal.broadcasts.setTotal, {
+    broadcastId,
+    total: deduped.length,
+  });
+  await ctx.scheduler.runAfter(0, internal.broadcasts.runBatch, { broadcastId });
+  return { total: deduped.length };
+}
+
 export const sendNow = action({
   args: { broadcastId: v.id("broadcasts") },
   handler: async (ctx, args): Promise<{ total: number }> => {
@@ -134,63 +248,70 @@ export const sendNow = action({
     if (!begin.started) throw new Error("Deze broadcast is al gestart of verzonden.");
 
     try {
-      const b = await ctx.runQuery(internal.broadcasts.loadForSend, { broadcastId: args.broadcastId });
-      if (!b) throw new Error("Broadcast niet gevonden");
-
-      // Stap 1: haal alle ontvangers op via gepagineerde internalQuery
-      const seg = await ctx.runQuery(internal.broadcasts.loadSegment, { segmentId: b.segmentId });
-      if (!seg) throw new Error("Segment niet gevonden");
-
-      const allRecipients: Array<{
-        contactId: Id<"contacts">;
-        email: string;
-        firstName?: string;
-        lastName?: string;
-      }> = [];
-      let cursor: string | null = null;
-      let isDone = false;
-      while (!isDone) {
-        const result: {
-          recipients: Array<{ contactId: Id<"contacts">; email: string; firstName?: string; lastName?: string }>;
-          continueCursor: string;
-          isDone: boolean;
-        } = await ctx.runQuery(internal.segments.resolvePage, {
-          workspaceId: b.workspaceId,
-          rules: seg.rules,
-          cursor,
-          numItems: 500,
-        });
-        allRecipients.push(...result.recipients);
-        cursor = result.continueCursor;
-        isDone = result.isDone;
-      }
-
-      // Stap 2: dedupe op lowercased email
-      const deduped = dedupeByEmail(allRecipients);
-
-      // Stap 3: schrijf broadcastRecipients-rijen in chunks van ≤ 500
-      const CHUNK = 500;
-      for (let i = 0; i < deduped.length; i += CHUNK) {
-        await ctx.runMutation(internal.broadcasts.addRecipients, {
-          broadcastId: args.broadcastId,
-          workspaceId: b.workspaceId,
-          rows: deduped.slice(i, i + CHUNK),
-        });
-      }
-
-      // Stap 4: sla totaal op en plan eerste batch in
-      await ctx.runMutation(internal.broadcasts.setTotal, {
-        broadcastId: args.broadcastId,
-        total: deduped.length,
-      });
-      await ctx.scheduler.runAfter(0, internal.broadcasts.runBatch, {
-        broadcastId: args.broadcastId,
-      });
-      return { total: deduped.length };
+      return await runSendPipeline(ctx, args.broadcastId);
     } catch (err) {
       // Reset naar "draft" zodat de gebruiker de broadcast opnieuw kan proberen.
       await ctx.runMutation(internal.broadcasts.resetToDraft, { broadcastId: args.broadcastId });
       throw err;
+    }
+  },
+});
+
+// ── Inplannen ────────────────────────────────────────────────────────
+
+/** Plan een concept-broadcast in voor een later verzendmoment. De flip
+ *  draft→scheduled gebeurt hier atomisch; op het gekozen tijdstip start
+ *  runScheduled de gewone pijplijn. Annuleren kan tot het moment zelf via
+ *  de bestaande cancel-mutatie (runScheduled controleert de status). */
+export const schedule = mutation({
+  args: { broadcastId: v.id("broadcasts"), scheduledAt: v.number() },
+  handler: async (ctx, args) => {
+    const b = await ctx.db.get(args.broadcastId);
+    if (!b) throw new Error("Broadcast niet gevonden");
+    await requireWorkspace(ctx, b.workspaceId);
+    if (b.status !== "draft") {
+      throw new Error("Alleen een concept kan worden ingepland.");
+    }
+    if (args.scheduledAt <= Date.now()) {
+      throw new Error("Kies een moment in de toekomst.");
+    }
+    await ctx.db.patch(args.broadcastId, {
+      status: "scheduled",
+      scheduledAt: args.scheduledAt,
+    });
+    await ctx.scheduler.runAt(args.scheduledAt, internal.broadcasts.runScheduled, {
+      broadcastId: args.broadcastId,
+    });
+  },
+});
+
+/** Atomische guard voor de ingeplande start (scheduled→sending). Een
+ *  geannuleerde of al gestarte broadcast geeft { started: false }. */
+export const beginScheduledSend = internalMutation({
+  args: { broadcastId: v.id("broadcasts") },
+  handler: async (ctx, args) => {
+    const b = await ctx.db.get(args.broadcastId);
+    if (!b) return { started: false as const };
+    if (b.status !== "scheduled") return { started: false as const };
+    await ctx.db.patch(args.broadcastId, { status: "sending", startedAt: Date.now() });
+    return { started: true as const };
+  },
+});
+
+/** Door de scheduler afgevuurd op scheduledAt. Geen auth (system-scheduled,
+ *  zelfde model als runBatch); de autorisatie zat op de schedule-mutatie. */
+export const runScheduled = internalAction({
+  args: { broadcastId: v.id("broadcasts") },
+  handler: async (ctx, args): Promise<void> => {
+    const begin = await ctx.runMutation(internal.broadcasts.beginScheduledSend, {
+      broadcastId: args.broadcastId,
+    });
+    if (!begin.started) return; // geannuleerd of al gestart — stil stoppen
+    try {
+      await runSendPipeline(ctx, args.broadcastId);
+    } catch (err) {
+      console.error(`[runScheduled] broadcast ${args.broadcastId}:`, err);
+      await ctx.runMutation(internal.broadcasts.markFailed, { broadcastId: args.broadcastId });
     }
   },
 });
