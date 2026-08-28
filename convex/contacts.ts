@@ -1662,3 +1662,35 @@ export const importCampaignAudience = internalMutation({
     return { created, tagged, unchanged };
   },
 });
+
+/**
+ * Conversie-afmelding: een klant die een abonnement heeft afgesloten is
+ * "gewonnen" en hoort de rest van de wervingscampagne niet meer te
+ * krijgen. Verwijdert alle campagne-tags met het gegeven prefix van het
+ * contact met dit e-mailadres. De drip-segmenten filteren op die tag en
+ * worden per verzendmoment opnieuw bepaald, dus dit werkt onmiddellijk.
+ */
+export const removeCampaignTag = internalMutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    email: v.string(),
+    tagPrefix: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ removed: boolean }> => {
+    const email = normalizeEmail(args.email);
+    if (!email) return { removed: false };
+    const contact = await ctx.db
+      .query("contacts")
+      .withIndex("by_workspace_email", (q) =>
+        q.eq("workspaceId", args.workspaceId).eq("email", email),
+      )
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
+      .first();
+    if (!contact) return { removed: false };
+    const tags = contact.tags ?? [];
+    const overig = tags.filter((t) => !t.startsWith(args.tagPrefix));
+    if (overig.length === tags.length) return { removed: false };
+    await ctx.db.patch(contact._id, { tags: overig });
+    return { removed: true };
+  },
+});

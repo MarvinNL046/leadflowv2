@@ -392,6 +392,51 @@ function jsonResponse(body: unknown, status: number) {
 // RESEND WEBHOOK — delivery + bounce events
 // ════════════════════════════════════════════════════════════════════
 //
+/**
+ * Conversie-afmelding vanaf aanmelden.staycoolairco.nl (server-to-server,
+ * x-api-key = CAMPAIGN_SYNC_KEY op beide deployments): wie daar een
+ * abonnement afsluit, is gewonnen en wordt uit de wervings-dripcampagne
+ * gehaald (campagne-tag eraf; de drip-segmenten resolven per
+ * verzendmoment, dus dit werkt direct voor alle nog komende mails).
+ */
+http.route({
+  path: "/api/campaign/converted",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const expected = process.env.CAMPAIGN_SYNC_KEY;
+    const provided = request.headers.get("x-api-key") ?? "";
+    // Constant-time vergelijking (zelfde patroon als de andere key-checks).
+    let mismatch = expected === undefined || expected.length !== provided.length ? 1 : 0;
+    if (expected !== undefined && expected.length === provided.length) {
+      for (let i = 0; i < expected.length; i++) {
+        mismatch |= expected.charCodeAt(i) ^ provided.charCodeAt(i);
+      }
+    }
+    if (mismatch !== 0) return jsonResponse({ error: "unauthorized" }, 401);
+
+    let body: { email?: unknown };
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse({ error: "invalid json" }, 400);
+    }
+    if (typeof body.email !== "string" || body.email.length === 0) {
+      return jsonResponse({ error: "email required" }, 400);
+    }
+    const workspaceId = await ctx.runQuery(
+      internal.messaging.getStaycoolWorkspaceIdInternal,
+      {},
+    );
+    if (!workspaceId) return jsonResponse({ error: "no workspace" }, 503);
+    const result = await ctx.runMutation(internal.contacts.removeCampaignTag, {
+      workspaceId,
+      email: body.email,
+      tagPrefix: "abbo-campagne",
+    });
+    return jsonResponse(result, 200);
+  }),
+});
+
 // Resend gebruikt Svix voor signing. Headers: svix-id, svix-timestamp,
 // svix-signature (format: "v1,base64Hash v2,base64Hash" — meerdere
 // versies, valid als ten minste 1 match).

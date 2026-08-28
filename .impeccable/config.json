@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "createdAt": "2026-08-27T15:12:33.629Z",
+        "reason": "E-mail-HTML: Arial/Helvetica is de email-safe systemstack; zelfde stack als leadflows bestaande emailShell en cta-button-node"
+      }
+    ]
+  }
+}
