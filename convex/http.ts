@@ -414,7 +414,7 @@ http.route({
     }
     if (mismatch !== 0) return jsonResponse({ error: "unauthorized" }, 401);
 
-    let body: { email?: unknown };
+    let body: { email?: unknown; name?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -428,12 +428,48 @@ http.route({
       {},
     );
     if (!workspaceId) return jsonResponse({ error: "no workspace" }, 503);
-    const result = await ctx.runMutation(internal.contacts.removeCampaignTag, {
+    const opEmail = await ctx.runMutation(internal.contacts.removeCampaignTag, {
       workspaceId,
       email: body.email,
       tagPrefix: "abbo-campagne",
     });
-    return jsonResponse(result, 200);
+    if (opEmail.removed) {
+      return jsonResponse({ removed: true, via: "email" }, 200);
+    }
+    // Naam-fallback: afrekenadres ≠ campagne-adres (partner-mail e.d.).
+    // Onterecht matchen op een naamgenoot kost hooguit één marketingmail
+    // te weinig — een veilige afweging.
+    if (typeof body.name !== "string" || body.name.trim().length < 5) {
+      return jsonResponse({ removed: false }, 200);
+    }
+    const ids: Id<"contacts">[] = [];
+    let cursor: string | null = null;
+    let isDone = false;
+    while (!isDone) {
+      const page: {
+        ids: Id<"contacts">[];
+        continueCursor: string;
+        isDone: boolean;
+      } = await ctx.runQuery(internal.contacts.findCampaignTaggedByName, {
+        workspaceId,
+        tagPrefix: "abbo-campagne",
+        naam: body.name,
+        cursor,
+        numItems: 500,
+      });
+      ids.push(...page.ids);
+      cursor = page.continueCursor;
+      isDone = page.isDone;
+    }
+    if (ids.length === 0) return jsonResponse({ removed: false }, 200);
+    const opNaam = await ctx.runMutation(internal.contacts.removeCampaignTagByIds, {
+      contactIds: ids,
+      tagPrefix: "abbo-campagne",
+    });
+    return jsonResponse(
+      { removed: opNaam.removed > 0, via: "naam", count: opNaam.removed },
+      200,
+    );
   }),
 });
 

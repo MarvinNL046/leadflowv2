@@ -3,6 +3,7 @@ import { paginationOptsValidator } from "convex/server";
 import { getUserId } from "./lib/identity";
 import {
   internalMutation,
+  internalQuery,
   mutation,
   query,
   type MutationCtx,
@@ -1692,5 +1693,66 @@ export const removeCampaignTag = internalMutation({
     if (overig.length === tags.length) return { removed: false };
     await ctx.db.patch(contact._id, { tags: overig });
     return { removed: true };
+  },
+});
+
+/** Genormaliseerde naam voor de fallback-match: kleine letters, alleen
+ *  letters/cijfers. "Jo van Bilzen" == "jo VAN bilzen  ". */
+function normalizeNaamVoorMatch(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Naam-fallback voor de conversie-afmelding: wie bij het afrekenen een
+ * ander e-mailadres gebruikt dan waar de campagne heen mailt, wordt op
+ * exacte (genormaliseerde) naam gezocht binnen de getagde contacten.
+ * Gepagineerd (geen zoekindex op contacts); de aanroeper loopt de pagina's
+ * af. Meerdere naamgenoten worden allemaal teruggegeven — de tag weghalen
+ * bij een naamgenoot betekent hooguit één marketingmail te weinig.
+ */
+export const findCampaignTaggedByName = internalQuery({
+  args: {
+    workspaceId: v.id("workspaces"),
+    tagPrefix: v.string(),
+    naam: v.string(),
+    cursor: v.union(v.string(), v.null()),
+    numItems: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const doel = normalizeNaamVoorMatch(args.naam);
+    const page = await ctx.db
+      .query("contacts")
+      .withIndex("by_workspace_created", (q) => q.eq("workspaceId", args.workspaceId))
+      .paginate({ cursor: args.cursor, numItems: Math.min(args.numItems, 500) });
+    const ids: Id<"contacts">[] = [];
+    if (doel.length >= 5) {
+      for (const c of page.page) {
+        if (c.deletedAt) continue;
+        if (!(c.tags ?? []).some((t) => t.startsWith(args.tagPrefix))) continue;
+        const naam = normalizeNaamVoorMatch(
+          [c.firstName, c.lastName].filter(Boolean).join(" "),
+        );
+        if (naam.length > 0 && naam === doel) ids.push(c._id);
+      }
+    }
+    return { ids, continueCursor: page.continueCursor, isDone: page.isDone };
+  },
+});
+
+/** Tag weghalen bij specifieke contacten (vervolg op de naam-fallback). */
+export const removeCampaignTagByIds = internalMutation({
+  args: { contactIds: v.array(v.id("contacts")), tagPrefix: v.string() },
+  handler: async (ctx, args): Promise<{ removed: number }> => {
+    let removed = 0;
+    for (const id of args.contactIds) {
+      const contact = await ctx.db.get(id);
+      if (!contact) continue;
+      const tags = contact.tags ?? [];
+      const overig = tags.filter((t) => !t.startsWith(args.tagPrefix));
+      if (overig.length === tags.length) continue;
+      await ctx.db.patch(id, { tags: overig });
+      removed++;
+    }
+    return { removed };
   },
 });
