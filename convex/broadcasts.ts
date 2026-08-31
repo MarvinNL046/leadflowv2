@@ -60,6 +60,35 @@ export const get = query({
   },
 });
 
+/** Volledig gerenderde mail voor de preview op de campagne-detailpagina:
+ *  zelfde shell + template-variabelen als de echte verzending, met
+ *  "Voorbeeld" als voornaam en een dode afmeldlink. */
+export const previewHtml = query({
+  args: { broadcastId: v.id("broadcasts") },
+  handler: async (ctx, args) => {
+    const b = await ctx.db.get(args.broadcastId);
+    if (!b) return null;
+    await requireWorkspace(ctx, b.workspaceId);
+    const settings = await ctx.db
+      .query("crmSettings")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", b.workspaceId))
+      .first();
+    const ws = await ctx.db.get(b.workspaceId);
+    const org = ws ? await ctx.db.get(ws.orgId) : null;
+    const companyName = settings?.companyName ?? org?.name ?? "StayCool Airco";
+    const vars = leadTemplateVars({ firstName: "Voorbeeld", lastName: "" }, companyName);
+    const subject = renderTemplate(b.subject, vars);
+    return {
+      subject,
+      html: renderEmailShell(renderTemplate(b.body ?? "", vars), {
+        companyName,
+        unsubUrl: "#",
+        previewText: subject,
+      }),
+    };
+  },
+});
+
 /** Ontvangers van een broadcast, gepagineerd, verrijkt met de bezorgstatus
  *  uit de messages-tabel (gevoed door de Resend-webhook): zo toont de
  *  detailpagina per adres verzonden/afgeleverd/gebounced/geopend. */

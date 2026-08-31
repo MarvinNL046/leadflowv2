@@ -36,6 +36,7 @@ function deliveryLabel(r: {
 function BroadcastDetail() {
   const { id } = Route.useParams()
   const b = useQuery(api.broadcasts.get, { broadcastId: id as Id<'broadcasts'> })
+  const preview = useQuery(api.broadcasts.previewHtml, { broadcastId: id as Id<'broadcasts'> })
   const cancel = useMutation(api.broadcasts.cancel)
   const schedule = useMutation(api.broadcasts.schedule)
   const [scheduleAt, setScheduleAt] = useState('')
@@ -109,6 +110,32 @@ function BroadcastDetail() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader><CardTitle className="text-sm">Voorbeeld van de mail</CardTitle></CardHeader>
+        <CardContent>
+          {preview === undefined && <Skeleton className="h-64 w-full" />}
+          {preview === null && (
+            <p className="text-sm text-zinc-500">Geen voorbeeld beschikbaar.</p>
+          )}
+          {preview && (
+            <div className="space-y-2">
+              <p className="text-sm">
+                <span className="text-zinc-500">Onderwerp:</span>{' '}
+                <span className="font-medium">{preview.subject}</span>
+              </p>
+              {/* Sandbox zonder scripts: de mail-HTML rendert exact zoals bij
+                  de ontvanger, maar kan niets uitvoeren of navigeren. */}
+              <iframe
+                title="Mailvoorbeeld"
+                sandbox=""
+                srcDoc={preview.html}
+                className="h-[640px] w-full rounded-lg border border-zinc-200 bg-white"
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle className="text-sm">Statistieken (live)</CardTitle></CardHeader>
