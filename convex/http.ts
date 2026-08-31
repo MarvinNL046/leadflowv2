@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import Stripe from "stripe";
 import { httpAction } from "./_generated/server";
 import { mcpEndpoint } from "./mcpWhatsapp";
+import { mcpEndpoint as mcpLeadflowEndpoint } from "./mcpLeadflow";
 import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -392,6 +393,19 @@ function jsonResponse(body: unknown, status: number) {
 // RESEND WEBHOOK — delivery + bounce events
 // ════════════════════════════════════════════════════════════════════
 //
+// MCP-server voor de CRM-leads (Claude Desktop / ChatGPT developer mode).
+// Sleutel in het pad; zie convex/mcpLeadflow.ts voor het waarom en de tools.
+http.route({
+  pathPrefix: "/mcp/leadflow/",
+  method: "POST",
+  handler: mcpLeadflowEndpoint,
+});
+http.route({
+  pathPrefix: "/mcp/leadflow/",
+  method: "GET",
+  handler: mcpLeadflowEndpoint,
+});
+
 /**
  * Conversie-afmelding vanaf aanmelden.staycoolairco.nl (server-to-server,
  * x-api-key = CAMPAIGN_SYNC_KEY op beide deployments): wie daar een
