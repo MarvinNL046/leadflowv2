@@ -442,15 +442,24 @@ export const updateStatusByExternalId = internalMutation({
         q.eq("externalMessageId", args.externalMessageId),
       )
       .first();
-    if (!msg) return { matched: false };
+    if (!msg) return { matched: false, firstRead: false };
 
     const patch: Record<string, unknown> = { status: args.newStatus };
+    // Webhook-events kunnen door elkaar binnenkomen: een (herhaald)
+    // delivered-event mag een al-geopende mail niet terugzetten naar
+    // "delivered" — dan verdwijnt het "Geopend"-label weer uit de UI.
+    if (msg.status === "read" && args.newStatus === "delivered") {
+      delete patch.status;
+    }
     if (args.deliveredAt !== undefined) patch.deliveredAt = args.deliveredAt;
     if (args.errorMessage !== undefined) patch.errorMessage = args.errorMessage;
-    if (args.newStatus === "read") patch.readAt = Date.now();
+    // firstRead: alleen de EERSTE open telt (herhaalde opens van dezelfde
+    // ontvanger bumpen de broadcast-teller niet nog eens).
+    const firstRead = args.newStatus === "read" && msg.readAt === undefined;
+    if (firstRead) patch.readAt = Date.now();
 
     await ctx.db.patch(msg._id, patch);
-    return { matched: true, messageId: msg._id };
+    return { matched: true, messageId: msg._id, firstRead };
   },
 });
 

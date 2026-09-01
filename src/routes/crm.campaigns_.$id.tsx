@@ -139,10 +139,11 @@ function BroadcastDetail() {
 
       <Card>
         <CardHeader><CardTitle className="text-sm">Statistieken (live)</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-3 gap-3 md:grid-cols-6">
+        <CardContent className="grid grid-cols-3 gap-3 md:grid-cols-7">
           {stat('Totaal', b.stats.total)}
           {stat('Verzonden', b.stats.sent)}
           {stat('Afgeleverd', b.stats.delivered)}
+          {stat('Geopend', b.stats.opened ?? 0)}
           {stat('Gebounced', b.stats.bounced)}
           {stat('Afgemeld', b.stats.unsubscribed)}
           {stat('Mislukt', b.stats.failed)}

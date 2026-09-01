@@ -546,7 +546,7 @@ http.route({
       return jsonResponse({ received: true, ignored: payload.type }, 200);
     }
 
-    await ctx.runMutation(internal.messaging.updateStatusByExternalId, {
+    const updateResult = await ctx.runMutation(internal.messaging.updateStatusByExternalId, {
       externalMessageId: externalId,
       newStatus,
       deliveredAt: payload.created_at
@@ -557,6 +557,15 @@ http.route({
           ? `${payload.data.bounce.type}: ${payload.data.bounce.message ?? ""}`
           : undefined,
     });
+
+    // Broadcast-stats: unieke opens (firstRead dedupet herhaalde opens
+    // van dezelfde ontvanger).
+    if (payload.type === "email.opened" && updateResult.firstRead) {
+      await ctx.runMutation(internal.broadcasts.bumpStatFromExternalId, {
+        externalMessageId: externalId,
+        field: "opened",
+      });
+    }
 
     // Broadcast-stats: bump delivered/bounced counters live via webhook.
     if (payload.type === "email.delivered") {

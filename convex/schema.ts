@@ -416,6 +416,9 @@ export default defineSchema({
       bounced: v.number(),
       unsubscribed: v.number(),
       failed: v.number(),
+      // Unieke opens (max 1 per ontvanger); optioneel — oudere broadcasts
+      // hebben dit veld niet.
+      opened: v.optional(v.number()),
     }),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),

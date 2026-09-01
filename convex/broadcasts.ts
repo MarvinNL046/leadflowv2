@@ -581,7 +581,12 @@ export const markFailed = internalMutation({
 export const bumpStatFromExternalId = internalMutation({
   args: {
     externalMessageId: v.string(),
-    field: v.union(v.literal("delivered"), v.literal("bounced"), v.literal("unsubscribed")),
+    field: v.union(
+      v.literal("delivered"),
+      v.literal("bounced"),
+      v.literal("unsubscribed"),
+      v.literal("opened"),
+    ),
   },
   handler: async (ctx, args) => {
     const message = await ctx.db
@@ -591,7 +596,9 @@ export const bumpStatFromExternalId = internalMutation({
     if (!message || message.relatedEntityType !== "broadcast" || !message.relatedEntityId) return;
     const b = await ctx.db.get(message.relatedEntityId as Id<"broadcasts">);
     if (!b) return;
-    await ctx.db.patch(b._id, { stats: { ...b.stats, [args.field]: b.stats[args.field] + 1 } });
+    await ctx.db.patch(b._id, {
+      stats: { ...b.stats, [args.field]: (b.stats[args.field] ?? 0) + 1 },
+    });
   },
 });
 
@@ -686,6 +693,32 @@ export const runBatch = internalAction({
     await ctx.scheduler.runAfter(BATCH_DELAY_MS, internal.broadcasts.runBatch, {
       broadcastId: args.broadcastId,
     });
+  },
+});
+
+/** Eenmalige backfill van stats.opened voor een al-verzonden broadcast:
+ *  telt de messages met readAt (unieke opens) via de ontvangerslijst.
+ *  Idempotent — zet de teller absoluut, bumpt niet. */
+export const backfillOpenedStat = internalMutation({
+  args: { broadcastId: v.id("broadcasts") },
+  handler: async (ctx, args) => {
+    const b = await ctx.db.get(args.broadcastId);
+    if (!b) return { opened: 0 };
+    const recipients = await ctx.db
+      .query("broadcastRecipients")
+      .withIndex("by_broadcast_status", (q) => q.eq("broadcastId", args.broadcastId))
+      .collect();
+    let opened = 0;
+    for (const r of recipients) {
+      if (!r.externalMessageId) continue;
+      const msg = await ctx.db
+        .query("messages")
+        .withIndex("by_external_id", (q) => q.eq("externalMessageId", r.externalMessageId))
+        .first();
+      if (msg?.readAt !== undefined) opened++;
+    }
+    await ctx.db.patch(args.broadcastId, { stats: { ...b.stats, opened } });
+    return { opened };
   },
 });
 
