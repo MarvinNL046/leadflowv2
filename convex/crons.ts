@@ -23,4 +23,15 @@ crons.interval(
   {},
 );
 
+// Elke 5 minuten: stilgevallen broadcast-verzendketens her-aantrappen
+// (mail-2-incident 1 sep 2026: één gecrashte runBatch = keten dood terwijl
+// de broadcast op "sending" blijft staan). Veilig: alleen her-aantrappen
+// als er pending-rijen zijn en geen runBatch meer ingepland staat.
+crons.interval(
+  "sweep-stalled-broadcasts",
+  { minutes: 5 },
+  internal.broadcasts.sweepStalledBroadcasts,
+  {},
+);
+
 export default crons;

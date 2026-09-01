@@ -689,6 +689,64 @@ export const runBatch = internalAction({
   },
 });
 
+/** Vangnet-cron (na het mail-2-incident van 1 sep 2026): Convex herstart
+ *  gecrashte scheduled actions niet, dus één runtime-fout in runBatch laat
+ *  de hele keten stilvallen terwijl de broadcast op "sending" blijft staan.
+ *  Deze sweep her-antrapt de keten alleen als er (a) nog pending-ontvangers
+ *  zijn én (b) geen runBatch meer ingepland/onderweg is — claimBatch is
+ *  atomisch, dus een her-aantrap kan nooit dubbel verzenden. Rijen die op
+ *  "sending" blijven hangen (mogelijk wél bij Resend bezorgd) worden bewust
+ *  NIET teruggezet naar pending: dat blijft handwerk met een Resend-check,
+ *  de veilige richting voor e-mail. We loggen ze alleen. */
+export const sweepStalledBroadcasts = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const sending = await ctx.db
+      .query("broadcasts")
+      .filter((q) => q.eq(q.field("status"), "sending"))
+      .collect();
+    for (const b of sending) {
+      // Startvertraging: addRecipients kan even duren; niets doen in de
+      // eerste 2 minuten na de start.
+      if (b.startedAt !== undefined && Date.now() - b.startedAt < 2 * 60_000) continue;
+      const pending = await ctx.db
+        .query("broadcastRecipients")
+        .withIndex("by_broadcast_status", (q) =>
+          q.eq("broadcastId", b._id).eq("status", "pending"),
+        )
+        .first();
+      if (!pending) continue;
+      const inflight = await ctx.db.system
+        .query("_scheduled_functions")
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("state.kind"), "pending"),
+            q.eq(q.field("state.kind"), "inProgress"),
+          ),
+        )
+        .collect();
+      const hasRunBatch = inflight.some(
+        (j) =>
+          j.name === "broadcasts.js:runBatch" &&
+          (j.args[0] as { broadcastId?: string } | undefined)?.broadcastId === (b._id as string),
+      );
+      if (hasRunBatch) continue;
+      const stuck = await ctx.db
+        .query("broadcastRecipients")
+        .withIndex("by_broadcast_status", (q) =>
+          q.eq("broadcastId", b._id).eq("status", "sending"),
+        )
+        .collect();
+      console.warn(
+        `[sweepStalledBroadcasts] Broadcast ${b._id} ("${b.name}") stilgevallen: keten her-aangetrapt. ${stuck.length} rijen staan op "sending" (handmatig checken tegen Resend).`,
+      );
+      await ctx.scheduler.runAfter(0, internal.broadcasts.runBatch, {
+        broadcastId: b._id,
+      });
+    }
+  },
+});
+
 // ── Resend batch-helper ──────────────────────────────────────────────
 async function postBatch(
   emails: Array<{
