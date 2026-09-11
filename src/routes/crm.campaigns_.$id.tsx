@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, usePaginatedQuery } from 'convex/react'
 import { ArrowLeft } from "@/components/icons"
@@ -8,6 +8,10 @@ import { Badge } from '#/components/ui/badge.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
+import { BroadcastEditor } from '#/components/crm/campaigns/broadcast-editor'
+import { htmlToBlocks } from '#/components/crm/campaigns/email-builder/html-to-blocks'
+import type { EmailBlock } from '../../convex/emailBlocks'
+import { humanizeConvexError } from '#/lib/errors'
 
 export const Route = createFileRoute('/crm/campaigns_/$id')({ component: BroadcastDetail })
 
@@ -39,8 +43,15 @@ function BroadcastDetail() {
   const preview = useQuery(api.broadcasts.previewHtml, { broadcastId: id as Id<'broadcasts'> })
   const cancel = useMutation(api.broadcasts.cancel)
   const schedule = useMutation(api.broadcasts.schedule)
+  const restore = useMutation(api.broadcasts.restoreDraft)
+  const [editing, setEditing] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [scheduleAt, setScheduleAt] = useState('')
   const [scheduleError, setScheduleError] = useState<string | null>(null)
+  useEffect(() => {
+    const date = b?.status === 'scheduled' && b.scheduledAt !== undefined ? new Date(b.scheduledAt) : null
+    setScheduleAt(date ? new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '')
+  }, [b?.scheduledAt, b?.status])
 
   const recipients = usePaginatedQuery(
     api.broadcasts.recipientsPage,
@@ -50,6 +61,22 @@ function BroadcastDetail() {
 
   if (b === undefined) return <Skeleton className="m-4 h-64" />
   if (b === null) return <p className="p-4 text-sm text-zinc-500">Broadcast niet gevonden.</p>
+  if (editing && b.status === 'draft') return (
+    <BroadcastEditor workspaceId={b.workspaceId} initialId={b._id}
+      initialName={b.name} initialSubject={b.subject} initialSegmentId={b.segmentId}
+      initialBlocks={(b.bodyBlocks as EmailBlock[] | undefined) ?? htmlToBlocks(b.body ?? '')}
+      onClose={() => setEditing(false)} />
+  )
+
+  async function changeStatus(action: 'cancel' | 'restore') {
+    setBusy(true)
+    setScheduleError(null)
+    try {
+      await (action === 'cancel' ? cancel : restore)({ broadcastId: b!._id })
+    } catch (err) {
+      setScheduleError(humanizeConvexError(err, 'Wijzigen mislukt.'))
+    } finally { setBusy(false) }
+  }
 
   const stat = (label: string, value: number) => (
     <div className="rounded-lg border border-zinc-200 p-4 text-center">
@@ -66,10 +93,11 @@ function BroadcastDetail() {
       return
     }
     try {
+      setBusy(true)
       await schedule({ broadcastId: b!._id, scheduledAt: when })
     } catch (err) {
-      setScheduleError(err instanceof Error ? err.message : 'Inplannen mislukt.')
-    }
+      setScheduleError(humanizeConvexError(err, 'Inplannen mislukt.'))
+    } finally { setBusy(false) }
   }
 
   return (
@@ -88,25 +116,35 @@ function BroadcastDetail() {
           )}
         </div>
         <div className="flex items-center gap-3">
-          <Badge>{b.status}</Badge>
+          <Badge>{{ draft: 'Concept', scheduled: 'Ingepland', sending: 'Wordt verzonden', sent: 'Verzonden', cancelled: 'Geannuleerd', failed: 'Mislukt' }[b.status]}</Badge>
+          {b.status === 'draft' && <Button onClick={() => setEditing(true)}>Mail bewerken</Button>}
+          {(b.status === 'scheduled' || b.status === 'cancelled') && b.startedAt === undefined && b.stats.total === 0 && (
+            <Button variant="outline" disabled={busy} onClick={() => void changeStatus('restore')}>
+              {b.status === 'cancelled' ? 'Herstellen als concept' : 'Terug naar concept'}
+            </Button>
+          )}
           {(b.status === 'sending' || b.status === 'scheduled') && (
-            <Button variant="outline" onClick={() => cancel({ broadcastId: b._id })}>Annuleren</Button>
+            <Button variant="outline" disabled={busy} onClick={() => void changeStatus('cancel')}>Annuleren</Button>
           )}
         </div>
       </div>
 
-      {b.status === 'draft' && (
+      {scheduleError && <p role="alert" className="text-sm text-red-600">{scheduleError}</p>}
+      {(b.status === 'draft' || b.status === 'scheduled') && (
         <Card>
-          <CardHeader><CardTitle className="text-sm">Inplannen</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-sm">{b.status === 'scheduled' ? 'Verzendmoment aanpassen' : 'Inplannen'}</CardTitle>
+            <p className="text-sm text-zinc-500">{b.status === 'scheduled' ? 'Kies een nieuw tijdstip of zet de campagne terug naar concept om de mail te bewerken.' : 'Uw concept wordt pas verzonden nadat u het inplant of zelf verstuurt.'}</p>
+          </CardHeader>
           <CardContent className="flex flex-wrap items-center gap-3">
             <input
               type="datetime-local"
+              aria-label="Verzenddatum en tijd"
               value={scheduleAt}
               onChange={(e) => setScheduleAt(e.target.value)}
               className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
             />
-            <Button onClick={() => void handleSchedule()}>Inplannen</Button>
-            {scheduleError && <p className="text-sm text-red-600">{scheduleError}</p>}
+            <span className="text-xs text-zinc-500">Tijdzone: {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
+            <Button disabled={busy} onClick={() => void handleSchedule()}>{b.status === 'scheduled' ? 'Nieuw tijdstip opslaan' : 'Inplannen'}</Button>
           </CardContent>
         </Card>
       )}

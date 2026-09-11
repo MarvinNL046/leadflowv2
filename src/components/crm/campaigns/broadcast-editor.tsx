@@ -20,25 +20,30 @@ export function BroadcastEditor({
   initialName,
   initialSubject,
   initialBlocks,
+  initialId,
+  initialSegmentId,
 }: {
   workspaceId: Id<'workspaces'>
   onClose: () => void
   initialName?: string
   initialSubject?: string
   initialBlocks?: EmailBlock[]
+  initialId?: Id<'broadcasts'>
+  initialSegmentId?: Id<'segments'>
 }) {
   const [name, setName] = useState(initialName ?? '')
   const [subject, setSubject] = useState(initialSubject ?? '')
   const [blocks, setBlocks] = useState<EmailBlock[]>(initialBlocks ?? [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [segmentId, setSegmentId] = useState<string>('')
-  const [draftId, setDraftId] = useState<Id<'broadcasts'> | null>(null)
+  const [segmentId, setSegmentId] = useState<string>(initialSegmentId ?? '')
+  const [draftId, setDraftId] = useState<Id<'broadcasts'> | null>(initialId ?? null)
   const [busy, setBusy] = useState(false)
 
   const segments = useQuery(api.segments.list, { workspaceId })
   const templates = useQuery(api.emailTemplates.list, { workspaceId })
   const crmSettings = useQuery(api.crmSettings.get, { workspaceId })
   const create = useMutation(api.broadcasts.create)
+  const update = useMutation(api.broadcasts.update)
   const sendTest = useAction(api.broadcasts.sendTest)
   const sendNow = useAction(api.broadcasts.sendNow)
 
@@ -57,7 +62,6 @@ export function BroadcastEditor({
     const b = createBlock(type, crypto.randomUUID())
     setBlocks((prev) => [...prev, b])
     setSelectedId(b.id)
-    setDraftId(null)
   }
 
   function updateBlock(id: string, props: Record<string, unknown>) {
@@ -66,13 +70,11 @@ export function BroadcastEditor({
         b.id === id ? ({ ...b, props: { ...b.props, ...props } } as EmailBlock) : b,
       ),
     )
-    setDraftId(null)
   }
 
   function deleteBlock(id: string) {
     setBlocks((prev) => prev.filter((b) => b.id !== id))
     if (selectedId === id) setSelectedId(null)
-    setDraftId(null)
   }
 
   function moveBlock(id: string, dir: -1 | 1) {
@@ -85,7 +87,6 @@ export function BroadcastEditor({
       ;[next[idx], next[newIdx]] = [next[newIdx], next[idx]]
       return next
     })
-    setDraftId(null)
   }
 
   // ── Save / test / send ─────────────────────────────────────────────────────
@@ -95,17 +96,33 @@ export function BroadcastEditor({
     if (!subject) throw new Error('Vul een onderwerp in')
     if (blocks.length === 0) throw new Error('Voeg minimaal één blok toe')
     if (!segmentId) throw new Error('Kies een segment')
-    if (draftId) return draftId
-    const id = await create({
-      workspaceId,
+    const fields = {
       name,
       subject,
       body: renderBlocksToHtml(blocks),
       bodyBlocks: blocks,
       segmentId: segmentId as Id<'segments'>,
-    })
+    }
+    if (draftId) {
+      await update({ broadcastId: draftId, ...fields })
+      return draftId
+    }
+    const id = await create({ workspaceId, ...fields })
     setDraftId(id)
     return id
+  }
+
+  const onSave = async () => {
+    setBusy(true)
+    try {
+      await saveDraft()
+      toast.success('Concept opgeslagen')
+      onClose()
+    } catch (e) {
+      toast.error(humanizeConvexError(e, 'Opslaan mislukt'))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const onTest = async () => {
@@ -148,6 +165,7 @@ export function BroadcastEditor({
         {/* Left: back button */}
         <button
           onClick={onClose}
+          disabled={busy}
           className="flex items-center gap-1.5 rounded px-2 py-1.5 text-sm text-zinc-600 hover:bg-zinc-100"
         >
           <ArrowLeft size={16} />
@@ -162,18 +180,19 @@ export function BroadcastEditor({
             className="max-w-xs"
             placeholder="Interne naam"
             value={name}
-            onChange={(e) => { setName(e.target.value); setDraftId(null) }}
+            onChange={(e) => { setName(e.target.value) }}
           />
           <Input
             className="max-w-xs"
             placeholder="Onderwerp van de mail"
             value={subject}
-            onChange={(e) => { setSubject(e.target.value); setDraftId(null) }}
+            onChange={(e) => { setSubject(e.target.value) }}
           />
         </div>
 
         {/* Right: actions */}
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onSave} disabled={busy}>Concept opslaan</Button>
           <Button variant="outline" onClick={onTest} disabled={busy}>
             Testmail
           </Button>
@@ -197,7 +216,7 @@ export function BroadcastEditor({
             <select
               className="w-full rounded border border-zinc-200 px-2 py-1.5 text-sm text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-400"
               value={segmentId}
-              onChange={(e) => { setSegmentId(e.target.value); setDraftId(null) }}
+              onChange={(e) => { setSegmentId(e.target.value) }}
             >
               <option value="">— kies segment —</option>
               {segments?.map((s) => (
@@ -227,7 +246,6 @@ export function BroadcastEditor({
                     if (t) {
                       setBlocks((t.bodyBlocks as EmailBlock[] | undefined) ?? htmlToBlocks(t.body ?? ''))
                       if (!subject) setSubject(t.subject)
-                      setDraftId(null)
                     }
                     // reset select back to placeholder
                     e.target.value = ''

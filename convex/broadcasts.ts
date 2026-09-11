@@ -173,8 +173,47 @@ export const cancel = mutation({
     if (!b) return;
     await requireWorkspace(ctx, b.workspaceId);
     if (b.status === "scheduled" || b.status === "sending") {
+      if (b.scheduledJobId) await ctx.scheduler.cancel(b.scheduledJobId);
       await ctx.db.patch(args.broadcastId, { status: "cancelled" });
     }
+  },
+});
+
+export const update = mutation({
+  args: {
+    broadcastId: v.id("broadcasts"), name: v.string(), subject: v.string(),
+    body: v.string(), bodyBlocks: v.optional(v.array(v.any())), segmentId: v.id("segments"),
+  },
+  returns: v.null(),
+  handler: async (ctx, { broadcastId, ...fields }) => {
+    const b = await ctx.db.get(broadcastId);
+    if (!b) throw new Error("Campagne niet gevonden.");
+    await requireWorkspace(ctx, b.workspaceId);
+    if (b.status !== "draft") throw new Error("Zet de campagne eerst terug naar concept.");
+    const segment = await ctx.db.get(fields.segmentId);
+    if (!segment || segment.workspaceId !== b.workspaceId) throw new Error("Ongeldig segment.");
+    if (!fields.name.trim() || !fields.subject.trim() || !fields.body.trim()) throw new Error("Vul naam, onderwerp en inhoud in.");
+    await ctx.db.patch(broadcastId, fields);
+    return null;
+  },
+});
+
+export const restoreDraft = mutation({
+  args: { broadcastId: v.id("broadcasts") },
+  returns: v.null(),
+  handler: async (ctx, { broadcastId }) => {
+    const b = await ctx.db.get(broadcastId);
+    if (!b) throw new Error("Campagne niet gevonden.");
+    await requireWorkspace(ctx, b.workspaceId);
+    if (b.status !== "cancelled" && b.status !== "scheduled") throw new Error("Deze campagne kan niet worden hersteld.");
+    const recipient = await ctx.db.query("broadcastRecipients")
+      .withIndex("by_broadcast_status", q => q.eq("broadcastId", broadcastId)).first();
+    if (b.startedAt !== undefined || b.stats.total > 0 || b.stats.sent > 0 || recipient) {
+      throw new Error("De verzending is al gestart. Maak een nieuwe campagne om dubbele mails te voorkomen.");
+    }
+    if (b.scheduledJobId) await ctx.scheduler.cancel(b.scheduledJobId);
+    await ctx.db.patch(broadcastId, { status: "draft", scheduledAt: undefined, scheduledJobId: undefined });
+    return null;
   },
 });
 
@@ -298,30 +337,32 @@ export const schedule = mutation({
     const b = await ctx.db.get(args.broadcastId);
     if (!b) throw new Error("Broadcast niet gevonden");
     await requireWorkspace(ctx, b.workspaceId);
-    if (b.status !== "draft") {
-      throw new Error("Alleen een concept kan worden ingepland.");
+    if (b.status !== "draft" && b.status !== "scheduled") {
+      throw new Error("Alleen een concept of ingeplande campagne kan worden ingepland.");
     }
-    if (args.scheduledAt <= Date.now()) {
+    if (!Number.isFinite(args.scheduledAt) || args.scheduledAt <= Date.now()) {
       throw new Error("Kies een moment in de toekomst.");
     }
-    await ctx.db.patch(args.broadcastId, {
-      status: "scheduled",
+    if (b.scheduledJobId) await ctx.scheduler.cancel(b.scheduledJobId);
+    const scheduledJobId = await ctx.scheduler.runAt(args.scheduledAt, internal.broadcasts.runScheduled, {
+      broadcastId: args.broadcastId,
       scheduledAt: args.scheduledAt,
     });
-    await ctx.scheduler.runAt(args.scheduledAt, internal.broadcasts.runScheduled, {
-      broadcastId: args.broadcastId,
-    });
+    await ctx.db.patch(args.broadcastId, { status: "scheduled", scheduledAt: args.scheduledAt, scheduledJobId });
   },
 });
 
 /** Atomische guard voor de ingeplande start (scheduled→sending). Een
  *  geannuleerde of al gestarte broadcast geeft { started: false }. */
 export const beginScheduledSend = internalMutation({
-  args: { broadcastId: v.id("broadcasts") },
+  args: { broadcastId: v.id("broadcasts"), scheduledAt: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const b = await ctx.db.get(args.broadcastId);
     if (!b) return { started: false as const };
     if (b.status !== "scheduled") return { started: false as const };
+    // Legacy jobs have no timestamp: they must still respect the current slot.
+    if (b.scheduledAt === undefined || b.scheduledAt > Date.now()) return { started: false as const };
+    if (args.scheduledAt !== undefined && args.scheduledAt !== b.scheduledAt) return { started: false as const };
     await ctx.db.patch(args.broadcastId, { status: "sending", startedAt: Date.now() });
     return { started: true as const };
   },
@@ -330,10 +371,11 @@ export const beginScheduledSend = internalMutation({
 /** Door de scheduler afgevuurd op scheduledAt. Geen auth (system-scheduled,
  *  zelfde model als runBatch); de autorisatie zat op de schedule-mutatie. */
 export const runScheduled = internalAction({
-  args: { broadcastId: v.id("broadcasts") },
+  args: { broadcastId: v.id("broadcasts"), scheduledAt: v.optional(v.number()) },
   handler: async (ctx, args): Promise<void> => {
     const begin = await ctx.runMutation(internal.broadcasts.beginScheduledSend, {
       broadcastId: args.broadcastId,
+      scheduledAt: args.scheduledAt,
     });
     if (!begin.started) return; // geannuleerd of al gestart — stil stoppen
     try {

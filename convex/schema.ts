@@ -409,6 +409,7 @@ export default defineSchema({
       v.literal("failed"),
     ),
     scheduledAt: v.optional(v.number()),
+    scheduledJobId: v.optional(v.id("_scheduled_functions")),
     stats: v.object({
       total: v.number(),
       sent: v.number(),
