@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   createFileRoute,
   Outlet,
+  Link,
   useNavigate,
   useRouterState,
 } from '@tanstack/react-router'
@@ -47,6 +48,8 @@ function CrmShell() {
     setDrawerOpen(false)
   }, [pathname])
 
+  if(tenants?.length===0)return <main className="mx-auto max-w-xl space-y-4 p-8"><h1 className="text-2xl font-bold">Welkom bij LeadFlow</h1><p>Maak je bedrijfsomgeving aan of accepteer een uitnodiging van je team.</p><Link className="text-violet-700 underline" to="/aan-de-slag">Aan de slag</Link></main>
+
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Desktop sidebar (md+) */}
@@ -65,7 +68,7 @@ function CrmShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <CrmTopbar onMenuClick={() => setDrawerOpen(true)} />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          {['/crm/settings','/crm/workflows','/crm/campaigns'].some(path => pathname === path || pathname.startsWith(path + '/')) && !canManage
+          {pathname!=='/crm/settings/handleiding' && ['/crm/settings','/crm/workflows','/crm/campaigns'].some(path => pathname === path || pathname.startsWith(path + '/')) && !canManage
             ? <p>{tenants === undefined ? 'Rechten laden…' : 'Alleen een eigenaar of bedrijfsbeheerder kan deze instellingen beheren.'}</p>
             : <Outlet />}
         </main>

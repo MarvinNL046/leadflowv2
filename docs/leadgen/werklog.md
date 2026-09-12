@@ -285,3 +285,11 @@ Publicatiebevestiging LG-041: Vercel dpl_8H95nJGcdCa89XAqe4ryN5xx32cr READY, pro
 [Technisch bereik](sms-whatsapp-bewaking-20260912.md); [bedrijfshandleiding](bedrijfshandleiding-koppelingen.md). Eén alleen-lezen providerrequest voor de vorm van de apparaatlijst, verder uitsluitend gesimuleerd verkeer. Geen echte berichten of providerinstellingen gewijzigd. Geen SEO-werk.
 
 Publicatiebevestiging LG-042: Vercel dpl_6MdUSAz9HXpbH3C2Vv1fnaMVpqgX READY, productiecommit b503d736c223c7df1deb33a878193a7555d8c382. Live alleen-lezen: vanuit Instellingen SMS geopend, apparaatvelden en uitleg over SIM/geen onlinebewijs zichtbaar. Handleiding toont SMS-benodigdheden, stappen en WhatsApp-bewaking/herstel. WhatsApp-pagina toont kwartiercontrole, blokkade bij mislukte controle en ontbreken van storingsmail. Bestaande providerconfiguratie blijft aanwezig. Geen echte koppeling aangemaakt of controleknop op een productieaccount gebruikt.
+
+## Bedrijfsregistratie, team en signaaluitleg — 12 september 2026
+
+| ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
+|---|---|---|---|---|---|---|---|---|---|
+| LG-043 | 2026-09-12 | leadflowv2 | /aan-de-slag, /crm/settings/team, CRM-instap, instellingen, handleiding, /crm/webhook-signalen; companyOnboarding en companyInvites | Eigen bedrijfsomgeving en pipeline, veilige uitnodigingscodes en toegang intrekken; bedrijfshandleiding; infobox met bron, betekenis en onderzoeklinks bij signalen | Klaar voor publicatie | 471 tests/50 bestanden; Convex-TypeScript en Vite-build; algemene TypeScript bestaande diagnostiek | Deze wijziging | Nog niet bevestigd | Livecontrole, daarna proef met afzonderlijk bedrijfsaccount en maandag echte telefoonproef |
+
+[Exact bereik en beperkingen](bedrijfsregistratie-team-20260912.md). Geen echte accounts of uitnodigingen aangemaakt, geen productieleden verwijderd en geen berichten verstuurd. Historische signalen bevatten geen bericht-ID; de exacte oorspronkelijke mail is niet gereconstrueerd. Geen SEO-werk.

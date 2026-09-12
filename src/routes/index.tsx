@@ -12,7 +12,7 @@ function Home() {
       <div className="mx-auto max-w-3xl">
         <h1 className="text-4xl font-bold text-zinc-900">LeadFlow v2</h1>
         <p className="mt-2 text-zinc-500">
-          TanStack Start + Convex + shadcn — rebuild in progress
+          Je klanten, verkoop en communicatie op één plek.
         </p>
 
         <div className="mt-8">
@@ -102,8 +102,7 @@ function AuthenticatedView() {
           <p className="mt-1 text-sm text-zinc-500">Laden…</p>
         ) : tenants.length === 0 ? (
           <p className="mt-1 text-sm text-amber-600">
-            Geen memberships gevonden. Wacht op een uitnodiging van een
-            super-admin.
+            Nog geen bedrijfsomgeving. <Link to="/aan-de-slag" className="underline">Maak je bedrijf aan of accepteer een teamuitnodiging.</Link>
           </p>
         ) : (
           <ul className="mt-2 space-y-2">
@@ -137,15 +136,7 @@ function AuthenticatedView() {
       </div>
 
       <div className="mt-4 rounded-md border border-dashed border-zinc-200 p-4 text-sm text-zinc-500">
-        <p className="font-medium text-zinc-700">Volgende v2-stappen:</p>
-        <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>Contacts: detail-page + edit + delete</li>
-          <li>Pipeline / Kanban (opportunities)</li>
-          <li>Messaging unified table queries</li>
-          <li>Workflow engine (Snelle Response port)</li>
-          <li>Meta webhook (via Convex HTTP action)</li>
-          <li>Invite-flow voor non-super-admin users</li>
-        </ul>
+        <Link to="/aan-de-slag" className="font-medium text-violet-700 underline">Startoverzicht: bedrijf, team en koppelingen</Link>
       </div>
     </div>
   )

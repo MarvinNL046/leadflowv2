@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AanDeSlagRouteImport } from './routes/aan-de-slag'
 import { Route as CrmRouteImport } from './routes/crm'
 import { Route as FeedRouteImport } from './routes/feed'
 import { Route as LoginRouteImport } from './routes/login'
@@ -40,6 +41,7 @@ import { Route as CrmSettingsLeadFlowRouteImport } from './routes/crm.settings_.
 import { Route as CrmSettingsMetaRouteImport } from './routes/crm.settings_.meta'
 import { Route as CrmSettingsPipelineRouteImport } from './routes/crm.settings_.pipeline'
 import { Route as CrmSettingsSmsRouteImport } from './routes/crm.settings_.sms'
+import { Route as CrmSettingsTeamRouteImport } from './routes/crm.settings_.team'
 import { Route as CrmSettingsTemplatesRouteImport } from './routes/crm.settings_.templates'
 import { Route as CrmSettingsWhatsappRouteImport } from './routes/crm.settings_.whatsapp'
 import { Route as CrmWorkflowsIdRouteImport } from './routes/crm.workflows_.$id'
@@ -48,6 +50,11 @@ import { Route as FeedLeadIdRouteImport } from './routes/feed.lead_.$id'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AanDeSlagRoute = AanDeSlagRouteImport.update({
+  id: '/aan-de-slag',
+  path: '/aan-de-slag',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CrmRoute = CrmRouteImport.update({
@@ -201,6 +208,11 @@ const CrmSettingsSmsRoute = CrmSettingsSmsRouteImport.update({
   path: '/settings/sms',
   getParentRoute: () => CrmRoute,
 } as any)
+const CrmSettingsTeamRoute = CrmSettingsTeamRouteImport.update({
+  id: '/settings_/team',
+  path: '/settings/team',
+  getParentRoute: () => CrmRoute,
+} as any)
 const CrmSettingsTemplatesRoute = CrmSettingsTemplatesRouteImport.update({
   id: '/settings_/templates',
   path: '/settings/templates',
@@ -224,6 +236,7 @@ const FeedLeadIdRoute = FeedLeadIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/aan-de-slag': typeof AanDeSlagRoute
   '/crm': typeof CrmRouteWithChildren
   '/feed': typeof FeedRouteWithChildren
   '/login': typeof LoginRoute
@@ -254,6 +267,7 @@ export interface FileRoutesByFullPath {
   '/crm/settings/meta': typeof CrmSettingsMetaRoute
   '/crm/settings/pipeline': typeof CrmSettingsPipelineRoute
   '/crm/settings/sms': typeof CrmSettingsSmsRoute
+  '/crm/settings/team': typeof CrmSettingsTeamRoute
   '/crm/settings/templates': typeof CrmSettingsTemplatesRoute
   '/crm/settings/whatsapp': typeof CrmSettingsWhatsappRoute
   '/crm/workflows/$id': typeof CrmWorkflowsIdRoute
@@ -261,6 +275,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/aan-de-slag': typeof AanDeSlagRoute
   '/login': typeof LoginRoute
   '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
@@ -289,6 +304,7 @@ export interface FileRoutesByTo {
   '/crm/settings/meta': typeof CrmSettingsMetaRoute
   '/crm/settings/pipeline': typeof CrmSettingsPipelineRoute
   '/crm/settings/sms': typeof CrmSettingsSmsRoute
+  '/crm/settings/team': typeof CrmSettingsTeamRoute
   '/crm/settings/templates': typeof CrmSettingsTemplatesRoute
   '/crm/settings/whatsapp': typeof CrmSettingsWhatsappRoute
   '/crm/workflows/$id': typeof CrmWorkflowsIdRoute
@@ -297,6 +313,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/aan-de-slag': typeof AanDeSlagRoute
   '/crm': typeof CrmRouteWithChildren
   '/feed': typeof FeedRouteWithChildren
   '/login': typeof LoginRoute
@@ -327,6 +344,7 @@ export interface FileRoutesById {
   '/crm/settings_/meta': typeof CrmSettingsMetaRoute
   '/crm/settings_/pipeline': typeof CrmSettingsPipelineRoute
   '/crm/settings_/sms': typeof CrmSettingsSmsRoute
+  '/crm/settings_/team': typeof CrmSettingsTeamRoute
   '/crm/settings_/templates': typeof CrmSettingsTemplatesRoute
   '/crm/settings_/whatsapp': typeof CrmSettingsWhatsappRoute
   '/crm/workflows_/$id': typeof CrmWorkflowsIdRoute
@@ -336,6 +354,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/aan-de-slag'
     | '/crm'
     | '/feed'
     | '/login'
@@ -366,6 +385,7 @@ export interface FileRouteTypes {
     | '/crm/settings/meta'
     | '/crm/settings/pipeline'
     | '/crm/settings/sms'
+    | '/crm/settings/team'
     | '/crm/settings/templates'
     | '/crm/settings/whatsapp'
     | '/crm/workflows/$id'
@@ -373,6 +393,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/aan-de-slag'
     | '/login'
     | '/crm/campaigns'
     | '/crm/contacts'
@@ -401,6 +422,7 @@ export interface FileRouteTypes {
     | '/crm/settings/meta'
     | '/crm/settings/pipeline'
     | '/crm/settings/sms'
+    | '/crm/settings/team'
     | '/crm/settings/templates'
     | '/crm/settings/whatsapp'
     | '/crm/workflows/$id'
@@ -408,6 +430,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/aan-de-slag'
     | '/crm'
     | '/feed'
     | '/login'
@@ -438,6 +461,7 @@ export interface FileRouteTypes {
     | '/crm/settings_/meta'
     | '/crm/settings_/pipeline'
     | '/crm/settings_/sms'
+    | '/crm/settings_/team'
     | '/crm/settings_/templates'
     | '/crm/settings_/whatsapp'
     | '/crm/workflows_/$id'
@@ -446,6 +470,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AanDeSlagRoute: typeof AanDeSlagRoute
   CrmRoute: typeof CrmRouteWithChildren
   FeedRoute: typeof FeedRouteWithChildren
   LoginRoute: typeof LoginRoute
@@ -459,6 +484,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/aan-de-slag': {
+      id: '/aan-de-slag'
+      path: '/aan-de-slag'
+      fullPath: '/aan-de-slag'
+      preLoaderRoute: typeof AanDeSlagRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/crm': {
@@ -671,6 +703,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmSettingsSmsRouteImport
       parentRoute: typeof CrmRoute
     }
+    '/crm/settings_/team': {
+      id: '/crm/settings_/team'
+      path: '/settings/team'
+      fullPath: '/crm/settings/team'
+      preLoaderRoute: typeof CrmSettingsTeamRouteImport
+      parentRoute: typeof CrmRoute
+    }
     '/crm/settings_/templates': {
       id: '/crm/settings_/templates'
       path: '/settings/templates'
@@ -725,6 +764,7 @@ interface CrmRouteChildren {
   CrmSettingsMetaRoute: typeof CrmSettingsMetaRoute
   CrmSettingsPipelineRoute: typeof CrmSettingsPipelineRoute
   CrmSettingsSmsRoute: typeof CrmSettingsSmsRoute
+  CrmSettingsTeamRoute: typeof CrmSettingsTeamRoute
   CrmSettingsTemplatesRoute: typeof CrmSettingsTemplatesRoute
   CrmSettingsWhatsappRoute: typeof CrmSettingsWhatsappRoute
   CrmWorkflowsIdRoute: typeof CrmWorkflowsIdRoute
@@ -753,6 +793,7 @@ const CrmRouteChildren: CrmRouteChildren = {
   CrmSettingsMetaRoute: CrmSettingsMetaRoute,
   CrmSettingsPipelineRoute: CrmSettingsPipelineRoute,
   CrmSettingsSmsRoute: CrmSettingsSmsRoute,
+  CrmSettingsTeamRoute: CrmSettingsTeamRoute,
   CrmSettingsTemplatesRoute: CrmSettingsTemplatesRoute,
   CrmSettingsWhatsappRoute: CrmSettingsWhatsappRoute,
   CrmWorkflowsIdRoute: CrmWorkflowsIdRoute,
@@ -780,6 +821,7 @@ const FeedRouteWithChildren = FeedRoute._addFileChildren(FeedRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AanDeSlagRoute: AanDeSlagRoute,
   CrmRoute: CrmRouteWithChildren,
   FeedRoute: FeedRouteWithChildren,
   LoginRoute: LoginRoute,
