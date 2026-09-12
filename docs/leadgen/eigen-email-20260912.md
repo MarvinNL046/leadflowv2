@@ -22,3 +22,5 @@ Geen productiecredentials, providerwebhooks of echte berichten aangemaakt. Een e
 Providercontrole gebaseerd op de officiële [Resend-webhookdocumentatie](https://resend.com/docs/api-reference/webhooks/get-webhook) en [domeinverificatie](https://resend.com/docs/dashboard/domains/introduction).
 
 Aanbevolen vervolg: bedrijfsgebonden WhatsApp-inrichting met een aantoonbaar juiste sessie, daarna SMS en onboarding. Echte SMS/inboundtest met de kantoor-telefoon blijft open.
+
+Live bevestigd: PR #37, commit 07902b342ef103480a186c924427af77ec881d61; Vercel dpl_BkCkdWSXot6nWpRSWvzUo65paDBd READY. Instellingenlink en lege e-mailconfiguratie alleen-lezen in de browser gecontroleerd. Productie heeft de benodigde encryptiesleutelconfiguratie en webhookbasis-URL. Er is nog geen eigen account aangesloten.
