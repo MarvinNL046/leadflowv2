@@ -198,6 +198,9 @@ export function SidebarContent({
                 location.pathname === '/crm/leadgen' ? 'bg-[#312e81] text-white shadow-sm' : 'text-zinc-700 hover:bg-[#ede9fe] hover:text-[#312e81]')}>
               <Store className="h-4 w-4 shrink-0" />Binnengekomen leads
             </Link>
+            <Link to="/crm/webhook-signalen" onClick={onNavigate} className={cn("flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium",location.pathname==='/crm/webhook-signalen'?'bg-[#312e81] text-white':'text-zinc-700 hover:bg-[#ede9fe]')}>
+              <Store className="h-4 w-4 shrink-0" />Webhooksignalen
+            </Link>
           </section>
         )}
 

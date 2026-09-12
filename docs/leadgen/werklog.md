@@ -245,3 +245,11 @@ Publicatiebevestiging LG-037: Vercel dpl_BcgVyEZnRdJpj5Y5dPvAvGPPcm6T READY, com
 [Exact bereik en beperkingen](inkomende-bedrijfsrouting-20260912.md). Geen echte berichten verstuurd of providerconfiguratie gewijzigd. Onbekende mapping geeft skipped zonder klantdata op te slaan; nog geen quarantaine/replay. Nieuwe bedrijven blijven geblokkeerd voor legacy-accounts. Geen SEO-werk.
 
 Publicatiebevestiging LG-038: Live op 12 september 2026 via PR #33, commit 4a856fd8083f896e81931b370fbcbebbf111fab9. Vercel dpl_Bp1cbpxaajqoMNLBV7sJh4ss58Yj READY. Alleen-lezen productiequeries bevestigen dat zowel de bestaande WhatsApp-sessie als het legacy-SMS-account naar de bestaande Staycool-workspace wijzen. Geen echte webhook met klantbericht ingestuurd; daadwerkelijke providerpayloadtest blijft open.
+
+## Webhooksignalen in platformbeheer — 12 september 2026
+
+| ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
+|---|---|---|---|---|---|---|---|---|---|
+| LG-039 | 2026-09-12 | leadflowv2 | /crm/webhook-signalen; sidebar; webhookSignals/Reviews; SMS/WA/Resend-webhooks en receipt-matching | Privacyarme signalen per kanaal/oorzaak; platformadmin-overzicht; controle met note/audit/count-check; nieuwe melding heropent | Getest; publicatie volgt | 414 tests/45 bestanden; Convex-TypeScript en productiebuild; algemene TypeScript bestaande diagnostiek | codex/webhook-signalen-20260912 | — | Echte inkomende test en eigen provideraccount-inrichting; geen automatische herverwerking |
+
+[Exact bereik en beperkingen](webhook-signalen-20260912.md). Geen echte berichten of testwebhooks naar productie gestuurd; geen providerconfiguratie gewijzigd. Geen historische reconstructie, berichtinhoud, secrets of automatische meldingen. Controle markeert alleen de signalengroep. Geen SEO-wijzigingen.
