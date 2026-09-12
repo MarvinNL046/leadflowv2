@@ -156,3 +156,11 @@ De gebruiker bevestigde airco-installatie in heel Limburg en drie kopers totaal.
 
 Publicatie en productiecontrole: [Staycool-pilot](staycool-pilot-20260912.md). Twaalf ongekochte gepubliceerde aanvragen zijn begrensd op drie kopers; prijzen, dienst en vervaldatum behouden. 305 tests, Convex-TypeScript en productiebuild geslaagd. Werkgebied en meldingen live gecontroleerd. Automatisch verlopen staat uit; opvolgbeleid voor nieuwe airco-installatieaanvragen staat op 24 uur.
 
+
+## Oude aanvragen beoordelen — 12 september 2026
+
+| ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
+|---|---|---|---|---|---|---|---|---|---|
+| LG-029 | 2026-09-12 | leadflowv2 | 12 gepubliceerde aanvragen; /crm/leadgen | Alle oude aanvragen read-only beoordeeld; oorspronkelijke importdatum en historische reviewstatus onderzocht. Beheer toont aanvraag- en importdatum apart, type werk en waarschuwing bij oude pending_review-status | Getest; publicatie volgt | 32 gerichte tests, Convex-TypeScript en Vite-build; geen productiemutaties of berichten | Branch codex/oude-aanvragen-review-20260912 | — | Actuele behoefte eerst herbevestigen; daarna dienst vastleggen |
+
+De zeven Limburgse airco-aanvragen zijn geïmporteerd op 23 juli, maar oorspronkelijk ontvangen van 23 mei tot 4 juli (circa 70–112 dagen oud op controlemoment). De eerdere leeftijdsindicatie op basis van de v2-opslagdatum onderschatte hun ouderdom. Alle zeven hadden in v1 de status pending_review; historische e-mailbevestiging staat alleen in importmetadata. Deze gegevens worden als historische aanwijzing weergegeven, niet gebruikt om verkoop- of verificatiestatus automatisch te wijzigen. Alle twaalf aanvragen missen een gestructureerd type werk; huidige behoefte is nergens opnieuw bevestigd. Het dossier met beoordeling per aanvraag is alleen in de lokale taakoutputs opgeslagen, zonder consumentnamen of contactgegevens. Geen SEO-pagina's gewijzigd.

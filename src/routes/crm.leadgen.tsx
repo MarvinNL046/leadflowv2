@@ -50,7 +50,7 @@ function LeadgenOverview() {
       <header>
         <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Leadgenbeheer</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Binnengekomen leads</h1>
-        <p className="mt-2 text-sm text-zinc-500">Alle opgeslagen websiteaanvragen in LeadFlow v2, met bron en opvolging. Nieuwste eerst.</p>
+        <p className="mt-2 text-sm text-zinc-500">Alle opgeslagen websiteaanvragen in LeadFlow v2, met bron en opvolging. Nieuwste opslag eerst; bij imports staat de oorspronkelijke aanvraagdatum apart.</p>
       </header>
 
       <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border bg-white p-4">
@@ -91,7 +91,10 @@ function LeadgenOverview() {
             <div className="min-w-0">
               <h2 className="font-semibold text-zinc-900">{lead.name}</h2>
               <p className="mt-1 break-all text-sm text-indigo-700">{lead.source}</p>
-              <p className="mt-1 text-xs text-zinc-500">{date(lead.createdAt)} · {lead.niche} · {statuses[lead.status] ?? lead.status}</p>
+              <p className="mt-1 text-xs text-zinc-500">{lead.imported ? 'Geïmporteerd op ' : 'Ontvangen op '}{date(lead.createdAt)} · {lead.niche} · {statuses[lead.status] ?? lead.status}</p>
+              {lead.imported && <p className="mt-1 text-xs text-zinc-500">Oorspronkelijke aanvraag: {lead.originalRequestedAt ? date(lead.originalRequestedAt) : 'datum onbekend'}</p>}
+              <p className="mt-1 text-xs text-zinc-500">Type werk: {({install:'Installeren',repair:'Repareren',maintain:'Onderhouden'} as Record<string,string>)[lead.serviceType ?? ''] ?? 'Nog vaststellen'}</p>
+              {lead.importedPendingReview && <p className="mt-2 rounded-md bg-amber-50 p-2 text-sm text-amber-900">Bij import was deze aanvraag nog te beoordelen. Controleer de actuele behoefte en het type werk voordat je deze als actuele lead aanbiedt.</p>}
               {lead.expiresAt && <p className="mt-1 text-xs text-zinc-500">Verkooptermijn tot {date(lead.expiresAt)}</p>}
               {lead.unclaimedAt && <p className="mt-2 rounded-md bg-amber-50 p-2 text-sm font-medium text-amber-900">Opvolging nodig: nog geen koper bij het verstrijken van de opvolgtermijn.</p>}
             </div>

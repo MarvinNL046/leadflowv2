@@ -5,11 +5,29 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { api, internal } from './_generated/api';
 import schema from './schema';
 import { hashApiKey } from './marketplace/apiKeys';
+import { importHistory } from './marketplace/admin';
 
 const modules = import.meta.glob('./**/*.ts');
 const rawKey = 'lmk_local_test_only_12345678901234567890';
 const payload = { firstName: 'Test', lastName: 'Aanvraag', phone: '+31612345678', email: 'test@example.com', postalCode: '6222XD', nicheData: { amount_rooms: 2 } };
 const fetchMock = vi.fn();
+test.each([null,[],{v1CreatedAt:'2026-05-23T07:33:31.138Z'},
+  {v1Import:true,v1CreatedAt:'invalid'},{v1Import:true,v1CreatedAt:'2026-02-30T00:00:00.000Z'},
+  {v1Import:true,v1CreatedAt:'2027-01-01T00:00:00.000Z'}])('invalid or unmarked import date stays unknown: %j', metadata=>{
+  expect(importHistory(metadata,Date.parse('2026-09-12T00:00:00Z')).originalRequestedAt).toBeNull();
+});
+
+test('admin sees original import evidence without changing sale or verification status',async()=>{
+  const {t,admin,buyer,keyId}=await setup();
+  const {leadId}=await t.mutation(internal.marketplace.intake.insertLead,{...payload,apiKeyId:keyId});
+  await t.run(ctx=>ctx.db.patch(leadId,{metadata:{v1Import:true,v1CreatedAt:'2026-05-23T07:33:31.138Z',v1Status:'pending_review',v1EmailVerifiedAt:'2026-05-23T07:33:30.883Z'}}));
+  const before=await t.run(ctx=>ctx.db.get(leadId));
+  const result=await admin.query(api.marketplace.admin.listLeads,{paginationOpts:{cursor:null,numItems:25}});
+  expect(result.page[0]).toMatchObject({imported:true,originalRequestedAt:Date.parse('2026-05-23T07:33:31.138Z'),importedPendingReview:true,serviceType:null,emailVerified:false,status:'published'});
+  expect(await t.run(ctx=>ctx.db.get(leadId))).toEqual(before);
+  await expect(buyer.query(api.marketplace.admin.listLeads,{paginationOpts:{cursor:null,numItems:25}})).rejects.toThrow();
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+});
 beforeEach(() => {
   vi.useFakeTimers();
   vi.stubEnv('RESEND_API_KEY', 'test-only');
