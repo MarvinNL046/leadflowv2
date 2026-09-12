@@ -22,4 +22,4 @@ Alleen-lezen productie-inventaris: één bestaande Staycool-organisatie en één
 
 Dit is een veilige tussenstap, geen volledige selfserviceproviderconfiguratie. Nieuwe bedrijven hebben nog geen eigen werkende communicatie. Inkomende e-mail/SMS/WhatsApp-webhooks en delivery receipts gebruiken nog legacy-routing; die moeten aan provideraccount, sessie en bedrijf worden gekoppeld voordat eigen accounts voor andere bedrijven worden geactiveerd. Daarna versleutelde bedrijfscredentials, afzenderverificatie, beheerformulieren en verbindingscontrole; daarna pas bedrijfsregistratie/teamuitnodigingen openen. Meta heeft bestaande bedrijfsrouting en is in deze stap niet gewijzigd. Marketplace-verificatie en platformmeldingen blijven platformcommunicatie.
 
-Status: getest; publicatie volgt.
+Live op 12 september 2026 via PR #31, commit 436b5a81f155ff21a00c5e5e82e9d50afac33950. Vercel dpl_BcgVyEZnRdJpj5Y5dPvAvGPPcm6T READY. Live instellingen tonen het bedrijfsgebonden statusoverzicht voor de bestaande owner; geen echte provideractie uitgevoerd.
