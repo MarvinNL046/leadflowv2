@@ -1,5 +1,6 @@
+import {requireActiveInbound} from './companyWhatsapp';
 import {recordSignal} from './webhookSignals';
-import {findLegacyReceipt,findCompanyEmailReceipt} from './providerRouting';
+import {findLegacyReceipt,findCompanyEmailReceipt,findCompanyWhatsappReceipt} from './providerRouting';
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { getUserId } from "./lib/identity";
@@ -75,8 +76,9 @@ export const send = action({
     const { contact, workspaceId, userId, recipient } = ctxData;
 
     const emailTransport = args.channel==='email' ? await ctx.runQuery(internal.companyEmail.transport,{workspaceId}) : null;
-    if(args.channel!=='email')await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
-    const waSession = args.channel === 'whatsapp' ? await ctx.runQuery(internal.companyProviders.whatsappSession,{workspaceId}) : undefined;
+    const ownWa=args.channel==='whatsapp'?await ctx.runQuery(internal.companyWhatsapp.transport,{workspaceId}):null;
+    if(args.channel!=='email' && !ownWa)await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
+    const waSession = args.channel === 'whatsapp' ? (ownWa?.sessionId ?? await ctx.runQuery(internal.companyProviders.whatsappSession,{workspaceId})) : undefined;
 
     // Insert messages-row pending
     const messageId = await ctx.runMutation(
@@ -91,6 +93,7 @@ export const send = action({
         htmlBody: args.htmlBody,
         sentById: userId,
         emailConnectionId:emailTransport?.connectionId,
+        whatsappConnectionId:ownWa?.connectionId,
       },
     );
 
@@ -112,6 +115,7 @@ export const send = action({
         });
       } else {
         externalId = await sendViaVoidfixWa({
+          apiKey:ownWa?.apiKey ?? process.env.VOIDFIX_API_KEY ?? '',
           sessionId: waSession!,
           to: recipient,
           message: args.body,
@@ -167,8 +171,9 @@ export const sendInternal = internalAction({
     }
     const { workspaceId, recipient } = data;
     const emailTransport = args.channel==='email' ? await ctx.runQuery(internal.companyEmail.transport,{workspaceId}) : null;
-    if(args.channel!=='email')await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
-    const waSession = args.channel === 'whatsapp' ? await ctx.runQuery(internal.companyProviders.whatsappSession,{workspaceId}) : undefined;
+    const ownWa=args.channel==='whatsapp'?await ctx.runQuery(internal.companyWhatsapp.transport,{workspaceId}):null;
+    if(args.channel!=='email' && !ownWa)await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
+    const waSession = args.channel === 'whatsapp' ? (ownWa?.sessionId ?? await ctx.runQuery(internal.companyProviders.whatsappSession,{workspaceId})) : undefined;
 
     const messageId = await ctx.runMutation(
       internal.messaging.insertPendingInternal,
@@ -182,6 +187,7 @@ export const sendInternal = internalAction({
         htmlBody: args.htmlBody,
         sentById: args.sentById,
         emailConnectionId:emailTransport?.connectionId,
+        whatsappConnectionId:ownWa?.connectionId,
       },
     );
 
@@ -202,6 +208,7 @@ export const sendInternal = internalAction({
         });
       } else {
         externalId = await sendViaVoidfixWa({
+          apiKey:ownWa?.apiKey ?? process.env.VOIDFIX_API_KEY ?? '',
           sessionId: waSession!,
           to: recipient,
           message: args.body,
@@ -287,7 +294,7 @@ export const resolveForSend = internalQuery({
 export const insertPending = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
-    emailConnectionId:v.optional(v.id("companyEmailConnections")),
+    emailConnectionId:v.optional(v.id("companyEmailConnections")), whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")),
     contactId: v.id("contacts"),
     channel: v.union(
       v.literal("sms"),
@@ -304,6 +311,7 @@ export const insertPending = internalMutation({
     return await ctx.db.insert("messages", {
       workspaceId: args.workspaceId,
       emailConnectionId:args.emailConnectionId,
+      whatsappConnectionId:args.whatsappConnectionId,
       contactId: args.contactId,
       channel: args.channel,
       direction: "outbound",
@@ -321,7 +329,7 @@ export const insertPending = internalMutation({
 export const insertPendingInternal = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
-    emailConnectionId:v.optional(v.id("companyEmailConnections")),
+    emailConnectionId:v.optional(v.id("companyEmailConnections")), whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")),
     contactId: v.id("contacts"),
     channel: v.union(
       v.literal("sms"),
@@ -338,6 +346,7 @@ export const insertPendingInternal = internalMutation({
     return await ctx.db.insert("messages", {
       workspaceId: args.workspaceId,
       emailConnectionId:args.emailConnectionId,
+      whatsappConnectionId:args.whatsappConnectionId,
       contactId: args.contactId,
       channel: args.channel,
       direction: "outbound",
@@ -444,7 +453,7 @@ export const markConversationRead = mutation({
 export const updateStatusByExternalId = internalMutation({
   args: {
     externalMessageId: v.string(),
-    emailConnectionId:v.optional(v.id("companyEmailConnections")),
+    emailConnectionId:v.optional(v.id("companyEmailConnections")), whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")),
     channel: v.union(v.literal('email'),v.literal('sms'),v.literal('whatsapp')),
     workspaceId: v.optional(v.id('workspaces')),
     complaint: v.optional(v.boolean()),
@@ -458,7 +467,7 @@ export const updateStatusByExternalId = internalMutation({
     errorMessage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const msg = args.emailConnectionId ? (args.channel==='email' ? await findCompanyEmailReceipt(ctx,args.externalMessageId,args.emailConnectionId):null) : await findLegacyReceipt(ctx,args.externalMessageId,args.channel,args.workspaceId);
+    const msg = args.whatsappConnectionId ? (args.channel==='whatsapp'?await findCompanyWhatsappReceipt(ctx,args.externalMessageId,args.whatsappConnectionId):null) : args.emailConnectionId ? (args.channel==='email' ? await findCompanyEmailReceipt(ctx,args.externalMessageId,args.emailConnectionId):null) : await findLegacyReceipt(ctx,args.externalMessageId,args.channel,args.workspaceId);
     if (!msg) {await recordSignal(ctx,args.channel,'unmatched_receipt');return { matched: false, firstRead: false };}
 
     const patch: Record<string, unknown> = { status: args.newStatus };
@@ -509,6 +518,7 @@ export const updateStatusByExternalId = internalMutation({
 export const recordInbound = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
+    whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")),
     channel: v.union(
       v.literal("sms"),
       v.literal("whatsapp"),
@@ -522,9 +532,10 @@ export const recordInbound = internalMutation({
     receivedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    if(args.whatsappConnectionId){if(args.channel!=='whatsapp')throw new Error('Wrong channel');await requireActiveInbound(ctx,args.whatsappConnectionId,args.workspaceId);}
     // Idempotency: skip als externalId al binnenkwam
     if (args.externalMessageId) {
-      const existing = await ctx.db
+      const existing = args.whatsappConnectionId ? await ctx.db.query('messages').withIndex('by_whatsappConnectionId_and_externalMessageId',q=>q.eq('whatsappConnectionId',args.whatsappConnectionId).eq('externalMessageId',args.externalMessageId)).first() : await ctx.db
         .query("messages")
         .withIndex("by_workspace_channel_external", (q) =>
           q.eq("workspaceId",args.workspaceId).eq("channel",args.channel).eq("externalMessageId", args.externalMessageId),
@@ -589,6 +600,7 @@ export const recordInbound = internalMutation({
 
     const messageId = await ctx.db.insert("messages", {
       workspaceId: args.workspaceId,
+      whatsappConnectionId:args.whatsappConnectionId,
       contactId,
       channel: args.channel,
       direction: "inbound",
@@ -617,6 +629,7 @@ export const recordInbound = internalMutation({
 export const recordOutbound = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
+    whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")),
     channel: v.union(
       v.literal("sms"),
       v.literal("whatsapp"),
@@ -631,10 +644,11 @@ export const recordOutbound = internalMutation({
     sentAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    if(args.whatsappConnectionId){if(args.channel!=='whatsapp')throw new Error('Wrong channel');await requireActiveInbound(ctx,args.whatsappConnectionId,args.workspaceId);}
     // Idempotency: skip als externalId al bestaat (bv. Leadflow stuurde 't zelf
     // via de Voidfix-API → markSent zette dezelfde externalMessageId).
     if (args.externalMessageId) {
-      const existing = await ctx.db
+      const existing = args.whatsappConnectionId ? await ctx.db.query('messages').withIndex('by_whatsappConnectionId_and_externalMessageId',q=>q.eq('whatsappConnectionId',args.whatsappConnectionId).eq('externalMessageId',args.externalMessageId)).first() : await ctx.db
         .query("messages")
         .withIndex("by_workspace_channel_external", (q) =>
           q.eq("workspaceId",args.workspaceId).eq("channel",args.channel).eq("externalMessageId", args.externalMessageId),
@@ -695,6 +709,7 @@ export const recordOutbound = internalMutation({
 
     const messageId = await ctx.db.insert("messages", {
       workspaceId: args.workspaceId,
+      whatsappConnectionId:args.whatsappConnectionId,
       contactId,
       channel: args.channel,
       direction: "outbound",
@@ -1160,11 +1175,12 @@ async function sendViaVoidfixSms(args: {
 }
 
 async function sendViaVoidfixWa(args: {
+  apiKey: string;
   sessionId: string;
   to: string;
   message: string;
 }): Promise<string> {
-  const apiKey = process.env.VOIDFIX_API_KEY;
+  const apiKey = args.apiKey;
   if (!apiKey) throw new Error("VOIDFIX_API_KEY niet geconfigureerd");
   const sessionId = args.sessionId;
 
@@ -1184,6 +1200,7 @@ async function sendViaVoidfixWa(args: {
     const text = await res.text();
     throw new Error(`Voidfix WA ${res.status}: ${text.slice(0, 200)}`);
   }
-  const data = (await res.json()) as { messageId?: string; id?: string };
-  return data.messageId ?? data.id ?? "";
+  const data = (await res.json()) as {success?:boolean; data?:{messageId?:string}; messageId?: string; id?: string };
+  if(data.success===false)throw new Error('Voidfix heeft de verzending geweigerd.');
+  return data.data?.messageId ?? data.messageId ?? data.id ?? "";
 }

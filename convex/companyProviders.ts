@@ -18,6 +18,9 @@ export async function requireWorkspaceProviders(ctx: QueryCtx, workspaceId: Id<'
     throw new ConvexError('Communicatie en koppelingen zijn nog niet ingesteld voor dit bedrijf. Neem contact op met de platformbeheerder.');
   }
 }
+export async function hasLegacyWhatsapp(ctx:QueryCtx,workspaceId:Id<'workspaces'>){
+  return await hasWorkspaceProviders(ctx,workspaceId) && !await ctx.db.query('companyWhatsappConnections').withIndex('by_workspaceId',q=>q.eq('workspaceId',workspaceId)).first();
+}
 export const assertWorkspace = internalQuery({
   args: {workspaceId:v.id('workspaces')}, returns:v.null(),
   handler:async(ctx,args)=>{await requireWorkspaceProviders(ctx,args.workspaceId);return null;},
@@ -39,10 +42,12 @@ export const status = query({
     const ws=await ctx.db.get(args.workspaceId);
     const ownEmail=ws?await ctx.db.query('companyEmailConnections').withIndex('by_org_status',q=>q.eq('orgId',ws.orgId).eq('status','active')).unique():null;
     const pausedEmail=ws?await ctx.db.query('companyEmailConnections').withIndex('by_org_status',q=>q.eq('orgId',ws.orgId).eq('status','disabled')).first():null;
-    return {assigned:assigned || !!ownEmail,
+    const ownWa=await ctx.db.query('companyWhatsappConnections').withIndex('by_workspaceId',q=>q.eq('workspaceId',args.workspaceId)).first();
+    const activeWa=await ctx.db.query('companyWhatsappConnections').withIndex('by_workspaceId_and_status',q=>q.eq('workspaceId',args.workspaceId).eq('status','active')).unique();
+    return {assigned:assigned || !!ownEmail || !!activeWa,
       email:!!ownEmail || (!pausedEmail && assigned && !!process.env.RESEND_API_KEY && !!process.env.EMAIL_FROM),
       sms:assigned && !!process.env.VOIDFIX_SMS_API_SECRET && !!process.env.VOIDFIX_SMS_DEVICE_ID,
-      whatsapp:assigned && !!process.env.VOIDFIX_API_KEY && !!(wa ? wa.isActive && wa.sessionId : process.env.VOIDFIX_WA_SESSION_ID),
+      whatsapp:ownWa ? !!activeWa : assigned && !!process.env.VOIDFIX_API_KEY && !!(wa ? wa.isActive && wa.sessionId : process.env.VOIDFIX_WA_SESSION_ID),
       calendar:assigned && !!process.env.GOOGLE_CALENDAR_ID && !!process.env.GOOGLE_CALENDAR_CLIENT_EMAIL && !!process.env.GOOGLE_CALENDAR_PRIVATE_KEY,
       suite:assigned && !!(process.env.CASHFLOW_READ_API_KEY || process.env.FROSTWORK_READ_API_KEY),
     };

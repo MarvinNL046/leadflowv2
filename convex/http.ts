@@ -939,6 +939,131 @@ http.route({
   }),
 });
 
+http.route({
+  path: "/webhooks/voidfix-wa-company",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const rawId=new URL(request.url).searchParams.get('connectionId');
+    if(!rawId)return jsonResponse({error:'Missing connection'},400);
+    let connection;
+    try{connection=await ctx.runQuery(internal.companyWhatsapp.webhookContext,{id:rawId as Id<'companyWhatsappConnections'>});}catch{return jsonResponse({error:'Invalid connection'},400);}
+    if(!connection)return jsonResponse({error:'Invalid connection'},401);
+    const connectionId=rawId as Id<'companyWhatsappConnections'>;
+    const expectedSecret=connection.secret;
+    const headerSecret =
+      request.headers.get("x-webhook-secret") ||
+      new URL(request.url).searchParams.get("secret");
+    if (
+      !headerSecret ||
+      !timingSafeStringEqual(headerSecret, expectedSecret)
+    ) {
+      console.warn("[voidfix-wa-webhook] invalid secret");
+      return jsonResponse({ error: "Invalid secret" }, 401);
+    }
+
+    let payload: VoidfixWaEvent;
+    try {
+      payload = JSON.parse(await request.text());
+      if(!payload || typeof payload!=='object' || Array.isArray(payload) || (payload.event!==undefined && typeof payload.event!=='string'))throw new Error('Invalid event');
+      for(const field of ['from','to','phoneNumber','message','body','messageId','id','mediaUrl','mediaType'] as const){if(payload[field]!=null && typeof payload[field]!=='string')throw new Error('Invalid field');}
+
+    } catch {
+      await ctx.runMutation(internal.webhookSignals.record,{channel:'whatsapp',reason:'invalid_payload'});
+      return jsonResponse({ error: "Invalid JSON" }, 400);
+    }
+
+    if(payload.data?.sessionId && payload.sessionId && payload.data.sessionId!==payload.sessionId){
+      await ctx.runMutation(internal.webhookSignals.record,{channel:'whatsapp',reason:'conflicting_session'});
+      return jsonResponse({received:true,skipped:'conflicting session'},200);
+    }
+    if((payload.data?.sessionId ?? payload.sessionId)!==connection.sessionId){await ctx.runMutation(internal.webhookSignals.record,{channel:'whatsapp',reason:'unmapped_session'});return jsonResponse({received:true,skipped:'unmapped session'},200);}
+    const wsId=connection.workspaceId;
+    await ctx.runMutation(internal.companyWhatsapp.seen,{id:connectionId});
+    if((payload.event ?? '').toLowerCase().startsWith('session'))return jsonResponse({received:true,type:'session'},200);
+    if(connection.status!=='active' && (payload.event==='message.outbound' || payload.event==='message.incoming' || (!payload.event && payload.from)))return jsonResponse({received:true,skipped:'paused'},200);
+
+    // Outbound: bericht verstuurd vanaf de gekoppelde bedrijfstelefoon (of een
+    // echo van een via-Leadflow verstuurd bericht). recordOutbound dedupt op
+    // externalMessageId, dus API-verstuurde berichten worden niet dubbel opgeslagen.
+    if (payload.event === "message.outbound") {
+      const to = payload.to ?? payload.phoneNumber;
+      if (!to) {
+        await ctx.runMutation(internal.webhookSignals.record,{channel:'whatsapp',reason:'missing_recipient'});
+        return jsonResponse({ received: true, skipped: "no to" }, 200);
+      }
+
+      if (!wsId) {
+        return jsonResponse({ error: "Workspace not provisioned" }, 500);
+      }
+      await ctx.runMutation(internal.messaging.recordOutbound, {
+        workspaceId: wsId,
+        whatsappConnectionId:connectionId,
+        channel: "whatsapp",
+        to,
+        body: payload.message ?? payload.body ?? "",
+        from: payload.from,
+        externalMessageId: payload.messageId ?? payload.id ?? undefined,
+        mediaUrl: payload.mediaUrl ?? undefined,
+        mediaType: payload.mediaType ?? undefined,
+      });
+      return jsonResponse({ received: true, type: "outbound" }, 200);
+    }
+
+    // Filter op inbound events; outbound-echo + status-receipts later
+    const isInbound =
+      payload.event === "message.incoming" ||
+      (payload.from && !payload.event);
+    if (!isInbound) {
+      // Probeer delivery-receipt match
+      if (payload.messageId && payload.status) {
+        const statusMap: Record<
+          string,
+          "delivered" | "failed" | "bounced" | "read" | null
+        > = {
+          sent: null,
+          delivered: "delivered",
+          read: "read",
+          failed: "failed",
+          // WhatsApp-ack-levels (Voidfix stuurt numeriek): 1=sent, 2=delivered, 3=read.
+          "1": null,
+          "2": "delivered",
+          "3": "read",
+        };
+        // status kan een getal of string zijn → defensief naar string.
+        const ns = statusMap[String(payload.status).toLowerCase()];
+        if (ns) {
+          await ctx.runMutation(
+            internal.messaging.updateStatusByExternalId,
+            { externalMessageId: String(payload.messageId), newStatus: ns, channel:'whatsapp', workspaceId:wsId, whatsappConnectionId:connectionId },
+          );
+        }
+      }
+      return jsonResponse({ received: true, event: payload.event }, 200);
+    }
+
+    const from = payload.from ?? payload.phoneNumber;
+    const body = payload.body ?? payload.message ?? "";
+    if (!from) {await ctx.runMutation(internal.webhookSignals.record,{channel:'whatsapp',reason:'missing_sender'});return jsonResponse({ received: true, skipped: "no from" }, 200);}
+
+
+    if (!wsId) return jsonResponse({ error: "Workspace not provisioned" }, 500);
+
+    await ctx.runMutation(internal.messaging.recordInbound, {
+      workspaceId: wsId,
+        whatsappConnectionId:connectionId,
+      channel: "whatsapp",
+      from,
+      body,
+      externalMessageId: payload.messageId ?? payload.id ?? undefined,
+      // Skip null → undefined (Voidfix stuurt expliciet null voor
+      // text-only messages, onze validator verwacht string|undefined)
+      mediaUrl: payload.mediaUrl ?? undefined,
+      mediaType: payload.mediaType ?? undefined,
+    });
+    return jsonResponse({ received: true, type: "inbound" }, 200);
+  }),
+});
+
 // ══════════════════════════════════════════════════════════════════════
 // WEBSITE-FORM LEAD INGEST — staycoolairco.nl forms → v2 CRM
 // Browser-form (cross-origin) → CORS nodig. Auth = WEBSITE_API_KEY via

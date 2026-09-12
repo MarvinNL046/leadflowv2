@@ -1,6 +1,6 @@
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
-import {hasWorkspaceProviders} from "./companyProviders";
+import {hasLegacyWhatsapp} from "./companyProviders";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { VOIDFIX_WA_BASE } from "./lib/voidfix";
@@ -39,7 +39,7 @@ export const alleSessies = internalQuery({
   handler: async (ctx): Promise<SessieStand[]> => {
     const candidates = await ctx.db.query("whatsappWebConfig").take(1000);
     const rijen = [];
-    for (const candidate of candidates) if(await hasWorkspaceProviders(ctx,candidate.workspaceId)) rijen.push(candidate);
+    for (const candidate of candidates) if(await hasLegacyWhatsapp(ctx,candidate.workspaceId)) rijen.push(candidate);
     return rijen.map((c) => ({
       workspaceId: c.workspaceId,
       sessionId: c.sessionId,
@@ -133,7 +133,7 @@ export const legStandVastOpSessie = internalMutation({
     // Onbekende sessie: Voidfix kent negen sessies van vroegere koppelpogingen
     // en stuurt daar ook events voor. Alleen de sessie die in LeadFlow staat
     // telt; de rest negeren we stil.
-    if (!rij || !await hasWorkspaceProviders(ctx,rij.workspaceId)) return { bekend: false };
+    if (!rij || !await hasLegacyWhatsapp(ctx,rij.workspaceId)) return { bekend: false };
     await ctx.db.patch(rij._id, {
       isActive: args.isActive,
       ...(args.isActive ? { lastSeenAt: Date.now() } : {}),

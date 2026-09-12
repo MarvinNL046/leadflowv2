@@ -33,7 +33,9 @@ import { Route as CrmContactsIdRouteImport } from './routes/crm.contacts_.$id'
 import { Route as CrmContactsImportRouteImport } from './routes/crm.contacts_.import'
 import { Route as CrmSettingsAiAgentRouteImport } from './routes/crm.settings_.ai-agent'
 import { Route as CrmSettingsCustomFieldsRouteImport } from './routes/crm.settings_.custom-fields'
+import { Route as CrmSettingsEigenWhatsappRouteImport } from './routes/crm.settings_.eigen-whatsapp'
 import { Route as CrmSettingsEmailRouteImport } from './routes/crm.settings_.email'
+import { Route as CrmSettingsHandleidingRouteImport } from './routes/crm.settings_.handleiding'
 import { Route as CrmSettingsLeadFlowRouteImport } from './routes/crm.settings_.lead-flow'
 import { Route as CrmSettingsMetaRouteImport } from './routes/crm.settings_.meta'
 import { Route as CrmSettingsPipelineRouteImport } from './routes/crm.settings_.pipeline'
@@ -162,9 +164,20 @@ const CrmSettingsCustomFieldsRoute = CrmSettingsCustomFieldsRouteImport.update({
   path: '/settings/custom-fields',
   getParentRoute: () => CrmRoute,
 } as any)
+const CrmSettingsEigenWhatsappRoute =
+  CrmSettingsEigenWhatsappRouteImport.update({
+    id: '/settings_/eigen-whatsapp',
+    path: '/settings/eigen-whatsapp',
+    getParentRoute: () => CrmRoute,
+  } as any)
 const CrmSettingsEmailRoute = CrmSettingsEmailRouteImport.update({
   id: '/settings_/email',
   path: '/settings/email',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmSettingsHandleidingRoute = CrmSettingsHandleidingRouteImport.update({
+  id: '/settings_/handleiding',
+  path: '/settings/handleiding',
   getParentRoute: () => CrmRoute,
 } as any)
 const CrmSettingsLeadFlowRoute = CrmSettingsLeadFlowRouteImport.update({
@@ -228,7 +241,9 @@ export interface FileRoutesByFullPath {
   '/crm/contacts/import': typeof CrmContactsImportRoute
   '/crm/settings/ai-agent': typeof CrmSettingsAiAgentRoute
   '/crm/settings/custom-fields': typeof CrmSettingsCustomFieldsRoute
+  '/crm/settings/eigen-whatsapp': typeof CrmSettingsEigenWhatsappRoute
   '/crm/settings/email': typeof CrmSettingsEmailRoute
+  '/crm/settings/handleiding': typeof CrmSettingsHandleidingRoute
   '/crm/settings/lead-flow': typeof CrmSettingsLeadFlowRoute
   '/crm/settings/meta': typeof CrmSettingsMetaRoute
   '/crm/settings/pipeline': typeof CrmSettingsPipelineRoute
@@ -260,7 +275,9 @@ export interface FileRoutesByTo {
   '/crm/contacts/import': typeof CrmContactsImportRoute
   '/crm/settings/ai-agent': typeof CrmSettingsAiAgentRoute
   '/crm/settings/custom-fields': typeof CrmSettingsCustomFieldsRoute
+  '/crm/settings/eigen-whatsapp': typeof CrmSettingsEigenWhatsappRoute
   '/crm/settings/email': typeof CrmSettingsEmailRoute
+  '/crm/settings/handleiding': typeof CrmSettingsHandleidingRoute
   '/crm/settings/lead-flow': typeof CrmSettingsLeadFlowRoute
   '/crm/settings/meta': typeof CrmSettingsMetaRoute
   '/crm/settings/pipeline': typeof CrmSettingsPipelineRoute
@@ -295,7 +312,9 @@ export interface FileRoutesById {
   '/crm/contacts_/import': typeof CrmContactsImportRoute
   '/crm/settings_/ai-agent': typeof CrmSettingsAiAgentRoute
   '/crm/settings_/custom-fields': typeof CrmSettingsCustomFieldsRoute
+  '/crm/settings_/eigen-whatsapp': typeof CrmSettingsEigenWhatsappRoute
   '/crm/settings_/email': typeof CrmSettingsEmailRoute
+  '/crm/settings_/handleiding': typeof CrmSettingsHandleidingRoute
   '/crm/settings_/lead-flow': typeof CrmSettingsLeadFlowRoute
   '/crm/settings_/meta': typeof CrmSettingsMetaRoute
   '/crm/settings_/pipeline': typeof CrmSettingsPipelineRoute
@@ -331,7 +350,9 @@ export interface FileRouteTypes {
     | '/crm/contacts/import'
     | '/crm/settings/ai-agent'
     | '/crm/settings/custom-fields'
+    | '/crm/settings/eigen-whatsapp'
     | '/crm/settings/email'
+    | '/crm/settings/handleiding'
     | '/crm/settings/lead-flow'
     | '/crm/settings/meta'
     | '/crm/settings/pipeline'
@@ -363,7 +384,9 @@ export interface FileRouteTypes {
     | '/crm/contacts/import'
     | '/crm/settings/ai-agent'
     | '/crm/settings/custom-fields'
+    | '/crm/settings/eigen-whatsapp'
     | '/crm/settings/email'
+    | '/crm/settings/handleiding'
     | '/crm/settings/lead-flow'
     | '/crm/settings/meta'
     | '/crm/settings/pipeline'
@@ -397,7 +420,9 @@ export interface FileRouteTypes {
     | '/crm/contacts_/import'
     | '/crm/settings_/ai-agent'
     | '/crm/settings_/custom-fields'
+    | '/crm/settings_/eigen-whatsapp'
     | '/crm/settings_/email'
+    | '/crm/settings_/handleiding'
     | '/crm/settings_/lead-flow'
     | '/crm/settings_/meta'
     | '/crm/settings_/pipeline'
@@ -585,11 +610,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmSettingsCustomFieldsRouteImport
       parentRoute: typeof CrmRoute
     }
+    '/crm/settings_/eigen-whatsapp': {
+      id: '/crm/settings_/eigen-whatsapp'
+      path: '/settings/eigen-whatsapp'
+      fullPath: '/crm/settings/eigen-whatsapp'
+      preLoaderRoute: typeof CrmSettingsEigenWhatsappRouteImport
+      parentRoute: typeof CrmRoute
+    }
     '/crm/settings_/email': {
       id: '/crm/settings_/email'
       path: '/settings/email'
       fullPath: '/crm/settings/email'
       preLoaderRoute: typeof CrmSettingsEmailRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/settings_/handleiding': {
+      id: '/crm/settings_/handleiding'
+      path: '/settings/handleiding'
+      fullPath: '/crm/settings/handleiding'
+      preLoaderRoute: typeof CrmSettingsHandleidingRouteImport
       parentRoute: typeof CrmRoute
     }
     '/crm/settings_/lead-flow': {
@@ -660,7 +699,9 @@ interface CrmRouteChildren {
   CrmContactsImportRoute: typeof CrmContactsImportRoute
   CrmSettingsAiAgentRoute: typeof CrmSettingsAiAgentRoute
   CrmSettingsCustomFieldsRoute: typeof CrmSettingsCustomFieldsRoute
+  CrmSettingsEigenWhatsappRoute: typeof CrmSettingsEigenWhatsappRoute
   CrmSettingsEmailRoute: typeof CrmSettingsEmailRoute
+  CrmSettingsHandleidingRoute: typeof CrmSettingsHandleidingRoute
   CrmSettingsLeadFlowRoute: typeof CrmSettingsLeadFlowRoute
   CrmSettingsMetaRoute: typeof CrmSettingsMetaRoute
   CrmSettingsPipelineRoute: typeof CrmSettingsPipelineRoute
@@ -685,7 +726,9 @@ const CrmRouteChildren: CrmRouteChildren = {
   CrmContactsImportRoute: CrmContactsImportRoute,
   CrmSettingsAiAgentRoute: CrmSettingsAiAgentRoute,
   CrmSettingsCustomFieldsRoute: CrmSettingsCustomFieldsRoute,
+  CrmSettingsEigenWhatsappRoute: CrmSettingsEigenWhatsappRoute,
   CrmSettingsEmailRoute: CrmSettingsEmailRoute,
+  CrmSettingsHandleidingRoute: CrmSettingsHandleidingRoute,
   CrmSettingsLeadFlowRoute: CrmSettingsLeadFlowRoute,
   CrmSettingsMetaRoute: CrmSettingsMetaRoute,
   CrmSettingsPipelineRoute: CrmSettingsPipelineRoute,
