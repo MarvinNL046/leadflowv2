@@ -1,3 +1,4 @@
+import {recordSignal} from './webhookSignals';
 import {findLegacyReceipt} from './providerRouting';
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
@@ -447,7 +448,7 @@ export const updateStatusByExternalId = internalMutation({
   },
   handler: async (ctx, args) => {
     const msg = await findLegacyReceipt(ctx,args.externalMessageId,args.channel,args.workspaceId);
-    if (!msg) return { matched: false, firstRead: false };
+    if (!msg) {await recordSignal(ctx,args.channel,'unmatched_receipt');return { matched: false, firstRead: false };}
 
     const patch: Record<string, unknown> = { status: args.newStatus };
     // Webhook-events kunnen door elkaar binnenkomen: een (herhaald)

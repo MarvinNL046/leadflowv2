@@ -26,6 +26,7 @@
 
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import {webhookChannel,webhookReason} from './lib/webhookSignalTypes';
 import {
   marketplaceLeadScore,
   marketplaceNiche,
@@ -34,6 +35,9 @@ import {
 } from "./marketplace/types";
 
 export default defineSchema({
+  webhookSignals:defineTable({channel:webhookChannel,reason:webhookReason,count:v.number(),firstSeenAt:v.number(),lastSeenAt:v.number(),open:v.boolean(),reviewedCount:v.optional(v.number()),lastReviewedAt:v.optional(v.number()),lastReviewNote:v.optional(v.string())})
+    .index('by_channel_reason',['channel','reason']).index('by_open_lastSeenAt',['open','lastSeenAt']).index('by_lastSeenAt',['lastSeenAt']),
+  webhookSignalReviews:defineTable({signalId:v.id('webhookSignals'),reviewedBy:v.id('users'),reviewedAt:v.number(),count:v.number(),note:v.string()}).index('by_signal',['signalId']),
   companyImages: defineTable({
     orgId: v.id('orgs'), workspaceId: v.id('workspaces'), storageId: v.id('_storage'), uploadedBy: v.id('users'),
   }).index('by_storage',['storageId']).index('by_org',['orgId']),

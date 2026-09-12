@@ -524,6 +524,7 @@ http.route({
     try {
       payload = JSON.parse(rawBody);
     } catch {
+      await ctx.runMutation(internal.webhookSignals.record,{channel:'email',reason:'invalid_payload'});
       return jsonResponse({ error: "Invalid JSON" }, 400);
     }
 
@@ -663,6 +664,7 @@ http.route({
       const parsed = JSON.parse(raw ?? rawBody);
       messages = Array.isArray(parsed) ? parsed : [parsed];
     } catch {
+      await ctx.runMutation(internal.webhookSignals.record,{channel:'sms',reason:'invalid_payload'});
       return jsonResponse({ error: "Invalid payload" }, 400);
     }
 
@@ -676,12 +678,13 @@ http.route({
       internal.providerRouting.legacySmsWorkspace,
       {},
     );
-    if(!wsId)return jsonResponse({received:true,skipped:'unmapped account'},200);
+    if(!wsId){await ctx.runMutation(internal.webhookSignals.record,{channel:'sms',reason:'unmapped_account'});return jsonResponse({received:true,skipped:'unmapped account'},200);}
     let inbound = 0;
     for (const m of messages) {
       const from = m.number ?? m.from;
       const body = m.message ?? m.body;
       const extId = m.ID != null ? String(m.ID) : (m.messageId ?? undefined);
+      if(m.status==='Received' && (!from || !body)){await ctx.runMutation(internal.webhookSignals.record,{channel:'sms',reason:!from?'missing_sender':'invalid_payload'});continue;}
       if (m.status === "Received" && from && body) {
         if (!wsId) {
           return jsonResponse({ error: "Workspace not provisioned" }, 500);
@@ -744,16 +747,18 @@ http.route({
     try {
       payload = JSON.parse(await request.text());
     } catch {
+      await ctx.runMutation(internal.webhookSignals.record,{channel:'whatsapp',reason:'invalid_payload'});
       return jsonResponse({ error: "Invalid JSON" }, 400);
     }
 
     if(payload.data?.sessionId && payload.sessionId && payload.data.sessionId!==payload.sessionId){
+      await ctx.runMutation(internal.webhookSignals.record,{channel:'whatsapp',reason:'conflicting_session'});
       return jsonResponse({received:true,skipped:'conflicting session'},200);
     }
     const wsId = await ctx.runQuery(internal.providerRouting.whatsappWorkspace,{
       sessionId:payload.data?.sessionId ?? payload.sessionId ?? undefined,
     });
-    if(!wsId)return jsonResponse({received:true,skipped:'unmapped session'},200);
+    if(!wsId){await ctx.runMutation(internal.webhookSignals.record,{channel:'whatsapp',reason:'unmapped_session'});return jsonResponse({received:true,skipped:'unmapped session'},200);}
 
     // Session-status: de webhook heeft "Session Status" aangevinkt, maar dat
     // event werd tot nu toe genegeerd. Juist dat event vertelt ons meteen dat
@@ -783,6 +788,7 @@ http.route({
     if (payload.event === "message.outbound") {
       const to = payload.to ?? payload.phoneNumber;
       if (!to) {
+        await ctx.runMutation(internal.webhookSignals.record,{channel:'whatsapp',reason:'missing_recipient'});
         return jsonResponse({ received: true, skipped: "no to" }, 200);
       }
 
@@ -836,7 +842,7 @@ http.route({
 
     const from = payload.from ?? payload.phoneNumber;
     const body = payload.body ?? payload.message ?? "";
-    if (!from) return jsonResponse({ received: true, skipped: "no from" }, 200);
+    if (!from) {await ctx.runMutation(internal.webhookSignals.record,{channel:'whatsapp',reason:'missing_sender'});return jsonResponse({ received: true, skipped: "no from" }, 200);}
 
 
     if (!wsId) return jsonResponse({ error: "Workspace not provisioned" }, 500);

@@ -21,6 +21,7 @@ import { Route as CrmMessagesRouteImport } from './routes/crm.messages'
 import { Route as CrmPipelinesRouteImport } from './routes/crm.pipelines'
 import { Route as CrmSettingsRouteImport } from './routes/crm.settings'
 import { Route as CrmTakenRouteImport } from './routes/crm.taken'
+import { Route as CrmWebhookSignalenRouteImport } from './routes/crm.webhook-signalen'
 import { Route as CrmWorkflowsRouteImport } from './routes/crm.workflows'
 import { Route as FeedIndexRouteImport } from './routes/feed.index'
 import { Route as FeedPurchasedRouteImport } from './routes/feed.purchased'
@@ -98,6 +99,11 @@ const CrmSettingsRoute = CrmSettingsRouteImport.update({
 const CrmTakenRoute = CrmTakenRouteImport.update({
   id: '/taken',
   path: '/taken',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmWebhookSignalenRoute = CrmWebhookSignalenRouteImport.update({
+  id: '/webhook-signalen',
+  path: '/webhook-signalen',
   getParentRoute: () => CrmRoute,
 } as any)
 const CrmWorkflowsRoute = CrmWorkflowsRouteImport.update({
@@ -203,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/crm/pipelines': typeof CrmPipelinesRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/taken': typeof CrmTakenRoute
+  '/crm/webhook-signalen': typeof CrmWebhookSignalenRoute
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/feed/purchased': typeof FeedPurchasedRoute
   '/feed/settings': typeof FeedSettingsRoute
@@ -233,6 +240,7 @@ export interface FileRoutesByTo {
   '/crm/pipelines': typeof CrmPipelinesRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/taken': typeof CrmTakenRoute
+  '/crm/webhook-signalen': typeof CrmWebhookSignalenRoute
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/feed/purchased': typeof FeedPurchasedRoute
   '/feed/settings': typeof FeedSettingsRoute
@@ -266,6 +274,7 @@ export interface FileRoutesById {
   '/crm/pipelines': typeof CrmPipelinesRoute
   '/crm/settings': typeof CrmSettingsRoute
   '/crm/taken': typeof CrmTakenRoute
+  '/crm/webhook-signalen': typeof CrmWebhookSignalenRoute
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/feed/purchased': typeof FeedPurchasedRoute
   '/feed/settings': typeof FeedSettingsRoute
@@ -300,6 +309,7 @@ export interface FileRouteTypes {
     | '/crm/pipelines'
     | '/crm/settings'
     | '/crm/taken'
+    | '/crm/webhook-signalen'
     | '/crm/workflows'
     | '/feed/purchased'
     | '/feed/settings'
@@ -330,6 +340,7 @@ export interface FileRouteTypes {
     | '/crm/pipelines'
     | '/crm/settings'
     | '/crm/taken'
+    | '/crm/webhook-signalen'
     | '/crm/workflows'
     | '/feed/purchased'
     | '/feed/settings'
@@ -362,6 +373,7 @@ export interface FileRouteTypes {
     | '/crm/pipelines'
     | '/crm/settings'
     | '/crm/taken'
+    | '/crm/webhook-signalen'
     | '/crm/workflows'
     | '/feed/purchased'
     | '/feed/settings'
@@ -475,6 +487,13 @@ declare module '@tanstack/react-router' {
       path: '/taken'
       fullPath: '/crm/taken'
       preLoaderRoute: typeof CrmTakenRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/webhook-signalen': {
+      id: '/crm/webhook-signalen'
+      path: '/webhook-signalen'
+      fullPath: '/crm/webhook-signalen'
+      preLoaderRoute: typeof CrmWebhookSignalenRouteImport
       parentRoute: typeof CrmRoute
     }
     '/crm/workflows': {
@@ -614,6 +633,7 @@ interface CrmRouteChildren {
   CrmPipelinesRoute: typeof CrmPipelinesRoute
   CrmSettingsRoute: typeof CrmSettingsRoute
   CrmTakenRoute: typeof CrmTakenRoute
+  CrmWebhookSignalenRoute: typeof CrmWebhookSignalenRoute
   CrmWorkflowsRoute: typeof CrmWorkflowsRoute
   CrmIndexRoute: typeof CrmIndexRoute
   CrmCampaignsIdRoute: typeof CrmCampaignsIdRoute
@@ -637,6 +657,7 @@ const CrmRouteChildren: CrmRouteChildren = {
   CrmPipelinesRoute: CrmPipelinesRoute,
   CrmSettingsRoute: CrmSettingsRoute,
   CrmTakenRoute: CrmTakenRoute,
+  CrmWebhookSignalenRoute: CrmWebhookSignalenRoute,
   CrmWorkflowsRoute: CrmWorkflowsRoute,
   CrmIndexRoute: CrmIndexRoute,
   CrmCampaignsIdRoute: CrmCampaignsIdRoute,
