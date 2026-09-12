@@ -250,6 +250,8 @@ Publicatiebevestiging LG-038: Live op 12 september 2026 via PR #33, commit 4a856
 
 | ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
 |---|---|---|---|---|---|---|---|---|---|
-| LG-039 | 2026-09-12 | leadflowv2 | /crm/webhook-signalen; sidebar; webhookSignals/Reviews; SMS/WA/Resend-webhooks en receipt-matching | Privacyarme signalen per kanaal/oorzaak; platformadmin-overzicht; controle met note/audit/count-check; nieuwe melding heropent | Getest; publicatie volgt | 414 tests/45 bestanden; Convex-TypeScript en productiebuild; algemene TypeScript bestaande diagnostiek | codex/webhook-signalen-20260912 | — | Echte inkomende test en eigen provideraccount-inrichting; geen automatische herverwerking |
+| LG-039 | 2026-09-12 | leadflowv2 | /crm/webhook-signalen; sidebar; webhookSignals/Reviews; SMS/WA/Resend-webhooks en receipt-matching | Privacyarme signalen per kanaal/oorzaak; platformadmin-overzicht; controle met note/audit/count-check; nieuwe melding heropent | Live | 414 tests/45 bestanden; Convex-TypeScript en productiebuild; algemene TypeScript bestaande diagnostiek | PR #35 / 6301775 | 2026-09-12 | Echte inkomende test en eigen provideraccount-inrichting; geen automatische herverwerking |
 
 [Exact bereik en beperkingen](webhook-signalen-20260912.md). Geen echte berichten of testwebhooks naar productie gestuurd; geen providerconfiguratie gewijzigd. Geen historische reconstructie, berichtinhoud, secrets of automatische meldingen. Controle markeert alleen de signalengroep. Geen SEO-wijzigingen.
+
+Publicatiebevestiging LG-039: Live op 12 september 2026 via PR #35, commit 630177547e74047059b660fe17bc884f37a0dc7e. Vercel dpl_GwY32BWmmKt7y6dDv3zE3SwB6yUw READY. Live /crm/webhook-signalen gecontroleerd: kop, uitleg, standaard open-filter en alle-signalenfilter werken; beide tonen momenteel een lege registratie. Geen productiesignalen aangemaakt of gecontroleerd voor deze test.
