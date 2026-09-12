@@ -1006,9 +1006,14 @@ export default defineSchema({
     publishedAt: v.optional(v.number()),
     expiresAt: v.optional(v.number()),
     adminNotes: v.optional(v.string()),
+    followUpStatus: v.optional(v.union(v.literal("new"), v.literal("contacted"), v.literal("done"))),
+    followUpUpdatedAt: v.optional(v.number()),
+    notificationStatus: v.optional(v.union(v.literal("pending"), v.literal("sent"), v.literal("failed"))),
+    notificationAttemptedAt: v.optional(v.number()),
     legacyId: v.optional(v.number()),
   })
     .index("by_niche_status", ["niche", "status"])
+    .index("by_api_key", ["apiKeyId"])
     .index("by_status_published", ["status", "publishedAt"]) // FEED main query
     .index("by_phone_niche", ["phone", "niche"]) // dedup at intake
     .index("by_province", ["province"])

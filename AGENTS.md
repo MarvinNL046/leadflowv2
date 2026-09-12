@@ -11,3 +11,12 @@ Convex agent skills for common tasks can be installed by running
 `npx convex ai-files install`.
 
 <!-- convex-ai-end -->
+
+## Leadgenwerk bijhouden
+
+Bij werk aan leadgenpagina's of leadgennavigatie: lees `docs/leadgen/README.md`
+en voeg na de wijziging een regel toe aan `docs/leadgen/werklog.md` met datum,
+exacte pagina of bereik, wijziging, controle, commit/PR en publicatiedatum.
+Markeer lokale wijzigingen pas als live nadat publicatie is bevestigd.
+Gebruik `docs/leadgen/inventaris.md` voor repo- en intakecontext; controleer
+de actuele situatie opnieuw voordat je een koppeling wijzigt.

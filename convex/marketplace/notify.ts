@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalAction, internalQuery } from "../_generated/server";
+import { internalAction, internalQuery, internalMutation } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { getSuperAdminEmails } from "../lib/env";
 
@@ -34,6 +34,7 @@ export const getLeadForNotify = internalQuery({
       message: lead.message,
       status: lead.status,
       source: key?.name,
+      notificationStatus: lead.notificationStatus,
     };
   },
 });
@@ -43,12 +44,12 @@ async function sendEmail(
   to: string,
   subject: string,
   text: string,
-): Promise<void> {
+): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM ?? "noreply@example.com";
   if (!apiKey) {
     console.warn("[marketplace-notify] RESEND_API_KEY ontbreekt — mail overgeslagen");
-    return;
+    return false;
   }
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -57,22 +58,39 @@ async function sendEmail(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ from, to, subject, text }),
+    signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) {
     console.error(
-      `[marketplace-notify] Resend ${res.status}: ${(await res.text()).slice(0, 200)}`,
+      `[marketplace-notify] Resend ${res.status}`,
     );
   }
+  return res.ok;
 }
+
+export const recordDelivery = internalMutation({
+  args: { leadId: v.id("marketplaceLeads"), sent: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, { leadId, sent }) => {
+    if (await ctx.db.get(leadId)) {
+      await ctx.db.patch(leadId, {
+        notificationStatus: sent ? "sent" : "failed",
+        notificationAttemptedAt: Date.now(),
+      });
+    }
+    return null;
+  },
+});
 
 export const notifyNewLead = internalAction({
   args: { leadId: v.id("marketplaceLeads") },
+  returns: v.null(),
   handler: async (ctx, { leadId }) => {
     const lead = await ctx.runQuery(
       internal.marketplace.notify.getLeadForNotify,
       { leadId },
     );
-    if (!lead) return;
+    if (!lead || lead.notificationStatus === "sent") return null;
 
     const name = `${lead.firstName} ${lead.lastName}`.trim();
     const loc = [lead.city, lead.province].filter(Boolean).join(", ");
@@ -89,13 +107,21 @@ export const notifyNewLead = internalAction({
       `Bron:     ${lead.source ?? "-"}`,
       `Status:   ${lead.status}`,
       "",
-      `Dashboard: ${process.env.SITE_URL ?? ""}/marketplace`,
+      `Dashboard: ${(process.env.SITE_URL ?? "https://leadflow.wetry.app").replace(/\/$/, "")}/crm/leadgen`,
     ]
       .filter((line): line is string => line !== null)
       .join("\n");
 
-    for (const to of getSuperAdminEmails()) {
-      await sendEmail(to, subject, text);
+    const recipients = getSuperAdminEmails();
+    let sent = recipients.size > 0;
+    for (const to of recipients) {
+      try {
+        if (!await sendEmail(to, subject, text)) sent = false;
+      } catch {
+        sent = false;
+      }
     }
+    await ctx.runMutation(internal.marketplace.notify.recordDelivery, { leadId, sent });
+    return null;
   },
 });

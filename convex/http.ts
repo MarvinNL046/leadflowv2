@@ -18,7 +18,6 @@ import {
   OTP_MAX_RESENDS,
   OTP_RESEND_COOLDOWN_SECONDS,
   OTP_TTL_MINUTES,
-  deriveJobSize,
   generateCode,
   hashCode,
 } from "./marketplace/wizard";
@@ -1588,7 +1587,7 @@ http.route({
 
     // Cooldown (60s over beide kanalen heen, v1-parity).
     const now = Date.now();
-    const lastSent = verification.lastSentAt ?? 0;
+    const lastSent = Math.max(verification.lastSentAt ?? 0, verification.emailCodeSentAt ?? 0);
     const cooldownEnds = lastSent + OTP_RESEND_COOLDOWN_SECONDS * 1000;
     if (lastSent > 0 && now < cooldownEnds) {
       return wizardJson(
@@ -1681,108 +1680,26 @@ http.route({
       );
     }
 
-    const attempt = await ctx.runMutation(
-      internal.marketplace.wizard.attemptVerify,
-      {
-        token: body.token,
-        apiKeyId: apiKey._id,
-        codeHash: await hashCode(body.code.trim()),
-      },
-    );
-
-    switch (attempt.outcome) {
-      case "not_found":
-        return wizardJson({ error: "verification_not_found" }, 404);
-      case "already_verified":
-        return wizardJson({ error: "already_verified" }, 410);
-      case "expired":
-        return wizardJson({ error: "verification_expired" }, 410);
-      case "too_many_attempts":
-        return wizardJson({ error: "too_many_attempts", attemptsLeft: 0 }, 429);
-      case "invalid_code":
-        return wizardJson(
-          { error: "invalid_code", attemptsLeft: attempt.attemptsLeft },
-          400,
-        );
-      case "second_channel":
-        return wizardJson(
-          {
-            success: true,
-            leadId: attempt.leadId,
-            thanksUrl: `/aanvragen/${attempt.niche}/thanks`,
-            duplicate: false,
-            matchedChannel: attempt.matchedChannel,
-            addedSecondChannel: true,
-          },
-          200,
-        );
-    }
-
-    // outcome === "match" → promoveren via de single-source intake-mutatie.
-    const payload = attempt.payload;
-    const str = (x: unknown) => (typeof x === "string" ? x : undefined);
-
-    // Wizard-verrijking: jobSize afleiden uit nicheData.amount_rooms.
-    let jobSize = str(payload.jobSize);
-    if (!jobSize) {
-      const nd = payload.nicheData as Record<string, unknown> | undefined;
-      jobSize = deriveJobSize(nd?.amount_rooms) ?? undefined;
-    }
-
-    let result: { ok: true; leadId: string; duplicate: boolean };
+    let attempt;
     try {
-      result = await ctx.runMutation(internal.marketplace.intake.insertLead, {
-        apiKeyId: apiKey._id,
-        niche: attempt.niche,
-        serviceType: str(payload.serviceType),
-        segment: str(payload.segment),
-        firstName: str(payload.firstName) ?? "",
-        lastName: str(payload.lastName) ?? "",
-        phone: str(payload.phone) ?? "",
-        postalCode: str(payload.postalCode) ?? "",
-        email: str(payload.email),
-        projectType: str(payload.projectType),
-        projectDescription: str(payload.projectDescription),
-        jobSize,
-        buyerIntention: str(payload.buyerIntention),
-        nicheData:
-          payload.nicheData && typeof payload.nicheData === "object"
-            ? payload.nicheData
-            : undefined,
-        photos: Array.isArray(payload.photos)
-          ? (payload.photos as string[])
-          : undefined,
-        urgency: str(payload.urgency),
-        message: str(payload.message),
-        city: str(payload.city),
-        metadata: {
-          ...((payload.metadata as Record<string, unknown>) ?? {}),
-          ...(attempt.metadata ?? {}),
-          via: "wizard",
-        },
+      attempt = await ctx.runMutation(internal.marketplace.wizard.verifyAndPromote, {
+        token: body.token, apiKeyId: apiKey._id, codeHash: await hashCode(body.code.trim()),
       });
-    } catch (err) {
-      const code = err instanceof Error ? err.message : "promotion_failed";
-      console.warn("[wizard-verify] promotie mislukt:", code);
-      return wizardJson({ error: "promotion_failed", detail: code }, 500);
+    } catch {
+      console.warn("[wizard-verify] promotie mislukt");
+      return wizardJson({error: "promotion_failed"}, 500);
     }
-
-    await ctx.runMutation(internal.marketplace.wizard.markPromoted, {
-      verificationId: attempt.verificationId,
-      leadId: result.leadId as Id<"marketplaceLeads">,
-      matchedChannel: attempt.matchedChannel,
-    });
-
-    return wizardJson(
-      {
-        success: true,
-        leadId: result.leadId,
-        thanksUrl: `/aanvragen/${attempt.niche}/thanks`,
-        duplicate: result.duplicate,
+    switch (attempt.outcome) {
+      case "not_found": return wizardJson({error: "verification_not_found"}, 404);
+      case "already_verified": return wizardJson({error: "already_verified"}, 410);
+      case "expired": return wizardJson({error: "verification_expired"}, 410);
+      case "too_many_attempts": return wizardJson({error: "too_many_attempts", attemptsLeft: 0}, 429);
+      case "invalid_code": return wizardJson({error: "invalid_code", attemptsLeft: attempt.attemptsLeft}, 400);
+      case "success": return wizardJson({success: true, leadId: attempt.leadId,
+        thanksUrl: `/aanvragen/${attempt.niche}/thanks`, duplicate: attempt.duplicate,
         matchedChannel: attempt.matchedChannel,
-      },
-      200,
-    );
+        ...(attempt.addedSecondChannel ? {addedSecondChannel: true} : {})}, 200);
+    }
   }),
 });
 

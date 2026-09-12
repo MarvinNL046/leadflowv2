@@ -1,5 +1,7 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
+import { insertMarketplaceLead } from "./intake";
 import { hashApiKey } from "./apiKeys";
 
 /**
@@ -144,23 +146,25 @@ export const recordDispatch = internalMutation({
 
 /**
  * Atomair: attempts++, code vergelijken tegen beide kanalen, en de
- * uitkomst teruggeven. Promotie naar marketplaceLeads gebeurt daarna in
- * de http-route via intake.insertLead (hergebruik van dedup/score/prijs),
- * gevolgd door markPromoted.
+ * uitkomst teruggeven. verifyAndPromote gebruikt deze helper binnen
+ * dezelfde transactie als de lead-insert.
  */
-export const attemptVerify = internalMutation({
-	args: {
-		token: v.string(),
-		apiKeyId: v.id("marketplaceApiKeys"),
-		codeHash: v.string(),
-	},
-	handler: async (ctx, a) => {
+async function verifyAttempt(ctx: MutationCtx, a: {token: string; apiKeyId: Id<"marketplaceApiKeys">; codeHash: string}) {
 		const row = await ctx.db
 			.query("leadVerifications")
 			.withIndex("by_token", (q) => q.eq("token", a.token))
 			.unique();
 		if (!row || row.apiKeyId !== a.apiKeyId) {
 			return { outcome: "not_found" as const };
+		}
+		const phoneMatch = a.codeHash === row.codeHash;
+		const emailMatch = !!row.emailCodeHash && a.codeHash === row.emailCodeHash;
+		// Een herhaling van een al geslaagde code levert dezelfde lead op,
+		// ook als de eerdere HTTP-response verloren ging op de laatste poging.
+		if (row.verifiedAt && row.promotedLeadId &&
+			((phoneMatch && row.phoneVerifiedAt) || (emailMatch && row.emailVerifiedAt))) {
+			return { outcome: "second_channel" as const, leadId: row.promotedLeadId,
+				niche: row.niche, matchedChannel: phoneMatch ? "phone" as const : "email" as const };
 		}
 		if (row.verifiedAt && row.phoneVerifiedAt && row.emailVerifiedAt) {
 			return { outcome: "already_verified" as const };
@@ -172,8 +176,6 @@ export const attemptVerify = internalMutation({
 			return { outcome: "too_many_attempts" as const };
 		}
 
-		const phoneMatch = a.codeHash === row.codeHash;
-		const emailMatch = !!row.emailCodeHash && a.codeHash === row.emailCodeHash;
 		await ctx.db.patch(row._id, { attempts: row.attempts + 1 });
 
 		if (!phoneMatch && !emailMatch) {
@@ -219,7 +221,15 @@ export const attemptVerify = internalMutation({
 			payload: row.payload as Record<string, unknown>,
 			metadata: row.metadata as Record<string, unknown> | undefined,
 		};
+}
+
+export const attemptVerify = internalMutation({
+	args: {
+		token: v.string(),
+		apiKeyId: v.id("marketplaceApiKeys"),
+		codeHash: v.string(),
 	},
+	handler: verifyAttempt,
 });
 
 /** Zet na promotie de verified-stempels op verificatie én lead. */
@@ -248,4 +258,45 @@ export const markPromoted = internalMutation({
 			});
 		}
 	},
+});
+
+/** Codecontrole, lead-insert en promotie delen één transactie. Een retry
+ * kan zo nooit een tweede lead of een half-gepromoveerde aanvraag maken. */
+export const verifyAndPromote = internalMutation({
+  args: { token: v.string(), apiKeyId: v.id("marketplaceApiKeys"), codeHash: v.string() },
+  returns: v.union(
+    v.object({outcome: v.literal("not_found")}),
+    v.object({outcome: v.literal("already_verified")}),
+    v.object({outcome: v.literal("expired")}),
+    v.object({outcome: v.literal("too_many_attempts")}),
+    v.object({outcome: v.literal("invalid_code"), attemptsLeft: v.number()}),
+    v.object({outcome: v.literal("success"), leadId: v.id("marketplaceLeads"), niche: v.string(), duplicate: v.boolean(), matchedChannel: v.union(v.literal("phone"),v.literal("email")), addedSecondChannel: v.optional(v.boolean())})
+  ),
+  handler: async (ctx, args) => {
+    const attempt = await verifyAttempt(ctx, args);
+    if (attempt.outcome === "second_channel") {
+      return {outcome: "success" as const, leadId: attempt.leadId, niche: attempt.niche, duplicate: false, matchedChannel: attempt.matchedChannel, addedSecondChannel: true};
+    }
+    if (attempt.outcome !== "match") return attempt;
+    const p = attempt.payload;
+    const str = (value: unknown) => typeof value === "string" ? value : undefined;
+    const nicheData = p.nicheData && typeof p.nicheData === "object" ? p.nicheData as Record<string, unknown> : undefined;
+    const result = await insertMarketplaceLead(ctx, {
+      apiKeyId: args.apiKeyId, niche: attempt.niche,
+      firstName: str(p.firstName) ?? "", lastName: str(p.lastName) ?? "",
+      phone: str(p.phone) ?? "", postalCode: str(p.postalCode) ?? "", email: str(p.email),
+      serviceType: str(p.serviceType), segment: str(p.segment),
+      projectType: str(p.projectType), projectDescription: str(p.projectDescription),
+      jobSize: str(p.jobSize) || deriveJobSize(nicheData?.amount_rooms) || undefined,
+      buyerIntention: str(p.buyerIntention), nicheData,
+      photos: Array.isArray(p.photos) ? p.photos : undefined,
+      urgency: str(p.urgency), message: str(p.message), city: str(p.city),
+      metadata: {...(p.metadata as Record<string, unknown> ?? {}), ...attempt.metadata, via: "wizard"},
+    });
+    const now = Date.now();
+    const verified = attempt.matchedChannel === "phone" ? {phoneVerifiedAt: now} : {emailVerifiedAt: now};
+    await ctx.db.patch(attempt.verificationId, {verifiedAt: now, promotedLeadId: result.leadId, ...verified});
+    await ctx.db.patch(result.leadId, verified);
+    return {outcome: "success" as const, leadId: result.leadId, niche: attempt.niche, duplicate: result.duplicate, matchedChannel: attempt.matchedChannel};
+  },
 });

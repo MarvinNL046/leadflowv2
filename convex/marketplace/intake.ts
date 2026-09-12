@@ -1,5 +1,5 @@
-import { v } from "convex/values";
-import { internalMutation } from "../_generated/server";
+import { v, type ObjectType } from "convex/values";
+import { internalMutation, type MutationCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { isDuplicateWithin24h } from "./dedup";
 import { computeLeadScore } from "./leadScore";
@@ -28,8 +28,7 @@ import {
 const VALID_SERVICE_TYPES: ServiceType[] = ["install", "repair", "maintain"];
 const VALID_SEGMENTS: Segment[] = ["b2c", "b2b"];
 
-export const insertLead = internalMutation({
-	args: {
+const leadArgs = {
 		apiKeyId: v.id("marketplaceApiKeys"),
 		niche: v.optional(v.string()),
 		serviceType: v.optional(v.string()),
@@ -49,8 +48,9 @@ export const insertLead = internalMutation({
 		message: v.optional(v.string()),
 		city: v.optional(v.string()),
 		metadata: v.optional(v.any()),
-	},
-	handler: async (ctx, p) => {
+	};
+
+export async function insertMarketplaceLead(ctx: MutationCtx, p: ObjectType<typeof leadArgs>) {
 		// 1. Load apiKey; reject if inactive.
 		const apiKey = await ctx.db.get(p.apiKeyId);
 		if (!apiKey || !apiKey.isActive) {
@@ -188,6 +188,7 @@ export const insertLead = internalMutation({
 			metadata: p.metadata ?? undefined,
 			score,
 			status,
+			notificationStatus: "pending",
 			priceExclusiveCents: pricing.exclusiveCents,
 			priceSharedCents: pricing.sharedCents,
 			maxSharedBuyers: pricing.maxSharedBuyers,
@@ -209,5 +210,10 @@ export const insertLead = internalMutation({
 		);
 
 		return { ok: true as const, leadId, duplicate: isDup, status };
-	},
+}
+
+export const insertLead = internalMutation({
+	args: leadArgs,
+	returns: v.object({ok: v.literal(true), leadId: v.id("marketplaceLeads"), duplicate: v.boolean(), status: v.union(v.literal("published"), v.literal("pending_review"), v.literal("duplicate"), v.literal("rejected"))}),
+	handler: insertMarketplaceLead,
 });

@@ -39,13 +39,20 @@ const EXTERNAL_NAV = [
   { href: `${CASHFLOW_URL}/dashboard`, label: 'Cashflow', icon: Receipt },
 ]
 
+const MARKETPLACE_NAV: NavItem[] = [
+  { to: '/feed', label: 'Offerteaanvragen', icon: Store },
+  { to: '/feed/purchased', label: 'Ontgrendelde leads', icon: Users },
+  { to: '/feed/wallet', label: 'Tegoed', icon: Receipt },
+]
+
+
 /**
  * Sidebar voor desktop (md+). Op mobile wordt SidebarContent zonder
  * aside-wrapper in een Sheet drawer gerenderd — zie crm.tsx.
  */
 export function CrmSidebar() {
   return (
-    <aside className="hidden h-screen w-56 flex-col border-r border-zinc-200 bg-white md:flex">
+    <aside className="hidden h-screen w-56 shrink-0 flex-col border-r border-zinc-200 bg-white md:flex">
       <SidebarContent />
     </aside>
   )
@@ -62,6 +69,7 @@ export function SidebarContent({
   onNavigate?: () => void
 }) {
   const { location } = useRouterState()
+  const profile = useQuery(api.userProfiles.me)
 
   // Globale "concepten wachten"-teller — zichtbaar vanaf elke CRM-pagina.
   const tenants = useQuery(api.userProfiles.myTenants)
@@ -178,22 +186,47 @@ export function SidebarContent({
           )
         })}
 
-        {/* Marketplace (leadfeed) — eigen sectie onder /feed, buiten de
-            CRM-layout. Zelfde stijl als de NAV-items; alleen mét toegang. */}
+        {profile?.isSuperAdmin && (
+          <section aria-label="Leadgenbeheer" className="mt-3 border-t border-zinc-200 pt-3">
+            <h2 className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">Leadgenbeheer</h2>
+            <Link to="/crm/leadgen" onClick={onNavigate}
+              aria-current={location.pathname === '/crm/leadgen' ? 'page' : undefined}
+              className={cn('flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                location.pathname === '/crm/leadgen' ? 'bg-[#312e81] text-white shadow-sm' : 'text-zinc-700 hover:bg-[#ede9fe] hover:text-[#312e81]')}>
+              <Store className="h-4 w-4 shrink-0" />Binnengekomen leads
+            </Link>
+          </section>
+        )}
+
         {hasMarketplace && (
-          <Link
-            to="/feed"
-            onClick={onNavigate}
-            className={cn(
-              'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-              location.pathname.startsWith('/feed')
-                ? 'bg-[#312e81] text-white shadow-sm'
-                : 'text-zinc-700 hover:bg-[#ede9fe] hover:text-[#312e81]',
-            )}
-          >
-            <Store className="h-4 w-4" />
-            Marketplace
-          </Link>
+          <section aria-label="Marketplace" className="mt-3 border-t border-zinc-200 pt-3">
+            <h2 className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Marketplace
+            </h2>
+            {MARKETPLACE_NAV.map((item) => {
+              const Icon = item.icon
+              const isActive = item.to === '/feed'
+                ? location.pathname === '/feed' || location.pathname.startsWith('/feed/lead/')
+                : location.pathname.startsWith(item.to)
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={onNavigate}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={cn(
+                    'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-[#312e81] text-white shadow-sm'
+                      : 'text-zinc-700 hover:bg-[#ede9fe] hover:text-[#312e81]',
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {item.label}
+                </Link>
+              )
+            })}
+          </section>
         )}
       </nav>
 
