@@ -45,10 +45,11 @@ function PipelinesPage() {
     )
   }
 
-  return <KanbanBoard workspaceId={workspaceId} />
+  const canManage = tenants.some(t => t.org?.id === tenant?.org?.id && (t.role === 'owner' || t.role === 'admin'))
+  return <KanbanBoard workspaceId={workspaceId} canManage={canManage} />
 }
 
-function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
+function KanbanBoard({ workspaceId, canManage }: { workspaceId: Id<'workspaces'>; canManage: boolean }) {
   const pipeline = useQuery(api.pipelines.getDefault, { workspaceId })
   const board = useQuery(
     api.opportunities.listForKanban,
@@ -78,7 +79,7 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
             Maak je eerste pipeline aan om leads in een kanban te beheren. Je
             krijgt 5 standaard-stages die je daarna kunt aanpassen.
           </p>
-          <CreatePipelineForm workspaceId={workspaceId} />
+          {canManage ? <CreatePipelineForm workspaceId={workspaceId} /> : <p>Vraag de bedrijfsbeheerder om een pipeline in te stellen.</p>}
         </CardContent>
       </Card>
     )
@@ -114,6 +115,7 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
         <div>
           <h1 className="text-xl font-semibold text-zinc-900">
             <InlineEditText
+              disabled={!canManage}
               value={pipeline.pipeline.name}
               maxLength={80}
               ariaLabel="Pipeline-naam bewerken"
@@ -152,6 +154,7 @@ function KanbanBoard({ workspaceId }: { workspaceId: Id<'workspaces'> }) {
         <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto pb-4">
           {stages.map((stage) => (
             <StageColumn
+              canManage={canManage}
               key={stage._id}
               stage={stage}
               opportunities={byStage.get(stage._id) ?? []}
@@ -222,10 +225,12 @@ function PipelineStatsBar({ pipelineId }: { pipelineId: Id<'pipelines'> }) {
 }
 
 function StageColumn({
+  canManage,
   stage,
   opportunities,
   onRename,
 }: {
+  canManage: boolean
   stage: Doc<'pipelineStages'>
   opportunities: Array<{
     _id: string
@@ -256,6 +261,7 @@ function StageColumn({
         />
         <h3 className="text-sm font-medium text-zinc-700">
           <InlineEditText
+            disabled={!canManage}
             value={stage.name}
             maxLength={50}
             ariaLabel="Stage-naam bewerken"

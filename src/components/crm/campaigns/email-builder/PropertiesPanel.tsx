@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { useMutation } from 'convex/react'
+import { useAction } from 'convex/react'
 import { AlignLeft, AlignCenter, AlignRight } from "@/components/icons"
 import { toast } from 'sonner'
 import { Input } from '#/components/ui/input.tsx'
@@ -135,8 +135,7 @@ function ImageForm({
   workspaceId: Id<'workspaces'>
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl)
-  const resolveStorageUrl = useMutation(api.files.resolveStorageUrl)
+  const uploadImage = useAction(api.files.uploadImage)
 
   const handleFile = async (file: File) => {
     if (file.size > 5 * 1024 * 1024) {
@@ -144,24 +143,13 @@ function ImageForm({
       return
     }
     try {
-      const postUrl = await generateUploadUrl()
-      const r = await fetch(postUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': file.type },
-        body: file,
-      })
-      if (!r.ok) throw new Error('Upload mislukt')
-      const { storageId } = (await r.json()) as { storageId: string }
-      const url = await resolveStorageUrl({ storageId: storageId as Id<'_storage'> })
-      onChange({ src: url ?? '' })
+      const url = await uploadImage({workspaceId, bytes: await file.arrayBuffer()})
+      onChange({ src: url })
     } catch (e) {
       toast.error(humanizeConvexError(e, 'Upload mislukt'))
     }
   }
 
-  // workspaceId is passed but we don't need to use it directly here since the
-  // Convex mutation verifies auth server-side. It's available for future scope checks.
-  void workspaceId
 
   return (
     <div className="space-y-3">
@@ -170,7 +158,7 @@ function ImageForm({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/png,image/jpeg,image/webp"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]

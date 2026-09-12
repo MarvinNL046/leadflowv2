@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import { type MutationCtx, mutation, query } from "../_generated/server";
-import { requireMarketplaceAccess } from "./access";
+import { requireMarketplaceAccess, requireMarketplaceManagement } from "./access";
 
 /**
  * Buyer feed preferences + onboarding flag (ported from v1
@@ -116,7 +116,7 @@ async function upsertPreferences(
 export const updateBuyerPreferences = mutation({
 	args: patchArgs,
 	handler: async (ctx, patch): Promise<{ success: true }> => {
-		const { orgId } = await requireMarketplaceAccess(ctx);
+		const { orgId } = await requireMarketplaceManagement(ctx);
 		await upsertPreferences(ctx, orgId, patch);
 		return { success: true as const };
 	},
@@ -141,7 +141,7 @@ export const completeOnboarding = mutation({
 		regions: v.optional(v.array(v.string())),
 	},
 	handler: async (ctx, values): Promise<{ success: true }> => {
-		const { orgId } = await requireMarketplaceAccess(ctx);
+		const { orgId } = await requireMarketplaceManagement(ctx);
 		if (values.niches.length === 0) {
 			throw new Error("Kies minimaal één niche");
 		}

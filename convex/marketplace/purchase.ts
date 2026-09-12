@@ -6,7 +6,7 @@ import {
 	insertContactWithSearchText,
 	refreshContactSearchText,
 } from "../lib/contactWrite";
-import { requireMarketplaceAccess } from "./access";
+import { requireMarketplaceAccess, requireMarketplaceManagement } from "./access";
 import { type Niche, NICHE_LABELS } from "./types";
 import { applyWalletDelta } from "./wallet";
 import { isLeadForSale, matchesBuyer } from "./availability";
@@ -65,7 +65,7 @@ export const purchaseLead = mutation({
 		mode: v.union(v.literal("exclusive"), v.literal("shared")),
 	},
 	handler: async (ctx, { leadId, mode }): Promise<PurchaseResult> => {
-		const { orgId, workspaceId, userId } = await requireMarketplaceAccess(ctx);
+		const { orgId, workspaceId, userId } = await requireMarketplaceManagement(ctx);
 
 		// 1. Load lead + re-check status against the DB.
 		const lead = await ctx.db.get(leadId);

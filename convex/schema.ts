@@ -34,6 +34,9 @@ import {
 } from "./marketplace/types";
 
 export default defineSchema({
+  companyImages: defineTable({
+    orgId: v.id('orgs'), workspaceId: v.id('workspaces'), storageId: v.id('_storage'), uploadedBy: v.id('users'),
+  }).index('by_storage',['storageId']).index('by_org',['orgId']),
   // ════════════════════════════════════════════════════════════════════
   // USERS — identiteit komt van Clerk (gedeelde wetry-instance); deze
   // tabel spiegelt de Clerk-user via `clerkUserId` (index by_clerk_user,

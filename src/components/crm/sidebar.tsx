@@ -75,6 +75,8 @@ export function SidebarContent({
   // Globale "concepten wachten"-teller — zichtbaar vanaf elke CRM-pagina.
   const tenants = useQuery(api.userProfiles.myTenants)
   const workspaceId = tenants?.find((t) => t.workspace !== null)?.workspace?.id
+  const selectedOrgId = tenants?.find(t => t.workspace !== null)?.org?.id
+  const canManage = tenants?.some(t => t.org?.id === selectedOrgId && (t.role === 'owner' || t.role === 'admin')) ?? false
   const pendingIds = useQuery(
     api.aiLeadResponse.pendingConceptContactIds,
     workspaceId ? { workspaceId } : 'skip',
@@ -148,7 +150,7 @@ export function SidebarContent({
 
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
-        {NAV.map((item) => {
+        {NAV.filter(item => canManage || !['/crm/workflows','/crm/campaigns'].includes(item.to)).map((item) => {
           const Icon = item.icon
           const isActive =
             item.to === '/crm'
@@ -204,7 +206,7 @@ export function SidebarContent({
             <h2 className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
               Marketplace
             </h2>
-            {MARKETPLACE_NAV.map((item) => {
+            {MARKETPLACE_NAV.filter(item => item.to !== '/feed/settings' || (marketplaceAccess?.ok && marketplaceAccess.canManage)).map((item) => {
               const Icon = item.icon
               const isActive = item.to === '/feed'
                 ? location.pathname === '/feed' || location.pathname.startsWith('/feed/lead/')
@@ -232,7 +234,7 @@ export function SidebarContent({
       </nav>
 
       {/* Footer */}
-      <div className="shrink-0 border-t border-zinc-200 p-2">
+      {canManage && <div className="shrink-0 border-t border-zinc-200 p-2">
         <Link
           to="/crm/settings"
           onClick={onNavigate}
@@ -246,7 +248,7 @@ export function SidebarContent({
           <Settings className="h-4 w-4" />
           Instellingen
         </Link>
-      </div>
+      </div>}
     </>
   )
 }

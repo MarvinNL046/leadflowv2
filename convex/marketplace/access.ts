@@ -1,4 +1,5 @@
 import { getUserId } from "../lib/identity";
+import {requireCompanyPermission, canManageCompany} from '../lib/permissions';
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import {
@@ -43,7 +44,8 @@ export async function requireMarketplaceAccess(
 	const memberships = await ctx.db
 		.query("memberships")
 		.withIndex("by_user_org", (q) => q.eq("userId", userId))
-		.collect();
+		.take(101);
+	if (memberships.length > 100) throw new Error('marketplace_access_denied');
 
 	for (const m of memberships) {
 		const org = await ctx.db.get(m.orgId);
@@ -61,11 +63,19 @@ export async function requireMarketplaceAccess(
 			workspaceId = defaultWorkspace?._id ?? null;
 		}
 		if (!workspaceId) continue;
+		const workspace = await ctx.db.get(workspaceId);
+		if (!workspace || workspace.orgId !== org._id) continue;
 
 		return { userId, orgId: org._id, workspaceId };
 	}
 
 	throw new Error("marketplace_access_denied");
+}
+
+export async function requireMarketplaceManagement(ctx: QueryCtx): Promise<MarketplaceContext> {
+  const buyer = await requireMarketplaceAccess(ctx);
+  await requireCompanyPermission(ctx, buyer.orgId, 'manage');
+  return buyer;
 }
 
 /**
@@ -102,10 +112,11 @@ export const marketplaceAccess = query({
 	args: {},
 	handler: async (
 		ctx,
-	): Promise<{ ok: true; orgId: Id<"orgs"> } | { ok: false }> => {
+	): Promise<{ ok: true; orgId: Id<"orgs">; canManage: boolean } | { ok: false }> => {
 		try {
 			const c = await requireMarketplaceAccess(ctx);
-			return { ok: true as const, orgId: c.orgId };
+			const {membership} = await requireCompanyPermission(ctx,c.orgId);
+			return { ok: true as const, orgId: c.orgId, canManage: canManageCompany(membership.role) };
 		} catch {
 			return { ok: false as const };
 		}
@@ -122,7 +133,7 @@ export const marketplaceAccess = query({
 export const requireBuyer = internalQuery({
 	args: {},
 	handler: async (ctx): Promise<MarketplaceContext> => {
-		return await requireMarketplaceAccess(ctx);
+		return await requireMarketplaceManagement(ctx);
 	},
 });
 

@@ -1,29 +1,15 @@
+import {requireWorkspacePermission, type CompanyPermission} from './lib/permissions';
 import { v } from "convex/values";
-import { getUserId } from "./lib/identity";
 import {
   query,
   mutation,
   type QueryCtx,
-  type MutationCtx,
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { slugifyKey, validateDefinition } from "./customFieldsLogic";
 
-async function requireWorkspaceMembership(
-  ctx: QueryCtx | MutationCtx,
-  workspaceId: Id<"workspaces">,
-): Promise<void> {
-  const userId = await getUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
-  const workspace = await ctx.db.get(workspaceId);
-  if (!workspace) throw new Error("Workspace not found");
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user_org", (q) =>
-      q.eq("userId", userId).eq("orgId", workspace.orgId),
-    )
-    .first();
-  if (!membership) throw new Error("Not a member of this workspace");
+async function requireWorkspaceMembership(ctx: QueryCtx, workspaceId: Id<"workspaces">, permission: CompanyPermission = 'crm') {
+  return (await requireWorkspacePermission(ctx, workspaceId, permission)).userId;
 }
 
 /**
@@ -119,7 +105,7 @@ export const createDefinition = mutation({
     isRequired: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    await requireWorkspaceMembership(ctx, args.workspaceId);
+    await requireWorkspaceMembership(ctx, args.workspaceId, 'manage');
     const err = validateDefinition({
       label: args.label,
       fieldType: args.fieldType,
@@ -164,7 +150,7 @@ export const updateDefinition = mutation({
   handler: async (ctx, args) => {
     const def = await ctx.db.get(args.definitionId);
     if (!def) throw new Error("Veld niet gevonden");
-    await requireWorkspaceMembership(ctx, def.workspaceId);
+    await requireWorkspaceMembership(ctx, def.workspaceId, 'manage');
     const patch: Record<string, unknown> = {};
     if (args.label !== undefined) {
       const err = validateDefinition({
@@ -193,7 +179,7 @@ export const deleteDefinition = mutation({
   handler: async (ctx, args) => {
     const def = await ctx.db.get(args.definitionId);
     if (!def) throw new Error("Veld niet gevonden");
-    await requireWorkspaceMembership(ctx, def.workspaceId);
+    await requireWorkspaceMembership(ctx, def.workspaceId, 'manage');
     const vals = await ctx.db
       .query("customFieldValues")
       .withIndex("by_definition", (q) =>

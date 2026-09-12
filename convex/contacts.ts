@@ -1,3 +1,4 @@
+import {requireWorkspacePermission, type CompanyPermission} from './lib/permissions';
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { getUserId } from "./lib/identity";
@@ -48,34 +49,8 @@ import {
  * Returnt de user-id voor downstream gebruik. Throws op niet-auth of
  * non-member.
  */
-async function requireWorkspaceMembership(
-  ctx: QueryCtx,
-  workspaceId: Id<"workspaces">,
-): Promise<Id<"users">> {
-  const userId = await getUserId(ctx);
-  if (!userId) {
-    throw new Error("Not authenticated");
-  }
-
-  // Workspace bestaat?
-  const workspace = await ctx.db.get(workspaceId);
-  if (!workspace) {
-    throw new Error("Workspace not found");
-  }
-
-  // User member van deze org?
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user_org", (q) =>
-      q.eq("userId", userId).eq("orgId", workspace.orgId),
-    )
-    .first();
-
-  if (!membership) {
-    throw new Error("Not a member of this workspace");
-  }
-
-  return userId;
+async function requireWorkspaceMembership(ctx: QueryCtx, workspaceId: Id<"workspaces">, permission: CompanyPermission = 'crm') {
+  return (await requireWorkspacePermission(ctx, workspaceId, permission)).userId;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useMutation } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import { Lock, Users } from "@/components/icons"
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button.tsx'
@@ -60,10 +60,12 @@ export function PurchaseModal({
 }: PurchaseModalProps) {
   const navigate = useNavigate()
   const purchaseLead = useMutation(api.marketplace.purchase.purchaseLead)
+  const access = useQuery(api.marketplace.access.marketplaceAccess)
+  const canBuy = access?.ok && access.canManage
   const [pending, setPending] = useState(false)
 
   async function confirm() {
-    if (!mode) return
+    if (!mode || !canBuy) return
     setPending(true)
     try {
       const res = await purchaseLead({ leadId, mode })
@@ -143,7 +145,8 @@ export function PurchaseModal({
           >
             Annuleren
           </Button>
-          <Button onClick={confirm} disabled={pending || !mode}>
+          {!canBuy && <p className="text-sm">Alleen een eigenaar of bedrijfsbeheerder kan leads kopen.</p>}
+          <Button onClick={confirm} disabled={pending || !mode || !canBuy}>
             {pending
               ? 'Bezig…'
               : isExclusive

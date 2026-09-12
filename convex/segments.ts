@@ -1,5 +1,5 @@
+import {requireWorkspacePermission, type CompanyPermission} from './lib/permissions';
 import { v } from "convex/values";
-import { getUserId } from "./lib/identity";
 import {
   query,
   mutation,
@@ -19,16 +19,8 @@ const rulesValidator = v.object({
   conditions: v.array(v.object({ field: v.string(), op: v.string(), value: v.any() })),
 });
 
-async function requireWorkspace(ctx: QueryCtx, workspaceId: Id<"workspaces">) {
-  const userId = await getUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
-  const workspace = await ctx.db.get(workspaceId);
-  if (!workspace) throw new Error("Workspace not found");
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user_org", (q) => q.eq("userId", userId).eq("orgId", workspace.orgId))
-    .first();
-  if (!membership) throw new Error("Not a member of this workspace");
+async function requireWorkspace(ctx: QueryCtx, workspaceId: Id<"workspaces">, permission: CompanyPermission = 'crm') {
+  return (await requireWorkspacePermission(ctx, workspaceId, permission)).userId;
 }
 
 /** Bepaal welke joins een rule-set echt nodig heeft — voorkomt onnodige reads. */
@@ -118,7 +110,7 @@ export const create = mutation({
     rules: rulesValidator,
   },
   handler: async (ctx, args) => {
-    await requireWorkspace(ctx, args.workspaceId);
+    await requireWorkspace(ctx, args.workspaceId, 'manage');
     return await ctx.db.insert("segments", {
       workspaceId: args.workspaceId,
       name: args.name,
@@ -138,7 +130,7 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const seg = await ctx.db.get(args.segmentId);
     if (!seg) throw new Error("Segment not found");
-    await requireWorkspace(ctx, seg.workspaceId);
+    await requireWorkspace(ctx, seg.workspaceId, 'manage');
     await ctx.db.patch(args.segmentId, {
       ...(args.name !== undefined ? { name: args.name } : {}),
       ...(args.description !== undefined ? { description: args.description } : {}),
@@ -152,7 +144,7 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const seg = await ctx.db.get(args.segmentId);
     if (!seg) throw new Error("Segment not found");
-    await requireWorkspace(ctx, seg.workspaceId);
+    await requireWorkspace(ctx, seg.workspaceId, 'manage');
     await ctx.db.delete(args.segmentId);
   },
 });

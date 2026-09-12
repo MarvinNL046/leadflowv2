@@ -4,7 +4,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import TiptapImage from '@tiptap/extension-image'
 import TextAlign from '@tiptap/extension-text-align'
-import { useMutation } from 'convex/react'
+import { useAction } from 'convex/react'
 import { api } from '../../../../convex/_generated/api'
 import { CtaButton } from '#/components/crm/campaigns/cta-button-node.ts'
 import { Button } from '#/components/ui/button.tsx'
@@ -23,16 +23,18 @@ import {
 } from "@/components/icons"
 import { toast } from 'sonner'
 
+import type { Id } from '../../../../convex/_generated/dataModel'
+
 interface RichTextEditorProps {
+  workspaceId: Id<'workspaces'>
   value: string
   onChange: (html: string) => void
 }
 
-export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
+export function RichTextEditor({ value, onChange, workspaceId }: RichTextEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl)
-  const resolveStorageUrl = useMutation(api.files.resolveStorageUrl)
+  const uploadImage = useAction(api.files.uploadImage)
 
   const editor = useEditor({
     extensions: [
@@ -117,11 +119,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     if (file.size > 5 * 1024 * 1024) { toast.error('Afbeelding mag maximaal 5 MB zijn'); return }
     setUploading(true)
     try {
-      const postUrl = await generateUploadUrl()
-      const res = await fetch(postUrl, { method: 'POST', headers: { 'Content-Type': file.type }, body: file })
-      if (!res.ok) throw new Error('Upload mislukt')
-      const { storageId } = await res.json()
-      const url = await resolveStorageUrl({ storageId })
+      const url = await uploadImage({workspaceId, bytes: await file.arrayBuffer()})
       editor?.chain().focus().setImage({ src: url }).run()
     } catch (err) {
       toast.error('Afbeelding uploaden mislukt')
@@ -134,7 +132,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     <div>
       <input
         type="file"
-        accept="image/*"
+        accept="image/png,image/jpeg,image/webp"
         ref={fileInputRef}
         onChange={handleFileChange}
         style={{ display: 'none' }}
