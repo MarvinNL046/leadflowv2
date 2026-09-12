@@ -34,4 +34,6 @@ crons.interval(
   {},
 );
 
+crons.interval("marketplace-verval-en-opvolging", {minutes:5}, internal.marketplace.lifecycle.sweep, {});
+
 export default crons;

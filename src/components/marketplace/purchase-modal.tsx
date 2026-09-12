@@ -43,6 +43,7 @@ interface PurchaseModalProps {
   leadId: Id<'marketplaceLeads'>
   mode: 'exclusive' | 'shared' | null
   priceCents: number
+  maxSharedBuyers: number
   open: boolean
   onOpenChange: (open: boolean) => void
   onPurchased: (full: FullContact) => void
@@ -52,6 +53,7 @@ export function PurchaseModal({
   leadId,
   mode,
   priceCents,
+  maxSharedBuyers,
   open,
   onOpenChange,
   onPurchased,
@@ -115,8 +117,8 @@ export function PurchaseModal({
           </DialogTitle>
           <DialogDescription>
             {isExclusive
-              ? 'Je krijgt deze aanvraag exclusief — geen andere vakman ontvangt hem.'
-              : 'Je deelt deze aanvraag met maximaal een paar andere vakmensen.'}
+              ? 'Via LeadFlow wordt deze aanvraag alleen aan jouw bedrijf verkocht.'
+              : `Je deelt deze aanvraag met maximaal ${Math.max(0,maxSharedBuyers-1)} andere installateurs (${maxSharedBuyers} kopers totaal).`}
           </DialogDescription>
         </DialogHeader>
 

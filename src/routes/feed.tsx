@@ -54,6 +54,7 @@ const TABS = [
   { to: '/feed', label: 'Offerteaanvragen', exact: true },
   { to: '/feed/purchased', label: 'Ontgrendeld', exact: false },
   { to: '/feed/wallet', label: 'Tegoed', exact: false },
+  { to: '/feed/settings', label: 'Werkgebied en meldingen', exact: false },
 ] as const
 
 function FeedShell() {

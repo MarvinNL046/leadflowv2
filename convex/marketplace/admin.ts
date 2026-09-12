@@ -29,26 +29,33 @@ const leadView = v.object({
   source: v.string(), niche: v.string(), status: v.string(), followUpStatus: followUp,
   notificationStatus: v.string(), phoneVerified: v.boolean(), emailVerified: v.boolean(),
   message: v.union(v.string(),v.null()),
+  expiresAt:v.union(v.number(),v.null()), unclaimedAt:v.union(v.number(),v.null()), buyerMailsSent:v.number(), buyerMailsFailed:v.number(),
 });
 
 export const listLeads = query({
-  args: {paginationOpts: paginationOptsValidator, sourceId: v.optional(v.id("marketplaceApiKeys"))},
+  args: {paginationOpts: paginationOptsValidator, sourceId: v.optional(v.id("marketplaceApiKeys")), attentionOnly:v.optional(v.boolean())},
   returns: v.object({page: v.array(leadView), isDone: v.boolean(), continueCursor: v.string()}),
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const base = args.sourceId
+    const base = args.attentionOnly
+      ? (args.sourceId ? ctx.db.query('marketplaceLeads').withIndex('by_api_key_unclaimedAt',q=>q.eq('apiKeyId',args.sourceId).gt('unclaimedAt',0))
+        : ctx.db.query('marketplaceLeads').withIndex('by_unclaimedAt',q=>q.gt('unclaimedAt',0)))
+      : args.sourceId
       ? ctx.db.query("marketplaceLeads").withIndex("by_api_key", q => q.eq("apiKeyId", args.sourceId))
       : ctx.db.query("marketplaceLeads");
     const result = await base.order("desc").paginate({...args.paginationOpts, numItems: Math.min(args.paginationOpts.numItems, 50)});
     const page = await Promise.all(result.page.map(async lead => {
       const key = lead.apiKeyId ? await ctx.db.get(lead.apiKeyId) : null;
+      const mails = await ctx.db.query('marketplaceBuyerNotifications').withIndex('by_lead_org',q=>q.eq('leadId',lead._id)).take(100);
       return {id: lead._id, createdAt: lead._creationTime,
         name: [lead.firstName,lead.lastName].filter(Boolean).join(" ") || "Naam onbekend",
         email: lead.email ?? null, phone: lead.phone ?? null, city: lead.city ?? null, postalCode: lead.postalCode ?? null,
         source: typeof lead.metadata?.source === "string" ? lead.metadata.source : key?.name ?? "Bron onbekend",
         niche: lead.niche, status: lead.status, followUpStatus: lead.followUpStatus ?? "new",
         notificationStatus: lead.notificationStatus ?? "unknown", phoneVerified: !!lead.phoneVerifiedAt,
-        emailVerified: !!lead.emailVerifiedAt, message: lead.message ?? lead.projectDescription ?? null};
+        emailVerified: !!lead.emailVerifiedAt, message: lead.message ?? lead.projectDescription ?? null,
+        expiresAt:lead.expiresAt??null,unclaimedAt:lead.unclaimedAt??null,
+        buyerMailsSent:mails.filter(m=>m.state==='sent').length,buyerMailsFailed:mails.filter(m=>m.state==='failed'&&m.attempts>=3).length};
     }));
     return {page, isDone: result.isDone, continueCursor: result.continueCursor};
   },
@@ -60,7 +67,7 @@ export const setFollowUpStatus = mutation({
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
     if (!await ctx.db.get(args.leadId)) throw new Error("Lead niet gevonden");
-    await ctx.db.patch(args.leadId, {followUpStatus: args.status, followUpUpdatedAt: Date.now()});
+    await ctx.db.patch(args.leadId, {followUpStatus: args.status, followUpUpdatedAt: Date.now(),...(args.status!=='new'?{unclaimedAt:undefined,followUpDueAt:undefined}:{})});
     return null;
   },
 });

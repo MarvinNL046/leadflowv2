@@ -221,6 +221,7 @@ function LeadDetailPage() {
           )}
 
           <Separator />
+          {lead.expiresAt && <p className="text-sm text-zinc-500">Te koop tot {new Intl.DateTimeFormat('nl-NL',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Amsterdam'}).format(lead.expiresAt)}. Een eerdere aankoop kan de beschikbaarheid beperken.</p>}
           {revealed ? (
             <p className="text-sm font-medium text-emerald-600">
               Je hebt deze aanvraag ontgrendeld.
@@ -256,6 +257,7 @@ function LeadDetailPage() {
 
       <PurchaseModal
         leadId={leadId}
+        maxSharedBuyers={lead.maxSharedBuyers}
         mode={modalMode}
         priceCents={
           modalMode === 'exclusive'

@@ -1007,7 +1007,7 @@ export default defineSchema({
     ),
     priceExclusiveCents: v.number(),
     priceSharedCents: v.number(),
-    maxSharedBuyers: v.number(), // default 4
+    maxSharedBuyers: v.number(), // default 3 for new leads
     allowExclusive: v.boolean(), // default true
     allowShared: v.boolean(), // default true
     publishedAt: v.optional(v.number()),
@@ -1015,6 +1015,8 @@ export default defineSchema({
     adminNotes: v.optional(v.string()),
     followUpStatus: v.optional(v.union(v.literal("new"), v.literal("contacted"), v.literal("done"))),
     followUpUpdatedAt: v.optional(v.number()),
+    followUpDueAt: v.optional(v.number()),
+    unclaimedAt: v.optional(v.number()),
     notificationStatus: v.optional(v.union(v.literal("pending"), v.literal("sent"), v.literal("failed"))),
     notificationAttemptedAt: v.optional(v.number()),
     legacyId: v.optional(v.number()),
@@ -1024,6 +1026,10 @@ export default defineSchema({
     .index("by_status_published", ["status", "publishedAt"]) // FEED main query
     .index("by_phone_niche", ["phone", "niche"]) // dedup at intake
     .index("by_province", ["province"])
+    .index("by_status_expiresAt", ["status", "expiresAt"])
+    .index("by_followUpDueAt", ["followUpDueAt"])
+    .index("by_unclaimedAt", ["unclaimedAt"])
+    .index("by_api_key_unclaimedAt", ["apiKeyId", "unclaimedAt"])
     .index("by_legacyId", ["legacyId"]),
 
   // A buyer org unlocking a lead. contactId = the auto-copied CRM contact.
@@ -1096,6 +1102,7 @@ export default defineSchema({
       v.literal("both"),
     ),
     notifyOnNewLead: v.boolean(),
+    emailAlertsActivatedAt: v.optional(v.number()),
     notifyChannel: v.union(
       v.literal("email"),
       v.literal("whatsapp"),
@@ -1106,6 +1113,19 @@ export default defineSchema({
     updatedAt: v.number(),
     legacyOrgId: v.optional(v.number()),
   }).index("by_org", ["orgId"]),
+
+  marketplacePolicies: defineTable({
+    niche: marketplaceNiche, serviceType: marketplaceServiceType,
+    expiryDays: v.optional(v.number()), followUpHours: v.number(), updatedAt: v.number(),
+  }).index("by_niche_serviceType", ["niche","serviceType"]),
+
+  // Immutable email payload + a leased, bounded retry chain per lead/buyer.
+  marketplaceBuyerNotifications: defineTable({
+    leadId: v.id("marketplaceLeads"), orgId: v.id("orgs"),
+    recipient: v.string(), from: v.string(), subject: v.string(), body: v.string(),
+    state: v.union(v.literal("pending"),v.literal("sending"),v.literal("sent"),v.literal("failed"),v.literal("skipped")),
+    attempts: v.number(), leaseUntil: v.optional(v.number()), sentAt: v.optional(v.number()),
+  }).index("by_lead_org", ["leadId","orgId"]),
 
   // Lead-view dedup tracking (light analytics — kept because the
   // lead-detail route writes it). v1: marketplace_lead_views.

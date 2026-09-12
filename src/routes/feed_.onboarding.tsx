@@ -84,6 +84,7 @@ function OnboardingContent() {
           'b2c',
           'b2b',
         ],
+        provinces: prefs.provinces ?? null,
       }
     : undefined
 
