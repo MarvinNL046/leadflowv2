@@ -44,10 +44,12 @@ export const status = query({
     const pausedEmail=ws?await ctx.db.query('companyEmailConnections').withIndex('by_org_status',q=>q.eq('orgId',ws.orgId).eq('status','disabled')).first():null;
     const ownWa=await ctx.db.query('companyWhatsappConnections').withIndex('by_workspaceId',q=>q.eq('workspaceId',args.workspaceId)).first();
     const activeWa=await ctx.db.query('companyWhatsappConnections').withIndex('by_workspaceId_and_status',q=>q.eq('workspaceId',args.workspaceId).eq('status','active')).unique();
-    return {assigned:assigned || !!ownEmail || !!activeWa,
+    const ownSms=await ctx.db.query('companySmsConnections').withIndex('by_workspaceId',q=>q.eq('workspaceId',args.workspaceId)).first();
+    const activeSms=await ctx.db.query('companySmsConnections').withIndex('by_workspaceId_and_status',q=>q.eq('workspaceId',args.workspaceId).eq('status','active')).unique();
+    return {assigned:assigned || !!ownEmail || !!activeWa || !!activeSms,
       email:!!ownEmail || (!pausedEmail && assigned && !!process.env.RESEND_API_KEY && !!process.env.EMAIL_FROM),
-      sms:assigned && !!process.env.VOIDFIX_SMS_API_SECRET && !!process.env.VOIDFIX_SMS_DEVICE_ID,
-      whatsapp:ownWa ? !!activeWa : assigned && !!process.env.VOIDFIX_API_KEY && !!(wa ? wa.isActive && wa.sessionId : process.env.VOIDFIX_WA_SESSION_ID),
+      sms:ownSms ? !!activeSms : assigned && !!process.env.VOIDFIX_SMS_API_SECRET && !!process.env.VOIDFIX_SMS_DEVICE_ID,
+      whatsapp:ownWa ? !!activeWa && (!activeWa.health || activeWa.health==='connected') : assigned && !!process.env.VOIDFIX_API_KEY && !!(wa ? wa.isActive && wa.sessionId : process.env.VOIDFIX_WA_SESSION_ID),
       calendar:assigned && !!process.env.GOOGLE_CALENDAR_ID && !!process.env.GOOGLE_CALENDAR_CLIENT_EMAIL && !!process.env.GOOGLE_CALENDAR_PRIVATE_KEY,
       suite:assigned && !!(process.env.CASHFLOW_READ_API_KEY || process.env.FROSTWORK_READ_API_KEY),
     };

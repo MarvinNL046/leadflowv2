@@ -275,3 +275,11 @@ Publicatiebevestiging LG-040: Vercel dpl_BkCkdWSXot6nWpRSWvzUo65paDBd READY, pro
 [Technisch bereik](eigen-whatsapp-20260912.md); [bedrijfshandleiding](bedrijfshandleiding-koppelingen.md). Geen echte providerconfiguratie of telefoon gewijzigd, geen berichten verstuurd. Sessiestatuscontrole is niet hetzelfde als bevestigde webhookontvangst. Geen SEO-werk.
 
 Publicatiebevestiging LG-041: Vercel dpl_8H95nJGcdCa89XAqe4ryN5xx32cr READY, productiecommit 5af6906eaa13386d9c05c4019fa197ab233019b1. Live vanuit Instellingen Eigen WhatsApp-koppeling geopend: juiste velden, activatie-uitleg en pauzeergedrag zichtbaar. Vanuit die pagina de handleiding geopend: voorbereiding, e-mailstappen, WhatsAppstappen, pauzeren, probleemoplossing en vervolgsectie zichtbaar; instellingslinks aanwezig. Bestaande providerstatus blijft configuratie aanwezig. Formulier niet ingevuld en niets geactiveerd.
+
+## Eigen SMS en WhatsApp-bewaking — 12 september 2026
+
+| ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
+|---|---|---|---|---|---|---|---|---|---|
+| LG-042 | 2026-09-12 | leadflowv2 | /crm/settings/sms, /crm/settings/eigen-whatsapp, handleiding en instellingen; companySmsConnections, messaging, eigen SMS-callback, legacy-routing, companyWhatsappHealth en kwartiercron | Gecontroleerd eigen SMS-apparaat/account, versleutelde credentials, gescheiden inbound/receipts, pauzeren. Automatische WhatsApp-controle met herstel/statusknop; handleiding uitgebreid | Gecontroleerd, publicatie volgt | 459 tests/49 bestanden; Convex-TypeScript en Vite-build; algemene TypeScript bestaande diagnostiek | codex/sms-whatsapp-bewaking-20260912 | — | Echte telefoonproef, daarna begeleide bedrijfsregistratie en optionele storingsmeldingen |
+
+[Technisch bereik](sms-whatsapp-bewaking-20260912.md); [bedrijfshandleiding](bedrijfshandleiding-koppelingen.md). Eén alleen-lezen providerrequest voor de vorm van de apparaatlijst, verder uitsluitend gesimuleerd verkeer. Geen echte berichten of providerinstellingen gewijzigd. Geen SEO-werk.

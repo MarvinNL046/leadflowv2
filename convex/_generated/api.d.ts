@@ -20,6 +20,8 @@ import type * as contactSearch from "../contactSearch.js";
 import type * as companyProviders from "../companyProviders.js";
 import type * as providerRouting from "../providerRouting.js";
 import type * as webhookSignals from "../webhookSignals.js";
+import type * as companyWhatsappHealth from "../companyWhatsappHealth.js";
+import type * as companySms from "../companySms.js";
 import type * as companyWhatsapp from "../companyWhatsapp.js";
 import type * as companyEmail from "../companyEmail.js";
 import type * as contacts from "../contacts.js";
@@ -129,6 +131,8 @@ declare const fullApi: ApiFromModules<{
   webhookSignals: typeof webhookSignals;
   companyEmail: typeof companyEmail;
   companyWhatsapp: typeof companyWhatsapp;
+  companySms: typeof companySms;
+  companyWhatsappHealth: typeof companyWhatsappHealth;
   contacts: typeof contacts;
   contactsBackfill: typeof contactsBackfill;
   contactsRead: typeof contactsRead;
