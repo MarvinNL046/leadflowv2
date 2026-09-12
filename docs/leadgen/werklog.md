@@ -33,9 +33,9 @@ De bovenstaande lokale controles beschrijven de eerste fase. Deze is inmiddels g
 | ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
 |---|---|---|---|---|---|---|---|---|---|
 | LG-011 | 2026-09-12 | leadflowv2 + vindaircomonteur-v2 | LG-003 t/m LG-010 | Eerste ronde gepubliceerd; ingelogd beheer en echte aanvraagroute gecontroleerd | Live | Beide Vercel-deployments READY; beheer bereikbaar | leadflowv2 PR #10 / c7d7461; pilot PR #1 / 286e728 | 2026-09-12 | Aflevering sms controleren |
-| LG-012 | 2026-09-12 | vindaircomonteur.nl | /aanvragen/verify → /aanvragen/bedankt | Eén geautoriseerde TESTAANVRAAG bevestigd per e-mail; lead en beheerdersnotificatie aangemaakt | Gecontroleerd | emailVerified=true, phoneVerified=false; notificatie door provider geaccepteerd; sms blijft Pending op OnePlus 8T | Productiecontrole eerste ronde | 2026-09-12 | Testlead uit verkoop halen met behoud historie; gatewayapp controleren |
-| LG-013 | 2026-09-12 | leadflowv2 | /crm/leadgen, /api/intake/events, wizard | 30-daagse telling per bron: paginaweergave, formulierstart, ingediend, nieuwe bevestigde lead; geen contactgegevens in telling; bewaakte archivering testlead | Gecontroleerd (lokaal) | 261 tests; Convex-typecheck; productiebuild; geen root-TS-fouten in gewijzigde bestanden | Zie git log op codex/leadgen-homepage-metrics-20260912 | — | Publiceren en live teller controleren |
-| LG-014 | 2026-09-12 | vindaircomonteur.nl | /, /privacy, /aanvragen/verify, /aanvragen/bedankt | Eén formulier met optionele toelichting; realistische reactietijd; anonieme meting; kanaalonafhankelijke bevestiging en e-mailalternatief | Gecontroleerd (lokaal) | 24 tests; TypeScript; productiebuild | Zie git log op codex/leadgen-homepage-metrics-20260912 | — | Publiceren en live controleren |
+| LG-012 | 2026-09-12 | vindaircomonteur.nl | /aanvragen/verify → /aanvragen/bedankt | Eén geautoriseerde TESTAANVRAAG bevestigd per e-mail; lead en beheerdersnotificatie aangemaakt | Gecontroleerd | emailVerified=true, phoneVerified=false; notificatie door provider geaccepteerd; sms blijft Pending op OnePlus 8T | Productiecontrole eerste ronde | 2026-09-12 | Testlead uit verkoop gehaald en afgerond, historie behouden; gatewayapp controleren |
+| LG-013 | 2026-09-12 | leadflowv2 | /crm/leadgen, /api/intake/events, wizard | 30-daagse telling per bron: paginaweergave, formulierstart, ingediend, nieuwe bevestigde lead; geen contactgegevens in telling; bewaakte archivering testlead | Live | 261 tests; Convex-typecheck; build; live teller 1 weergave en 1 formulierstart | PR #11 / c259114 | 2026-09-12 | Verzamelen van echte gebruiksgegevens |
+| LG-014 | 2026-09-12 | vindaircomonteur.nl | /, /privacy, /aanvragen/verify, /aanvragen/bedankt | Eén formulier met optionele toelichting; realistische reactietijd; anonieme meting; kanaalonafhankelijke bevestiging en e-mailalternatief | Live | 24 tests; TypeScript; build; live één formulier en werkende events; mobiel 390 px zonder overflow | PR #2 / c4c8d66 | 2026-09-12 | Sms-gatewayapp controleren |
 
 Sms-documentatie: https://gateway.voidfix.com/rest-api/api-documentation en https://gateway.voidfix.com/device-connection.
 WhatsApp is een apart kanaal; sessiecontrole gedocumenteerd op https://wa.voidfix.com/api-docs/#/Sessions/get_api_external_sessions. Voor deze test is geen WhatsApp verstuurd.
@@ -86,7 +86,7 @@ De records hieronder gaan over de site als geheel. Vul bij daadwerkelijk werk de
 | tosotaircolimburg | 2026-09-12 | — | Geïnventariseerd | Pagina kiezen; formulierbestemming en inhoud controleren |
 | vind-aannemer | 2026-09-12 | — | Geïnventariseerd | Pagina kiezen; formulierbestemming en inhoud controleren |
 | vindaircomonteur | 2026-09-12 | — | Geïnventariseerd | Gebruik vindaircomonteur-v2 voor het huidige Vercel-project |
-| vindaircomonteur-v2 | 2026-09-12 | 2026-09-12 (aanvraagroute) | Live (aanvraagroute) | Homepageverbetering en meting publiceren; sms-gateway controleren |
+| vindaircomonteur-v2 | 2026-09-12 | 2026-09-12 (aanvraagroute) | Live (homepage, aanvraagroute en meting) | Sms-gateway controleren; daarna conversie volgen |
 | vindcvmonteur | 2026-09-12 | — | Geïnventariseerd | Pagina kiezen; formulierbestemming en inhoud controleren |
 | vinddakdekker | 2026-09-12 | — | Geïnventariseerd | Pagina kiezen; formulierbestemming en inhoud controleren |
 | vindelektricien | 2026-09-12 | — | Geïnventariseerd | Pagina kiezen; formulierbestemming en inhoud controleren |
@@ -100,3 +100,12 @@ De records hieronder gaan over de site als geheel. Vul bij daadwerkelijk werk de
 | vindstukadoor | 2026-09-12 | — | Geïnventariseerd | Pagina kiezen; formulierbestemming en inhoud controleren |
 | vindtandarts.nl | 2026-09-12 | — | Geïnventariseerd | Pagina kiezen; formulierbestemming en inhoud controleren |
 | vindtimmerman | 2026-09-12 | — | Geïnventariseerd | Pagina kiezen; formulierbestemming en inhoud controleren |
+
+## Eindcontrole publicatie — 12 september 2026
+
+- LeadFlow v2: PR #11, c259114, dpl_2w1DbfYg6ywrNUMYLqAkWmd3gMg4, READY, TanStack Start, build circa 35 seconden. https://leadflow.wetry.app/crm/leadgen
+- Pilot: PR #2, c4c8d66, dpl_4m8aZuf1RLd5gaqRtoojgdYi5eJw, READY, Next.js, build circa 30 seconden. https://vindaircomonteur.nl/
+- Live gecontroleerd: één homepageformulier; de controle leverde 1 weergave en 1 start in de teller op. Niet ingestuurd; geen extra testlead. De eerste e-mailtest vond vóór activering van de meting plaats en is niet teruggeteld.
+- Geautoriseerde testlead staat op rejected + done; emailVerified=true en phoneVerified=false. Geen aankoop gevonden bij archivering; historie behouden.
+- Beide Vercel-projecten: geen runtimefouten gevonden in de laatste 30 minuten. Externe logdrains niet gecontroleerd; geen nieuwe periodieke monitoring aangemaakt.
+- Openstaand: sms Pending bij Staycool Airconditioning, OnePlus 8T [887]. Gatewayapp/service, internet en SIM op het toestel controleren. Provideracceptatie bewijst geen ontvangst.
