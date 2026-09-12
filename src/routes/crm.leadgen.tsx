@@ -6,6 +6,7 @@ import type { Id } from '../../convex/_generated/dataModel'
 import { Button } from '#/components/ui/button'
 import { LeadCoverage } from '#/components/marketplace/lead-coverage'
 import { ServiceReview } from '#/components/marketplace/service-review'
+import { SaleReview } from '#/components/marketplace/sale-review'
 
 export const Route = createFileRoute('/crm/leadgen')({ component: LeadgenPage })
 
@@ -123,6 +124,7 @@ function LeadgenOverview() {
           {lead.message && <p className="mt-3 whitespace-pre-wrap break-words text-sm text-zinc-600">{lead.message}</p>}
           <LeadCoverage coverage={lead.coverage} />
           <ServiceReview leadId={lead.id} current={lead.serviceType} revision={lead.serviceTypeRevision} canEdit={lead.canEditServiceType} latest={lead.latestServiceReview} />
+          <SaleReview leadId={lead.id} action={lead.saleReviewAction} revision={lead.saleReviewRevision} latest={lead.latestSaleReview}/>
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className={`rounded-full px-2.5 py-1 ${lead.phoneVerified ? 'bg-emerald-50 text-emerald-800' : 'bg-zinc-100 text-zinc-500'}`}>Telefoon {lead.phoneVerified ? 'bevestigd' : 'onbevestigd'}</span>
             {lead.email && <span className={`rounded-full px-2.5 py-1 ${lead.emailVerified ? 'bg-emerald-50 text-emerald-800' : 'bg-zinc-100 text-zinc-500'}`}>E-mail {lead.emailVerified ? 'bevestigd' : 'onbevestigd'}</span>}
