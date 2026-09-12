@@ -965,6 +965,7 @@ export default defineSchema({
     apiKeyId: v.optional(v.id("marketplaceApiKeys")),
     niche: marketplaceNiche,
     serviceType: v.optional(marketplaceServiceType),
+    serviceTypeRevision: v.optional(v.number()),
     segment: marketplaceSegment, // default "b2c"
     region: v.optional(v.string()),
     province: v.optional(v.string()),
@@ -1113,6 +1114,12 @@ export default defineSchema({
     updatedAt: v.number(),
     legacyOrgId: v.optional(v.number()),
   }).index("by_org", ["orgId"]),
+
+  marketplaceServiceReviews: defineTable({
+    leadId: v.id('marketplaceLeads'),
+    before: v.union(marketplaceServiceType,v.null()), after: v.union(marketplaceServiceType,v.null()),
+    reviewedBy: v.id('users'), reviewedAt: v.number(), note: v.string(), revision: v.number(),
+  }).index('by_lead',['leadId']),
 
   marketplacePolicies: defineTable({
     niche: marketplaceNiche, serviceType: marketplaceServiceType,
