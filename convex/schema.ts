@@ -922,6 +922,13 @@ export default defineSchema({
     .index("by_active", ["isActive"])
     .index("by_legacyId", ["legacyId"]),
 
+  // Homepage funnel totals only: no visitor IDs, IPs or contact details.
+  leadgenDailyMetrics: defineTable({
+    apiKeyId: v.id("marketplaceApiKeys"),
+    day: v.number(), // UTC day start
+    views: v.number(), starts: v.number(), submitted: v.number(), verified: v.number(),
+  }).index("by_source_day", ["apiKeyId", "day"]),
+
   // OTP-verificaties voor de wizard-intake (v1: lead_verifications).
   // De SEO-sites praten tegen /api/intake/wizard/{start,send-code,verify};
   // pas na een geldige code wordt de payload gepromoveerd naar

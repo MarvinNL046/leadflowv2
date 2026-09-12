@@ -32,6 +32,7 @@ function LeadgenOverview() {
     api.marketplace.admin.listLeads, sourceId ? { sourceId } : {}, { initialNumItems: 25 },
   )
   const updateStatus = useMutation(api.marketplace.admin.setFollowUpStatus)
+  const funnel = useQuery(api.marketplace.metrics.homepageFunnel, sourceId ? { sourceId } : 'skip')
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -64,6 +65,19 @@ function LeadgenOverview() {
       </div>
 
       {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      <section aria-label="Homepageconversie" className="rounded-xl border bg-white p-4">
+        <h2 className="font-semibold">Homepageconversie · laatste 30 dagen</h2>
+        {!sourceId ? <p className="mt-2 text-sm text-zinc-500">Kies hierboven een leadbron om de meetgegevens te bekijken.</p>
+          : !funnel ? <p role="status" className="mt-2 text-sm">Meetgegevens laden…</p>
+          : <>
+            <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {[[funnel.views, 'Paginaweergaven'], [funnel.starts, 'Formulier gestart'], [funnel.submitted, 'Ingediend'], [funnel.verified, 'Nieuwe bevestigde leads']].map(([value,label]) => (
+                <div key={label}><p className="text-2xl font-semibold text-indigo-800">{value}</p><p className="mt-1 text-xs text-zinc-500">{label}</p></div>
+              ))}
+            </div>
+            <p className="mt-4 text-xs text-zinc-500">{funnel.firstMeasuredDay ? 'Tellingen vanaf ' + new Intl.DateTimeFormat('nl-NL', {dateStyle:'medium',timeZone:'UTC'}).format(funnel.firstMeasuredDay) + '. ' : 'Nog geen metingen ontvangen. '}Weergaven zijn geen unieke bezoekers. Alleen de aangesloten homepage telt mee; dubbele leads en herhaalde bevestigingen tellen niet als nieuwe lead. Dagen lopen van 00:00 tot 24:00 UTC.</p>
+          </>}
+      </section>
       {status === 'LoadingFirstPage' ? <p role="status">Aanvragen laden…</p> : results.length === 0 ? (
         <div className="rounded-xl border border-dashed p-10 text-center">
           <p className="font-medium">Nog geen aanvragen gevonden</p>

@@ -3,6 +3,7 @@ import { internalMutation, internalQuery, type MutationCtx } from "../_generated
 import type { Id } from "../_generated/dataModel";
 import { insertMarketplaceLead } from "./intake";
 import { hashApiKey } from "./apiKeys";
+import { countHomepageEvent } from "./metrics";
 
 /**
  * Wizard-OTP backend (v1-compat). De SEO-sites (aircooffertelimburg.nl
@@ -104,6 +105,9 @@ export const start = internalMutation({
 			userAgent: args.userAgent,
 		});
 
+		if (typeof args.metadata?.source === "string" && args.metadata.source.startsWith("home:")) {
+			await countHomepageEvent(ctx, args.apiKeyId, "submitted");
+		}
 		return { rateLimited: false as const, token, expiresAt };
 	},
 });
@@ -297,6 +301,9 @@ export const verifyAndPromote = internalMutation({
     const verified = attempt.matchedChannel === "phone" ? {phoneVerifiedAt: now} : {emailVerifiedAt: now};
     await ctx.db.patch(attempt.verificationId, {verifiedAt: now, promotedLeadId: result.leadId, ...verified});
     await ctx.db.patch(result.leadId, verified);
+    if (!result.duplicate && typeof attempt.metadata?.source === 'string' && attempt.metadata.source.startsWith('home:')) {
+      await countHomepageEvent(ctx, args.apiKeyId, 'verified');
+    }
     return {outcome: "success" as const, leadId: result.leadId, niche: attempt.niche, duplicate: result.duplicate, matchedChannel: attempt.matchedChannel};
   },
 });

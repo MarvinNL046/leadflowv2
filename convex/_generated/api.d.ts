@@ -62,6 +62,7 @@ import type * as marketplace_leadPricing from "../marketplace/leadPricing.js";
 import type * as marketplace_leadScore from "../marketplace/leadScore.js";
 import type * as marketplace_leadViews from "../marketplace/leadViews.js";
 import type * as marketplace_mask from "../marketplace/mask.js";
+import type * as marketplace_metrics from "../marketplace/metrics.js";
 import type * as marketplace_notify from "../marketplace/notify.js";
 import type * as marketplace_phone from "../marketplace/phone.js";
 import type * as marketplace_pricing from "../marketplace/pricing.js";
@@ -160,6 +161,7 @@ declare const fullApi: ApiFromModules<{
   "marketplace/leadScore": typeof marketplace_leadScore;
   "marketplace/leadViews": typeof marketplace_leadViews;
   "marketplace/mask": typeof marketplace_mask;
+  "marketplace/metrics": typeof marketplace_metrics;
   "marketplace/notify": typeof marketplace_notify;
   "marketplace/phone": typeof marketplace_phone;
   "marketplace/pricing": typeof marketplace_pricing;

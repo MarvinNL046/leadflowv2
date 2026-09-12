@@ -1561,6 +1561,23 @@ http.route({
   }),
 });
 
+// Anonymous homepage counts, authenticated by each site's server-side intake key.
+// Contact details, URLs, IPs and user agents are deliberately not forwarded here.
+http.route({
+  path: "/api/intake/events",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const key = await wizardAuth(ctx, request);
+    if (!key) return wizardJson({error: "invalid_api_key"}, 401);
+    let body: unknown;
+    try { body = await request.json(); } catch { return wizardJson({error: "invalid_json"}, 400); }
+    const event = body && typeof body === 'object' && 'event' in body ? body.event : undefined;
+    if (event !== 'views' && event !== 'starts') return wizardJson({error: 'invalid_event'}, 400);
+    await ctx.runMutation(internal.marketplace.metrics.recordBrowserEvent, {apiKeyId: key._id, event});
+    return wizardJson({ok: true}, 200);
+  }),
+});
+
 http.route({
   path: "/api/intake/wizard/send-code",
   method: "GET",

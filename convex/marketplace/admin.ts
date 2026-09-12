@@ -5,7 +5,7 @@ import { getUserId } from "../lib/identity";
 
 const followUp = v.union(v.literal("new"), v.literal("contacted"), v.literal("done"));
 
-async function requireAdmin(ctx: QueryCtx) {
+export async function requireAdmin(ctx: QueryCtx) {
   const userId = await getUserId(ctx);
   if (!userId) throw new Error("Niet ingelogd");
   const profile = await ctx.db.query("userProfiles").withIndex("by_user", q => q.eq("userId", userId)).unique();
