@@ -88,6 +88,7 @@ const SECTIONS: HubSection[] = [
     description: 'Externe diensten die leads inbrengen of berichten versturen',
     items: [
       {to:'/crm/settings/email',title:'Eigen e-mailkoppeling',description:'Resend-account, geverifieerde afzender en bezorgmeldingen voor jouw bedrijf',icon:Mail,iconColor:'bg-blue-100 text-blue-700'},
+      {to:'/crm/settings/team',title:'Bedrijf en team',description:'Startoverzicht, teamuitnodigingen en toegangsbeheer',icon:Settings,iconColor:'bg-violet-100 text-violet-700'},
       {to:'/crm/settings/eigen-whatsapp',title:'Eigen WhatsApp-koppeling',description:'Eigen Voidfix-account, bedrijfsnummer en inkomende berichten',icon:MessageCircle,iconColor:'bg-green-100 text-green-700'},
       {to:'/crm/settings/sms',title:'Eigen SMS-koppeling',description:'Eigen SMS-gateway, Android-apparaat en inkomende berichten',icon:MessageCircle,iconColor:'bg-blue-100 text-blue-700'},
       {to:'/crm/settings/handleiding',title:'Handleiding voor bedrijven',description:'E-mail, SMS en WhatsApp aansluiten, testen en problemen oplossen',icon:Settings,iconColor:'bg-violet-100 text-violet-700'},

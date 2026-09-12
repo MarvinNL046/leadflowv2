@@ -35,6 +35,7 @@ import {
 } from "./marketplace/types";
 
 export default defineSchema({
+  companyInvites:defineTable({orgId:v.id('orgs'),workspaceId:v.id('workspaces'),email:v.string(),role:v.union(v.literal('admin'),v.literal('member')),tokenHash:v.string(),createdBy:v.id('users'),expiresAt:v.number(),status:v.union(v.literal('pending'),v.literal('accepted'),v.literal('revoked')),acceptedBy:v.optional(v.id('users')),acceptedAt:v.optional(v.number())}).index('by_tokenHash',['tokenHash']).index('by_orgId_and_status',['orgId','status']),
   companySmsConnections:defineTable({workspaceId:v.id('workspaces'),status:v.union(v.literal('active'),v.literal('disabled')),createdBy:v.id('users'),deviceId:v.string(),deviceName:v.string(),encryptedApiKey:v.string(),encryptedWebhookSecret:v.string(),verifiedAt:v.number(),lastWebhookAt:v.optional(v.number()),disabledAt:v.optional(v.number())}).index('by_workspaceId_and_status',['workspaceId','status']).index('by_workspaceId',['workspaceId']).index('by_deviceId',['deviceId']),
   companyWhatsappConnections:defineTable({workspaceId:v.id('workspaces'),status:v.union(v.literal('active'),v.literal('disabled')),createdBy:v.id('users'),sessionId:v.string(),phoneNumber:v.string(),encryptedApiKey:v.string(),encryptedWebhookSecret:v.string(),verifiedAt:v.number(),health:v.optional(v.union(v.literal('connected'),v.literal('disconnected'),v.literal('unknown'))),lastCheckedAt:v.optional(v.number()),healthReason:v.optional(v.string()),lastWebhookAt:v.optional(v.number()),disabledAt:v.optional(v.number())}).index('by_workspaceId_and_status',['workspaceId','status']).index('by_workspaceId',['workspaceId']).index('by_sessionId',['sessionId']).index('by_status',['status']),
   companyEmailConnections:defineTable({orgId:v.id('orgs'),status:v.union(v.literal('draft'),v.literal('active'),v.literal('disabled')),createdBy:v.id('users'),encryptedApiKey:v.optional(v.string()),encryptedWebhookSecret:v.optional(v.string()),fromEmail:v.optional(v.string()),fromName:v.optional(v.string()),domainId:v.optional(v.string()),webhookId:v.optional(v.string()),verifiedAt:v.optional(v.number()),disabledAt:v.optional(v.number())}).index('by_org_status',['orgId','status']).index('by_org',['orgId']),
@@ -87,6 +88,7 @@ export default defineSchema({
 
   orgs: defineTable({
     name: v.string(),
+    contactEmail:v.optional(v.string()),contactPhone:v.optional(v.string()),workArea:v.optional(v.string()),services:v.optional(v.string()),
     slug: v.string(),
     ownerId: v.id("users"),
     // Plan/billing — koppel later aan Stripe; in v1 was er client_subscriptions

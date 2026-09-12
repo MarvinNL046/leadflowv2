@@ -17,6 +17,7 @@ import type * as callAttemptStage from "../callAttemptStage.js";
 import type * as campaignSetup from "../campaignSetup.js";
 import type * as consent from "../consent.js";
 import type * as contactSearch from "../contactSearch.js";
+import type * as companyOnboarding from "../companyOnboarding.js";
 import type * as companyProviders from "../companyProviders.js";
 import type * as providerRouting from "../providerRouting.js";
 import type * as webhookSignals from "../webhookSignals.js";
@@ -127,6 +128,7 @@ declare const fullApi: ApiFromModules<{
   consent: typeof consent;
   contactSearch: typeof contactSearch;
   companyProviders: typeof companyProviders;
+  companyOnboarding: typeof companyOnboarding;
   providerRouting: typeof providerRouting;
   webhookSignals: typeof webhookSignals;
   companyEmail: typeof companyEmail;

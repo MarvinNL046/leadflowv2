@@ -1,10 +1,36 @@
-# Bedrijfshandleiding: e-mail, SMS en WhatsApp aansluiten
+# Bedrijfshandleiding: je bedrijf, team en koppelingen inrichten
 
 Versie 12 september 2026. Voor eigenaren en bedrijfsbeheerders in LeadFlow.
 
 ## Voordat je begint
 
-Je hebt een bestaande LeadFlow-bedrijfsomgeving nodig met de rol eigenaar of bedrijfsbeheerder. Medewerkers kunnen dagelijks met het CRM werken, maar beheren geen sleutels. Het zelfstandig aanmelden van nieuwe bedrijven is nog niet beschikbaar.
+Je kunt na inloggen met een geverifieerd e-mailadres een eigen bedrijfsomgeving maken of een teamuitnodiging accepteren. Voor het beheren van koppelingen heb je de rol eigenaar of bedrijfsbeheerder nodig. Medewerkers kunnen dagelijks met het CRM werken, maar beheren geen sleutels.
+
+## Je bedrijfsomgeving aanmaken
+
+1. Log in of maak via het inlogscherm een account aan. Bevestig je e-mailadres. Open daarna Aan de slag via de startpagina. Ook een lege CRM-omgeving verwijst je hiernaartoe.
+
+2. Ben je door een bedrijf uitgenodigd? Kies dan eerst Ik heb een uitnodiging. Maak niet daarnaast een eigen bedrijf aan: één account kan in deze eerste versie maar bij één bedrijf horen.
+
+3. Voor je eigen bedrijf kies je Eigen bedrijf starten. Vul bedrijfsnaam, zakelijk telefoonnummer, werkgebied en diensten in. Je geverifieerde e-mailadres wordt het contactadres. Klik Mijn bedrijfsomgeving aanmaken.
+
+4. Je wordt eigenaar van uitsluitend jouw bedrijf. Je krijgt een lege verkooppipeline met Nieuw, Contact gelegd, Offerte verstuurd, Gewonnen en Verloren. Er worden geen provideraccounts, klantberichten, tegoeden of platformbeheerrechten aangemaakt. Toegang tot de leadmarktplaats wordt afzonderlijk toegelaten.
+
+5. Open via Instellingen → Bedrijf en team het Startoverzicht. Nodig teamleden uit en richt je communicatiekanalen in met de stappen hieronder. Het eigen CRM is ook bruikbaar zonder leads te kopen.
+
+## Teamleden uitnodigen
+
+1. Open Instellingen → Bedrijf en team. Vul het e-mailadres van de ontvanger in en kies Medewerker. Een eigenaar kan ook Bedrijfsbeheerder kiezen. Medewerkers hebben dagelijkse CRM-toegang; beheerders kunnen daarnaast instellingen, campagnes en toegestane aankopen beheren. Rollen gelden voor het hele bedrijf, niet voor een afgeschermde werkruimte daarbinnen.
+
+2. Klik Uitnodigingscode maken. Er wordt geen e-mail verstuurd. Kopieer de eenmalig getoonde code en deel die zelf met de bedoelde ontvanger. LeadFlow bewaart uitsluitend een controlehash van de code. Een nieuwe code voor hetzelfde adres vervangt de vorige.
+
+3. De ontvanger logt in met exact het uitgenodigde e-mailadres, verifieert dat adres en opent Aan de slag → Ik heb een uitnodiging. Vul de code in en klik Uitnodiging accepteren. De code is zeven dagen geldig en eenmaal bruikbaar. De rol en het bedrijf worden door de uitnodiging bepaald.
+
+4. Onder Open uitnodigingen kun je een ongebruikte code intrekken. Als de uitnodiger zijn benodigde beheerrechten verliest, kan de uitnodiging niet meer worden gebruikt. Een verlopen of kwijtgeraakte code vervang je door een nieuwe.
+
+5. Met Toegang intrekken verwijder je de toegang van een teamlid tot dit bedrijf. CRM-gegevens blijven bewaard. Een eigenaar kan beheerders verwijderen; beheerders kunnen alleen medewerkers verwijderen. Eigenaren en je eigen toegang worden op deze pagina niet verwijderd. Verwijderen annuleert geen eerder ingeplande bedrijfsautomatiseringen.
+
+Een ontvanger die al bij een bedrijf hoort kan de uitnodiging nog niet accepteren. Een bedrijfswisselaar en meerdere bedrijven per account volgen later. Rolwijziging van een bestaand lid gebeurt in deze versie door de toegang in te trekken en een nieuwe uitnodiging met de gewenste rol te maken. Overdracht van eigenaarschap is nog niet beschikbaar.
 
 Gebruik accounts en telefoonnummers die jouw bedrijf beheert. Deel API-keys en persoonlijke webhookadressen alleen met bevoegde beheerders. Stuur ze niet naar klanten of in screenshots. LeadFlow slaat providerkeys versleuteld op en toont opgeslagen API-keys niet opnieuw.
 
@@ -96,4 +122,4 @@ Een onbekende status kan ook een tijdelijke providerstoring zijn. De bewaking bl
 
 ## Wat komt later?
 
-Automatische storingsmeldingen buiten de app, e-mailantwoorden in de inbox en zelfstandig bedrijven aanmelden zijn nog vervolgstappen. De eerste echte telefoon- en afleveringstest van de nieuwe koppelingen staat nog open.
+Automatische storingsmeldingen buiten de app, e-mailantwoorden in de inbox, meerdere bedrijven per account en overdracht van eigenaarschap zijn nog vervolgstappen. De eerste echte telefoon- en afleveringstest van de nieuwe koppelingen staat nog open.
