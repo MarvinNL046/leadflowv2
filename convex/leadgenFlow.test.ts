@@ -41,7 +41,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
-async function setup(source = 'home:vindaircomonteur.nl') {
+async function setup(source = 'home:vindaircomonteur.nl', serviceType?: 'install' | 'maintain' | 'repair') {
   const t = convexTest(schema, modules);
   const keyHash = await hashApiKey(rawKey);
   const ids = await t.run(async ctx => {
@@ -55,13 +55,34 @@ async function setup(source = 'home:vindaircomonteur.nl') {
   const headers = { Authorization: `Bearer ${rawKey}`, 'Content-Type': 'application/json' };
   const start = async () => {
     const response = await t.fetch('/api/intake/wizard/start', { method: 'POST', headers,
-      body: JSON.stringify({ niche: 'airco', payload: {...payload,...(source.startsWith('page:') ? {serviceType:'install'} : {})}, metadata: { source } }) });
+      body: JSON.stringify({ niche: 'airco', payload: {...payload,...(source.startsWith('page:') ? {serviceType:'install'} : serviceType ? {serviceType} : {})}, metadata: { source } }) });
     expect(response.status).toBe(200);
     return (await response.json()).token as string;
   };
   const verify = (token: string, code: string) => t.fetch('/api/intake/wizard/verify', { method: 'POST', headers, body: JSON.stringify({ token, code }) });
   return { t, ...ids, headers, start, verify, admin: t.withIdentity({ subject: 'admin-test' }), buyer: t.withIdentity({ subject: 'buyer-test' }) };
 }
+
+test.each(['install','maintain','repair'] as const)('homepage %s survives verification and only installation alerts Staycool',async serviceType=>{
+  const {t,admin,headers,start,verify}=await setup('home:vindaircomonteur.nl',serviceType);
+  const orgId=await t.run(async ctx=>{
+    const userId=await ctx.db.insert('users',{clerkUserId:'staycool-home-test',email:'buyer@example.invalid'});
+    return ctx.db.insert('orgs',{name:'Staycool Airconditioning',slug:'staycool-home-test',ownerId:userId});
+  });
+  await t.mutation(internal.marketplace.adminCli.configureStaycoolPilot,{orgId});
+  const token=await start();
+  await t.fetch('/api/intake/wizard/send-code?v='+token,{headers});
+  const smsCall=fetchMock.mock.calls.find(([url])=>String(url).includes('voidfix'))!;
+  const code=new URLSearchParams(smsCall[1].body).get('message')!.match(/\d{6}/)![0];
+  expect(await (await verify(token,code)).json()).toMatchObject({success:true});
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  const result=await admin.query(api.marketplace.admin.listLeads,{paginationOpts:{cursor:null,numItems:25}});
+  expect(result.page).toHaveLength(1);
+  expect(result.page[0]).toMatchObject({serviceType,source:'home:vindaircomonteur.nl',phoneVerified:true});
+  const mails=await t.run(ctx=>ctx.db.query('marketplaceBuyerNotifications').take(10));
+  expect(mails).toHaveLength(serviceType==='install'?1:0);
+  if(serviceType==='install') expect(mails[0]).toMatchObject({orgId,state:'sent',recipient:'buyer@example.invalid'});
+});
 
 test.each(['home:vindaircomonteur.nl', 'page:vindaircomonteur.nl/installatie/airco-laten-plaatsen-stappen'])('HTTP start → dispatch → verify → admin overview preserves %s, without duplicate on retry', async source => {
   const { t, admin, headers, start, verify, keyId } = await setup(source);
