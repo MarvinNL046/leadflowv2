@@ -1,5 +1,7 @@
 # Afnemers- en verkooproute — 12 september 2026
 
+Historische audit op de hieronder genoemde commit. De aansluitende [herstelronde](marketplace-herstel-20260912.md) is gepubliceerd: betaalcontrole, ingestelde vervaldatums, dienstclassificatie en CRM-overdracht zijn verbeterd. De auditfixture reproduceert de oorspronkelijke situatie; actuele regressietests staan in convex/marketplacePurchaseFlow.test.ts. De commerciële en overige open punten blijven relevant.
+
 De intake is aanwezig, maar de marketplace is nog niet klaar voor betrouwbare betaalde leadverkoop. Eerst de betaalcontrole en verkoopvoorwaarden herstellen, daarna afnemers activeren en de regionale paginagroei hervatten.
 
 ## Omvang en bewijs
