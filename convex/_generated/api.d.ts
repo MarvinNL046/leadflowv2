@@ -50,6 +50,7 @@ import type * as lib_moneybirdMatch from "../lib/moneybirdMatch.js";
 import type * as lib_phone from "../lib/phone.js";
 import type * as lib_voidfix from "../lib/voidfix.js";
 import type * as marketplace_access from "../marketplace/access.js";
+import type * as marketplace_admin from "../marketplace/admin.js";
 import type * as marketplace_adminCli from "../marketplace/adminCli.js";
 import type * as marketplace_apiKeys from "../marketplace/apiKeys.js";
 import type * as marketplace_buyerPreferences from "../marketplace/buyerPreferences.js";
@@ -147,6 +148,7 @@ declare const fullApi: ApiFromModules<{
   "lib/phone": typeof lib_phone;
   "lib/voidfix": typeof lib_voidfix;
   "marketplace/access": typeof marketplace_access;
+  "marketplace/admin": typeof marketplace_admin;
   "marketplace/adminCli": typeof marketplace_adminCli;
   "marketplace/apiKeys": typeof marketplace_apiKeys;
   "marketplace/buyerPreferences": typeof marketplace_buyerPreferences;
