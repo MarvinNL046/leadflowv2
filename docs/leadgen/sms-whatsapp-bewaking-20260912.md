@@ -25,3 +25,5 @@ Eén echte alleen-lezen apparaatlijstrequest is gebruikt om de antwoordstructuur
 Bronnen: SMS Voidfix API Integration en het ingebouwde webhookvoorbeeld (deviceID/simSlot); de officiële API-specificatie op https://gateway.voidfix.com/rest-api/your-swagger-doc.yaml; WhatsApp session-status op https://wa.voidfix.com/api-docs/. Gecontroleerd op 12 september 2026. Geen SEO-werk.
 
 Vervolg: een gecontroleerde praktijkproef in twee richtingen met de kantoor-telefoon. Daarna begeleide bedrijfsregistratie/uitnodigingen en optionele storingsmeldingen buiten de app.
+
+Live bevestigd via PR #41, commit b503d736c223c7df1deb33a878193a7555d8c382; Vercel dpl_6MdUSAz9HXpbH3C2Vv1fnaMVpqgX READY. SMS-formulier, handleidingsecties en WhatsApp-bewakingsuitleg vanuit de instellingsnavigatie alleen-lezen gecontroleerd. Er is geen eigen provideraccount aangesloten voor deze livecontrole.
