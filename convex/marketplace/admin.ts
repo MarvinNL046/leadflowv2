@@ -4,6 +4,7 @@ import { query, mutation, type QueryCtx } from "../_generated/server";
 import { getUserId } from "../lib/identity";
 import { coverageForLead, coverageValidator, loadCoverageBuyers } from './coverage';
 import {marketplaceServiceType, nicheHasSubservices} from './types';
+import {isLeadForSale} from './availability';
 
 const followUp = v.union(v.literal("new"), v.literal("contacted"), v.literal("done"));
 
@@ -47,6 +48,8 @@ const leadView = v.object({
   coverage: coverageValidator,
   serviceTypeRevision:v.number(), canEditServiceType:v.boolean(),
   latestServiceReview:v.union(v.null(),v.object({at:v.number(),note:v.string()})),
+  saleReviewRevision:v.number(), saleReviewAction:v.union(v.literal('pause'),v.literal('resume'),v.null()),
+  latestSaleReview:v.union(v.null(),v.object({at:v.number(),note:v.string(),action:v.union(v.literal('pause'),v.literal('resume'))})),
   serviceType: v.union(v.string(),v.null()), imported: v.boolean(), originalRequestedAt: v.union(v.number(),v.null()), importedPendingReview: v.boolean(),
   expiresAt:v.union(v.number(),v.null()), unclaimedAt:v.union(v.number(),v.null()), buyerMailsSent:v.number(), buyerMailsFailed:v.number(),
 });
@@ -69,7 +72,12 @@ export const listLeads = query({
       const mails = await ctx.db.query('marketplaceBuyerNotifications').withIndex('by_lead_org',q=>q.eq('leadId',lead._id)).take(100);
       const purchases = await ctx.db.query('marketplacePurchases').withIndex('by_lead',q=>q.eq('leadId',lead._id)).take(101);
       const review=await ctx.db.query('marketplaceServiceReviews').withIndex('by_lead',q=>q.eq('leadId',lead._id)).order('desc').first();
+      const saleReview=await ctx.db.query('marketplaceSaleReviews').withIndex('by_lead',q=>q.eq('leadId',lead._id)).order('desc').first();
       return {id: lead._id, createdAt: lead._creationTime,
+        saleReviewRevision:lead.saleReviewRevision??0,
+        saleReviewAction:purchases.length?null:lead.status==='published'&&isLeadForSale(lead)?'pause' as const:
+          lead.status==='pending_review'&&lead.salePausedByAdmin&&(lead.expiresAt===undefined||lead.expiresAt>Date.now())?'resume' as const:null,
+        latestSaleReview:saleReview?{at:saleReview.reviewedAt,note:saleReview.note,action:saleReview.action}:null,
         serviceTypeRevision:lead.serviceTypeRevision??0,
         canEditServiceType:nicheHasSubservices(lead.niche)&&purchases.length===0&&lead.status!=='sold_shared'&&lead.status!=='sold_exclusive',
         latestServiceReview:review?{at:review.reviewedAt,note:review.note}:null,
@@ -118,6 +126,32 @@ export const reviewServiceType = mutation({
     const revision=(lead.serviceTypeRevision??0)+1;
     await ctx.db.insert('marketplaceServiceReviews',{leadId:lead._id,before:lead.serviceType??null,after:args.serviceType,reviewedBy:userId,reviewedAt:Date.now(),note,revision});
     await ctx.db.patch(lead._id,{serviceType:args.serviceType??undefined,serviceTypeRevision:revision});
+    return null;
+  },
+});
+
+export const reviewSale = mutation({
+  args:{leadId:v.id('marketplaceLeads'),action:v.union(v.literal('pause'),v.literal('resume')),expectedRevision:v.number(),note:v.string(),confirmedCurrent:v.boolean()},
+  returns:v.null(),
+  handler:async(ctx,args)=>{
+    const userId=await requireAdmin(ctx),lead=await ctx.db.get(args.leadId);
+    if(!lead) throw new ConvexError('Aanvraag niet gevonden.');
+    const note=args.note.trim();
+    if(note.length<3||note.length>500) throw new ConvexError('Vul een reden in (3 tot 500 tekens).');
+    if(!Number.isSafeInteger(args.expectedRevision)||args.expectedRevision<0||(lead.saleReviewRevision??0)!==args.expectedRevision)
+      throw new ConvexError('De verkoopstatus is ondertussen gewijzigd. Open de actie opnieuw.');
+    const purchased=await ctx.db.query('marketplacePurchases').withIndex('by_lead',q=>q.eq('leadId',lead._id)).first();
+    if(purchased) throw new ConvexError('Een verkochte aanvraag kan niet met deze actie worden aangepast.');
+    if(args.action==='pause'){
+      if(lead.status!=='published'||!isLeadForSale(lead)) throw new ConvexError('Alleen een beschikbare, ongekochte aanvraag kan worden gepauzeerd.');
+    }else{
+      if(lead.status!=='pending_review'||!lead.salePausedByAdmin) throw new ConvexError('Deze aanvraag is niet via beheer gepauzeerd.');
+      if(lead.expiresAt!==undefined&&lead.expiresAt<=Date.now()) throw new ConvexError('De oorspronkelijke verkooptermijn is verstreken. Deze aanvraag kan niet opnieuw worden aangeboden.');
+      if(!args.confirmedCurrent) throw new ConvexError('Bevestig eerst dat je hebt gecontroleerd of de aanvraag nog actueel is.');
+    }
+    const revision=(lead.saleReviewRevision??0)+1;
+    await ctx.db.insert('marketplaceSaleReviews',{leadId:lead._id,action:args.action,reviewedBy:userId,reviewedAt:Date.now(),note,revision,confirmedCurrent:args.action==='resume'&&args.confirmedCurrent});
+    await ctx.db.patch(lead._id,{status:args.action==='pause'?'pending_review':'published',salePausedByAdmin:args.action==='pause',saleReviewRevision:revision});
     return null;
   },
 });
