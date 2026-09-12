@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
-async function setup() {
+async function setup(source = 'home:vindaircomonteur.nl') {
   const t = convexTest(schema, modules);
   const keyHash = await hashApiKey(rawKey);
   const ids = await t.run(async ctx => {
@@ -37,7 +37,7 @@ async function setup() {
   const headers = { Authorization: `Bearer ${rawKey}`, 'Content-Type': 'application/json' };
   const start = async () => {
     const response = await t.fetch('/api/intake/wizard/start', { method: 'POST', headers,
-      body: JSON.stringify({ niche: 'airco', payload, metadata: { source: 'home:vindaircomonteur.nl' } }) });
+      body: JSON.stringify({ niche: 'airco', payload, metadata: { source } }) });
     expect(response.status).toBe(200);
     return (await response.json()).token as string;
   };
@@ -45,8 +45,8 @@ async function setup() {
   return { t, ...ids, headers, start, verify, admin: t.withIdentity({ subject: 'admin-test' }), buyer: t.withIdentity({ subject: 'buyer-test' }) };
 }
 
-test('HTTP start → dispatch → verify → admin overview → follow-up, with no duplicate on retry', async () => {
-  const { t, admin, headers, start, verify, keyId } = await setup();
+test.each(['home:vindaircomonteur.nl', 'page:vindaircomonteur.nl/installatie/airco-laten-plaatsen-stappen'])('HTTP start → dispatch → verify → admin overview preserves %s, without duplicate on retry', async source => {
+  const { t, admin, headers, start, verify, keyId } = await setup(source);
   const token = await start();
   const sent = await t.fetch('/api/intake/wizard/send-code?v=' + token, { headers });
   expect(await sent.json()).toMatchObject({ sent: true, smsSent: true, emailSent: true });
@@ -63,14 +63,15 @@ test('HTTP start → dispatch → verify → admin overview → follow-up, with 
   expect(await t.run(ctx => ctx.db.query('marketplaceLeads').collect())).toHaveLength(1);
   const overview = await admin.query(api.marketplace.admin.listLeads, { paginationOpts: { cursor: null, numItems: 25 }, sourceId: keyId });
   expect(overview.page).toHaveLength(1);
-  expect(overview.page[0]).toMatchObject({ source: 'home:vindaircomonteur.nl', phoneVerified: true, followUpStatus: 'new', notificationStatus: 'pending' });
+  expect(overview.page[0]).toMatchObject({ source, phoneVerified: true, followUpStatus: 'new', notificationStatus: 'pending' });
   await admin.mutation(api.marketplace.admin.setFollowUpStatus, { leadId: overview.page[0].id, status: 'contacted' });
   expect((await admin.query(api.marketplace.admin.listLeads, { paginationOpts: { cursor: null, numItems: 25 } })).page[0].followUpStatus).toBe('contacted');
   await t.finishAllScheduledFunctions(vi.runAllTimers);
   expect((await t.run(ctx => ctx.db.get(overview.page[0].id)))?.notificationStatus).toBe('sent');
   const mailBodies = fetchMock.mock.calls.filter(([url]) => String(url).includes('resend')).map(([, init]) => JSON.parse(init.body));
   expect(mailBodies.some(body => body.text.includes('https://leadflow.wetry.app/crm/leadgen'))).toBe(true);
-  expect(await admin.query(api.marketplace.metrics.homepageFunnel, {sourceId:keyId})).toMatchObject({submitted:1,verified:1});
+  const homepageCount = source.startsWith('home:') ? 1 : 0;
+  expect(await admin.query(api.marketplace.metrics.homepageFunnel, {sourceId:keyId})).toMatchObject({submitted:homepageCount,verified:homepageCount});
 });
 
 test('homepage events only accept the two anonymous counters and metrics require admin', async () => {

@@ -109,3 +109,14 @@ De records hieronder gaan over de site als geheel. Vul bij daadwerkelijk werk de
 - Geautoriseerde testlead staat op rejected + done; emailVerified=true en phoneVerified=false. Geen aankoop gevonden bij archivering; historie behouden.
 - Beide Vercel-projecten: geen runtimefouten gevonden in de laatste 30 minuten. Externe logdrains niet gecontroleerd; geen nieuwe periodieke monitoring aangemaakt.
 - Openstaand: sms Pending bij Staycool Airconditioning, OnePlus 8T [887]. Gatewayapp/service, internet en SIM op het toestel controleren. Provideracceptatie bewijst geen ontvangst.
+
+## Installatiepagina en vervolg — 12 september 2026
+
+| ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
+|---|---|---|---|---|---|---|---|---|---|
+| LG-015 | 2026-09-12 | vindaircomonteur-v2 | /installatie/airco-laten-plaatsen-stappen | Kostenopbouw, voorbereiding, selectie monteur en aanvraagproces herschreven; onderbouwde bronverwijzingen; formulier op de pagina | Live | 29 pilottests, TypeScript, Next-build; desktop/mobiel 390 px; live één formulier en juiste ankers/canonical | Pilot PR #4 / 2c04c83 | 2026-09-12 | Echte aanvragen en afnemersrespons beoordelen |
+| LG-016 | 2026-09-12 | vindaircomonteur-v2 + leadflowv2 | /api/lead/start en bron in /crm/leadgen | Vaste paginabron en serverbepaalde dienst; bestaand v2-pad behoudt bron na verificatie en retries; homepagecijfers blijven gescheiden | Live | Proxy/UI-tests; 262 v2-tests inclusief ketentest met installatiebron; geen productieberichten | Pilot PR #4; v2-testcommit via git log | 2026-09-12 | Aanvragen herkenbaar per pagina opvolgen |
+| LG-017 | 2026-09-12 | vindaircomonteur-v2 | Gedeelde gids-CTA, header/footer/mobiele CTA; /sitemap.xml | Routebewuste aanvraaglinks; niet-onderbouwde reactie-/offertebelofte uit gids-CTA verwijderd; bestaande gidsen en categorieën in sitemap | Live | Browser op desktop/mobiel, clientnavigatietest en sitemapcontrole | Pilot PR #4 / 2c04c83 | 2026-09-12 | Onderhouds- en storingsinhoud apart beoordelen |
+| LG-018 | 2026-09-12 | leadflowv2 | docs/leadgen/programmatic-vervolg.md | Gebruikersblauwdruk vertaald naar plan voor lokale brondata, calculatorvalidatie, afnemersdekking en opbrengstmeting | Gepland | Bijlage gelezen; Google-richtlijnen gecontroleerd; voorbeeldclaims niet overgenomen | Zie git log | — | Eén regio kiezen met echte afnemers en brongegevens |
+
+Productiepilot: dpl_DzD7EqvsL3pMdfGECEH1vHqj9M1N, READY, Next.js, build 31 seconden. De echte installatieaanvraag is deze ronde niet opnieuw verstuurd: providers zijn gesimuleerd in tests. Sms-test blijft voor maandag na inschakelen van de kantoortelefoon. Geen nieuwe partners gekoppeld, geen lokale datapagina's of calculator gepubliceerd. De algemene certificeringsclaims op de homepage en de inhoud van onderhoud/storing zijn niet volledig geaudit in deze ronde; de gewijzigde gedeelde CTA is wel gecontroleerd.
