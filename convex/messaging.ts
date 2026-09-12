@@ -1,3 +1,4 @@
+import {findLegacyReceipt} from './providerRouting';
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { getUserId } from "./lib/identity";
@@ -432,6 +433,9 @@ export const markConversationRead = mutation({
 export const updateStatusByExternalId = internalMutation({
   args: {
     externalMessageId: v.string(),
+    channel: v.union(v.literal('email'),v.literal('sms'),v.literal('whatsapp')),
+    workspaceId: v.optional(v.id('workspaces')),
+    complaint: v.optional(v.boolean()),
     newStatus: v.union(
       v.literal("delivered"),
       v.literal("failed"),
@@ -442,12 +446,7 @@ export const updateStatusByExternalId = internalMutation({
     errorMessage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const msg = await ctx.db
-      .query("messages")
-      .withIndex("by_external_id", (q) =>
-        q.eq("externalMessageId", args.externalMessageId),
-      )
-      .first();
+    const msg = await findLegacyReceipt(ctx,args.externalMessageId,args.channel,args.workspaceId);
     if (!msg) return { matched: false, firstRead: false };
 
     const patch: Record<string, unknown> = { status: args.newStatus };
@@ -457,13 +456,34 @@ export const updateStatusByExternalId = internalMutation({
     if (msg.status === "read" && args.newStatus === "delivered") {
       delete patch.status;
     }
-    if (args.deliveredAt !== undefined) patch.deliveredAt = args.deliveredAt;
+    if (args.deliveredAt !== undefined && Number.isFinite(args.deliveredAt)) patch.deliveredAt = args.deliveredAt;
     if (args.errorMessage !== undefined) patch.errorMessage = args.errorMessage;
     // firstRead: alleen de EERSTE open telt (herhaalde opens van dezelfde
     // ontvanger bumpen de broadcast-teller niet nog eens).
     const firstRead = args.newStatus === "read" && msg.readAt === undefined;
     if (firstRead) patch.readAt = Date.now();
 
+    const firstDelivery=args.newStatus==='delivered' && msg.deliveryReceiptAt===undefined && msg.deliveredAt===undefined;
+    const firstBounce=args.newStatus==='bounced' && msg.bounceReceiptAt===undefined && msg.status!=='bounced';
+    if(firstDelivery)patch.deliveryReceiptAt=Date.now();
+    if(firstBounce)patch.bounceReceiptAt=Date.now();
+    if(args.channel==='email'){
+      if(args.newStatus==='bounced' && msg.contactId){
+        const contact=await ctx.db.get(msg.contactId);
+        if(contact?.workspaceId===msg.workspaceId)await ctx.db.patch(contact._id,{emailMarketingStatus:'cleaned',marketingUnsubscribedAt:Date.now(),marketingUnsubscribedReason:args.complaint?'complained':'bounced'});
+      }
+      if(msg.relatedEntityType==='broadcast' && msg.relatedEntityId){
+        const id=ctx.db.normalizeId('broadcasts',msg.relatedEntityId);
+        const broadcast=id ? await ctx.db.get(id):null;
+        if(broadcast?.workspaceId===msg.workspaceId){
+          const stats={...broadcast.stats};
+          if(firstRead)stats.opened=(stats.opened??0)+1;
+          if(firstDelivery)stats.delivered+=1;
+          if(firstBounce)stats.bounced+=1;
+          await ctx.db.patch(broadcast._id,{stats});
+        }
+      }
+    }
     await ctx.db.patch(msg._id, patch);
     return { matched: true, messageId: msg._id, firstRead };
   },
@@ -494,8 +514,8 @@ export const recordInbound = internalMutation({
     if (args.externalMessageId) {
       const existing = await ctx.db
         .query("messages")
-        .withIndex("by_external_id", (q) =>
-          q.eq("externalMessageId", args.externalMessageId),
+        .withIndex("by_workspace_channel_external", (q) =>
+          q.eq("workspaceId",args.workspaceId).eq("channel",args.channel).eq("externalMessageId", args.externalMessageId),
         )
         .first();
       if (existing) return { duplicate: true, messageId: existing._id };
@@ -604,8 +624,8 @@ export const recordOutbound = internalMutation({
     if (args.externalMessageId) {
       const existing = await ctx.db
         .query("messages")
-        .withIndex("by_external_id", (q) =>
-          q.eq("externalMessageId", args.externalMessageId),
+        .withIndex("by_workspace_channel_external", (q) =>
+          q.eq("workspaceId",args.workspaceId).eq("channel",args.channel).eq("externalMessageId", args.externalMessageId),
         )
         .first();
       if (existing) return { duplicate: true, messageId: existing._id };

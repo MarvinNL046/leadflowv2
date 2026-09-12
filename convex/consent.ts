@@ -1,3 +1,4 @@
+import {findLegacyReceipt} from './providerRouting';
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 
@@ -28,13 +29,10 @@ export const cleanContactByExternalId = internalMutation({
     reason: v.union(v.literal("bounced"), v.literal("complained")),
   },
   handler: async (ctx, args) => {
-    const message = await ctx.db
-      .query("messages")
-      .withIndex("by_external_id", (q) =>
-        q.eq("externalMessageId", args.externalMessageId),
-      )
-      .first();
+    const message = await findLegacyReceipt(ctx,args.externalMessageId,'email');
     if (!message?.contactId) return { ok: false as const };
+    const contact=await ctx.db.get(message.contactId);
+    if(contact?.workspaceId!==message.workspaceId)return {ok:false as const};
     await ctx.db.patch(message.contactId, {
       emailMarketingStatus: "cleaned",
       marketingUnsubscribedAt: Date.now(),

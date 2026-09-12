@@ -550,8 +550,10 @@ http.route({
       return jsonResponse({ received: true, ignored: payload.type }, 200);
     }
 
-    const updateResult = await ctx.runMutation(internal.messaging.updateStatusByExternalId, {
+    await ctx.runMutation(internal.messaging.updateStatusByExternalId, {
       externalMessageId: externalId,
+      channel: 'email',
+      complaint: payload.type === 'email.complained',
       newStatus,
       deliveredAt: payload.created_at
         ? new Date(payload.created_at).getTime()
@@ -561,36 +563,6 @@ http.route({
           ? `${payload.data.bounce.type}: ${payload.data.bounce.message ?? ""}`
           : undefined,
     });
-
-    // Broadcast-stats: unieke opens (firstRead dedupet herhaalde opens
-    // van dezelfde ontvanger).
-    if (payload.type === "email.opened" && updateResult.firstRead) {
-      await ctx.runMutation(internal.broadcasts.bumpStatFromExternalId, {
-        externalMessageId: externalId,
-        field: "opened",
-      });
-    }
-
-    // Broadcast-stats: bump delivered/bounced counters live via webhook.
-    if (payload.type === "email.delivered") {
-      await ctx.runMutation(internal.broadcasts.bumpStatFromExternalId, {
-        externalMessageId: externalId,
-        field: "delivered",
-      });
-    }
-    // Marketing-consent: harde bounce of spam-klacht → contact permanent
-    // uit alle verzendingen (cleaned). Alleen voor deze twee event-types.
-    if (payload.type === "email.bounced" || payload.type === "email.complained") {
-      const reason = payload.type === "email.complained" ? "complained" : "bounced";
-      await ctx.runMutation(internal.consent.cleanContactByExternalId, {
-        externalMessageId: externalId,
-        reason,
-      });
-      await ctx.runMutation(internal.broadcasts.bumpStatFromExternalId, {
-        externalMessageId: externalId,
-        field: "bounced",
-      });
-    }
 
     return jsonResponse({ received: true, type: payload.type }, 200);
   }),
@@ -699,11 +671,12 @@ http.route({
       "delivered" | "failed" | "bounced" | "read" | null
     > = { Sent: null, Delivered: "delivered", Failed: "failed" };
 
-    // Workspace eenmalig resolven (single-tenant inbound).
+    // The verified legacy secret identifies one company account; require one workspace.
     const wsId = await ctx.runQuery(
-      internal.messaging.getStaycoolWorkspaceIdInternal,
+      internal.providerRouting.legacySmsWorkspace,
       {},
     );
+    if(!wsId)return jsonResponse({received:true,skipped:'unmapped account'},200);
     let inbound = 0;
     for (const m of messages) {
       const from = m.number ?? m.from;
@@ -726,6 +699,8 @@ http.route({
         if (ns && extId) {
           await ctx.runMutation(internal.messaging.updateStatusByExternalId, {
             externalMessageId: extId,
+            channel:'sms',
+            workspaceId:wsId ?? undefined,
             newStatus: ns,
           });
         }
@@ -772,6 +747,14 @@ http.route({
       return jsonResponse({ error: "Invalid JSON" }, 400);
     }
 
+    if(payload.data?.sessionId && payload.sessionId && payload.data.sessionId!==payload.sessionId){
+      return jsonResponse({received:true,skipped:'conflicting session'},200);
+    }
+    const wsId = await ctx.runQuery(internal.providerRouting.whatsappWorkspace,{
+      sessionId:payload.data?.sessionId ?? payload.sessionId ?? undefined,
+    });
+    if(!wsId)return jsonResponse({received:true,skipped:'unmapped session'},200);
+
     // Session-status: de webhook heeft "Session Status" aangevinkt, maar dat
     // event werd tot nu toe genegeerd. Juist dat event vertelt ons meteen dat
     // de koppeling wegvalt — de kwartiercron in whatsappHealth is het vangnet.
@@ -802,10 +785,7 @@ http.route({
       if (!to) {
         return jsonResponse({ received: true, skipped: "no to" }, 200);
       }
-      const wsId = await ctx.runQuery(
-        internal.messaging.getStaycoolWorkspaceIdInternal,
-        {},
-      );
+
       if (!wsId) {
         return jsonResponse({ error: "Workspace not provisioned" }, 500);
       }
@@ -847,7 +827,7 @@ http.route({
         if (ns) {
           await ctx.runMutation(
             internal.messaging.updateStatusByExternalId,
-            { externalMessageId: String(payload.messageId), newStatus: ns },
+            { externalMessageId: String(payload.messageId), newStatus: ns, channel:'whatsapp', workspaceId:wsId },
           );
         }
       }
@@ -858,10 +838,7 @@ http.route({
     const body = payload.body ?? payload.message ?? "";
     if (!from) return jsonResponse({ received: true, skipped: "no from" }, 200);
 
-    const wsId = await ctx.runQuery(
-      internal.messaging.getStaycoolWorkspaceIdInternal,
-      {},
-    );
+
     if (!wsId) return jsonResponse({ error: "Workspace not provisioned" }, 500);
 
     await ctx.runMutation(internal.messaging.recordInbound, {
