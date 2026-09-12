@@ -833,7 +833,7 @@ export default defineSchema({
     // verbroken was. Houdt de bewaker (convex/whatsappHealth.ts) stil zolang
     // een neerliggende sessie nog niet is hersteld. Additief + optioneel.
     lastAlertAt: v.optional(v.number()),
-  }).index("by_workspace", ["workspaceId"]),
+  }).index("by_workspace", ["workspaceId"]).index("by_session", ["sessionId"]),
 
   whatsappTemplates: defineTable({
     workspaceId: v.optional(v.id("workspaces")),  // null = platform-wide

@@ -78,6 +78,10 @@ export const createAppointmentEvent = internalAction({
     houseNumberAddition: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    if (!await ctx.runQuery(internal.companyProviders.contactEnabled,{contactId:args.contactId})) {
+      await ctx.runMutation(internal.contacts.addSystemNote,{contactId:args.contactId,body:'Agenda is niet gekoppeld voor dit bedrijf. Plan de afspraak handmatig in.'});
+      return;
+    }
     const calendarId = process.env.GOOGLE_CALENDAR_ID;
     const clientEmail = process.env.GOOGLE_CALENDAR_CLIENT_EMAIL;
     const privateKey = process.env.GOOGLE_CALENDAR_PRIVATE_KEY;

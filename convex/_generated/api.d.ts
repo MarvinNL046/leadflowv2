@@ -17,6 +17,7 @@ import type * as callAttemptStage from "../callAttemptStage.js";
 import type * as campaignSetup from "../campaignSetup.js";
 import type * as consent from "../consent.js";
 import type * as contactSearch from "../contactSearch.js";
+import type * as companyProviders from "../companyProviders.js";
 import type * as contacts from "../contacts.js";
 import type * as contactsBackfill from "../contactsBackfill.js";
 import type * as contactsRead from "../contactsRead.js";
@@ -119,6 +120,7 @@ declare const fullApi: ApiFromModules<{
   campaignSetup: typeof campaignSetup;
   consent: typeof consent;
   contactSearch: typeof contactSearch;
+  companyProviders: typeof companyProviders;
   contacts: typeof contacts;
   contactsBackfill: typeof contactsBackfill;
   contactsRead: typeof contactsRead;

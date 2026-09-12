@@ -23,9 +23,9 @@ import { insertContactWithSearchText } from "./lib/contactWrite";
  * V2 MVP-scope (kleiner dan v1):
  * - Geen rate-limiting yet (komt later via @convex-dev/rate-limiter)
  * - Geen inbound webhooks (delivery-receipts/replies) yet
- * - Geen per-org/per-workspace device routing — use platform-defaults
- *   in env (VOIDFIX_SMS_DEVICE_ID). Per-workspace WA session ID kan
- *   later via whatsappWebConfig table.
+ * - Deployment-providers zijn uitsluitend toegewezen aan het bestaande
+ *   pilotbedrijf; andere bedrijven blijven uit tot eigen routing is ingericht.
+ *   WhatsApp gebruikt alleen de expliciet gekozen workspace-sessie.
  * - Geen React Email templates — plain text/HTML body
  * - Geen phone E.164 normalisatie — opgeslagen waarde wordt 1:1 gebruikt
  *
@@ -40,7 +40,6 @@ import { insertContactWithSearchText } from "./lib/contactWrite";
 
 const VOIDFIX_SMS_URL = "https://sms.voidfix.com/services/send.php";
 const VOIDFIX_WA_URL = "https://wa.voidfix.com/api/external/send-message";
-const VOIDFIX_WA_SESSIONS_URL = "https://wa.voidfix.com/api/external/sessions";
 const RESEND_URL = "https://api.resend.com/emails";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -72,6 +71,9 @@ export const send = action({
       throw new Error(ctxData.error);
     }
     const { contact, workspaceId, userId, recipient } = ctxData;
+
+    await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
+    const waSession = args.channel === 'whatsapp' ? await ctx.runQuery(internal.companyProviders.whatsappSession,{workspaceId}) : undefined;
 
     // Insert messages-row pending
     const messageId = await ctx.runMutation(
@@ -105,6 +107,7 @@ export const send = action({
         });
       } else {
         externalId = await sendViaVoidfixWa({
+          sessionId: waSession!,
           to: recipient,
           message: args.body,
         });
@@ -158,6 +161,8 @@ export const sendInternal = internalAction({
       throw new Error(data.error);
     }
     const { workspaceId, recipient } = data;
+    await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
+    const waSession = args.channel === 'whatsapp' ? await ctx.runQuery(internal.companyProviders.whatsappSession,{workspaceId}) : undefined;
 
     const messageId = await ctx.runMutation(
       internal.messaging.insertPendingInternal,
@@ -189,6 +194,7 @@ export const sendInternal = internalAction({
         });
       } else {
         externalId = await sendViaVoidfixWa({
+          sessionId: waSession!,
           to: recipient,
           message: args.body,
         });
@@ -1121,47 +1127,14 @@ async function sendViaVoidfixSms(args: {
   return id != null ? String(id) : "";
 }
 
-/** Zoekt de actuele verbonden (WORKING) WhatsApp-sessie op bij Voidfix.
- *  Voorkeur voor de in env gehinte sessie (VOIDFIX_WA_SESSION_ID) als die
- *  verbonden is; anders de eerste verbonden sessie. Zo breekt uitgaand niet
- *  meer bij elke QR-(her)koppeling — die maakt telkens een nieuwe sessionId.
- *  (Eén extra GET /sessions per verzending; acceptabel bij dit volume.) */
-async function resolveWorkingWaSession(apiKey: string): Promise<string> {
-  const hinted = process.env.VOIDFIX_WA_SESSION_ID;
-  let sessions: Array<{
-    sessionId: string;
-    status?: string;
-    isConnected?: boolean;
-  }> = [];
-  try {
-    const res = await fetch(VOIDFIX_WA_SESSIONS_URL, {
-      headers: { "X-API-Key": apiKey },
-    });
-    if (res.ok) {
-      const data = (await res.json()) as { data?: typeof sessions };
-      sessions = data.data ?? [];
-    }
-  } catch {
-    // Lijst onbereikbaar → val hieronder terug op de env-hint.
-  }
-  const working = sessions.filter(
-    (s) => s.isConnected === true && s.status === "WORKING",
-  );
-  const preferred = working.find((s) => s.sessionId === hinted) ?? working[0];
-  if (preferred) return preferred.sessionId;
-  if (hinted) return hinted; // fallback: env-hint (lijst onbereikbaar)
-  throw new Error(
-    "Geen verbonden WhatsApp-sessie bij Voidfix (scan de QR-code opnieuw)",
-  );
-}
-
 async function sendViaVoidfixWa(args: {
+  sessionId: string;
   to: string;
   message: string;
 }): Promise<string> {
   const apiKey = process.env.VOIDFIX_API_KEY;
   if (!apiKey) throw new Error("VOIDFIX_API_KEY niet geconfigureerd");
-  const sessionId = await resolveWorkingWaSession(apiKey);
+  const sessionId = args.sessionId;
 
   const res = await fetch(VOIDFIX_WA_URL, {
     method: "POST",

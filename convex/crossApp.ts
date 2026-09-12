@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 import { action } from './_generated/server'
-import { api } from './_generated/api'
+import { api, internal } from './_generated/api'
 
 /**
  * Cross-app "hub": haalt de samenvatting van dit contact op bij de andere
@@ -77,6 +77,7 @@ export const contactSuiteSummary = action({
     // Auth- + workspace-membership-gate (gooit voor niet-leden).
     const detail = await ctx.runQuery(api.contacts.getDetail, { contactId: args.contactId })
     if (!detail) return { cashflow: null, frostwork: null }
+    if (!await ctx.runQuery(internal.companyProviders.contactEnabled,{contactId:args.contactId})) return {cashflow:null,frostwork:null}
 
     const [cashflow, frostwork] = await Promise.all([
       fetchSummary<CashflowSummary>(

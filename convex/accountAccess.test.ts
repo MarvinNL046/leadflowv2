@@ -25,6 +25,7 @@ async function setup(){
     await ctx.db.insert('whatsappWebConfig',{workspaceId,sessionId:'test-session',phoneNumber:'',isActive:true});
     return {owner,admin,member,outsider,orgId,workspaceId,pageId};
   });
+  vi.stubEnv('LEGACY_PROVIDER_ORG_ID',ids.orgId);
   return {t,...ids};
 }
 
