@@ -43,3 +43,7 @@ Convex-TypeScript en Vite-productiebuild geslaagd. De algemene TypeScriptcontrol
 De transportlaag voor berichten, agenda en suitekoppelingen bevat nog globale instellingen en Staycool-defaults. Deze update regelt wie acties mag uitvoeren; hij maakt nog niet alle externe diensten geschikt voor meerdere bedrijven. Daarom externe bedrijfsregistratie nog niet breed openen.
 
 Aanbevolen volgende stap: bedrijfsgebonden afzenders en koppelingen scheiden met een veilige toestand voor bedrijven zonder configuratie. Daarna bedrijfsregistratie, uitnodigingen en expliciete organisatiekeuze. Platformbrede auditlogging, fijnere marketing-/inkooprechten, private bijlagen en operationele quota volgen als afzonderlijke onderdelen. Bestaande geplande systeemacties worden door een latere rolwijziging niet automatisch ingetrokken.
+
+## Publicatie
+
+Live op 12 september 2026 via PR #29, commit 9504dc8259e81acf8164f4f40ac2ceb1ec06fc57. Vercel dpl_8kDWjCmNFUHnNov9YgRbZibqoKKz READY. Bestaande owner kan instellingen en pipelinebeheer openen; productieaccounts, rollen en gepauzeerde voorraad ongewijzigd. Geen echte provideractie uitgevoerd.
