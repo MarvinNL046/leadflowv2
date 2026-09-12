@@ -295,3 +295,11 @@ Publicatiebevestiging LG-042: Vercel dpl_6MdUSAz9HXpbH3C2Vv1fnaMVpqgX READY, pro
 [Exact bereik en beperkingen](bedrijfsregistratie-team-20260912.md). Geen echte accounts of uitnodigingen aangemaakt, geen productieleden verwijderd en geen berichten verstuurd. Historische signalen bevatten geen bericht-ID; de exacte oorspronkelijke mail is niet gereconstrueerd. Geen SEO-werk.
 
 Publicatiebevestiging LG-043: Vercel dpl_78P78XHAozjB1oTXpyvhUGU2LnVB READY, productiecommit af68bf5509be9ed79e92a250ada471453901f74f. Live alleen-lezen gecontroleerd: webhooksignaal met bron Resend, correcte enkelvoudtelling, provider-/CRM-links en uitgeklapte onderzoekstappen. Teambeheer toont bestaande eigenaren, medewerker als standaardrol, beheerderoptie voor eigenaar en geen open uitnodigingen. Vanuit teambeheer startoverzicht geopend met bestaande bedrijfsrol en configuratiestatussen; vandaar handleiding geopend met registratie en teamstappen. Nieuwe accountmutaties zijn uitsluitend met fictieve testidentiteiten geverifieerd. Geen uitnodigingscode gemaakt en de echte melding niet als gecontroleerd gemarkeerd.
+
+## Consistente shadcn-formulieren — 12 september 2026
+
+| ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
+|---|---|---|---|---|---|---|---|---|---|
+| LG-044 | 2026-09-12 | leadflowv2 | /aan-de-slag, /crm/settings/team, gedeelde alert-dialog | shadcn Input/Label/Select/Badge/Skeleton, themakleuren, Nederlandse rolnamen, juiste laadstatus, blokkeren velden tijdens opslaan; toegankelijk bevestigingsvenster met teamlid en gevolgen bij toegang intrekken | Klaar voor publicatie | 473 tests/51 bestanden; Vite-build; TypeScript bestaande diagnostiek | Deze wijziging | Nog niet bevestigd | Dezelfde formulierstijl toepassen op e-mail-, SMS- en WhatsApp-instellingen |
+
+Geen backend- of rolwijzigingen. Twee interactietests controleren dat openen/annuleren geen toegang intrekt en dat een mislukte verwijdering met foutmelding openblijft; herhalen richt zich op hetzelfde testlid. Geen echte uitnodigingen verzonden of productieleden aangepast. Bestaande lichte huisstijl en shadcn-configuratie behouden. Geen SEO-werk.
