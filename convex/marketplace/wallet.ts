@@ -125,10 +125,15 @@ export const creditTopupIdempotent = internalMutation({
 		amountCents: v.number(),
 		sessionId: v.string(),
 	},
+	returns: v.object({ alreadyProcessed: v.boolean(), balanceCents: v.optional(v.number()) }),
 	handler: async (
 		ctx,
 		{ orgId, userId, amountCents, sessionId },
 	): Promise<{ alreadyProcessed: boolean; balanceCents?: number }> => {
+		if (!Number.isSafeInteger(amountCents) || amountCents < TOPUP_MIN_CENTS || amountCents > TOPUP_MAX_CENTS || !sessionId.trim()) {
+			throw new ConvexError({ code: "invalid_topup" });
+		}
+		if (!await ctx.db.get(orgId)) throw new ConvexError({ code: "org_not_found" });
 		const existing = await ctx.db
 			.query("marketplaceWalletTransactions")
 			.withIndex("by_ref", (q) =>

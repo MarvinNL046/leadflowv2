@@ -9,6 +9,7 @@ import {
 import { requireMarketplaceAccess } from "./access";
 import { type Niche, NICHE_LABELS } from "./types";
 import { applyWalletDelta } from "./wallet";
+import { isLeadForSale, matchesServiceTypes } from "./availability";
 
 /**
  * Lead purchase (ported from v1 src/lib/actions/marketplace/purchase.ts).
@@ -69,7 +70,16 @@ export const purchaseLead = mutation({
 		// 1. Load lead + re-check status against the DB.
 		const lead = await ctx.db.get(leadId);
 		if (!lead) return { success: false, error: "lead_not_available" };
-		if (lead.status !== "published" && lead.status !== "sold_shared") {
+		if (!isLeadForSale(lead)) {
+			return { success: false, error: "lead_not_available" };
+		}
+
+		const prefs = await ctx.db.query("marketplaceBuyerPreferences")
+			.withIndex("by_org", q => q.eq("orgId", orgId)).unique();
+		if (!prefs?.niches.includes(lead.niche)) {
+			return { success: false, error: "niche_not_allowed" };
+		}
+		if (!matchesServiceTypes(lead, prefs.serviceTypes)) {
 			return { success: false, error: "lead_not_available" };
 		}
 
@@ -252,12 +262,23 @@ async function copyLeadToContact(
 		});
 	}
 
-	// 4. Attribution → 'marketplace' source badge (source "api").
+	const metadata = lead.metadata as Record<string, unknown> | undefined;
+	const originalSource = typeof metadata?.source === "string" ? metadata.source.slice(0, 300) : undefined;
+	const pagePath = typeof metadata?.pagePath === "string" ? metadata.pagePath.slice(0, 500) : undefined;
+	// Keep the marketplace badge while retaining the original acquisition source.
 	await ctx.db.insert("leadAttribution", {
 		contactId,
 		workspaceId,
 		source: "api",
 		utmSource: "marketplace",
+		rawPayload: {
+			marketplaceLeadId: lead._id, originalSource: originalSource ?? null,
+			pagePath: pagePath ?? null, serviceType: lead.serviceType ?? null,
+			projectType: lead.projectType ?? null, projectDescription: lead.projectDescription ?? null,
+			message: lead.message ?? null, jobSize: lead.jobSize ?? null,
+			buyerIntention: lead.buyerIntention ?? null, urgency: lead.urgency ?? null,
+			nicheData: lead.nicheData ?? null, photos: lead.photos ?? [],
+		},
 	});
 
 	// 5. Fresh opportunity in the default-pipeline's first non-won/lost
@@ -297,6 +318,17 @@ async function copyLeadToContact(
 	// 6. Note for traceability.
 	const noteLines = ["📋 Marketplace-aankoop", `• Niche: ${nicheLabel}`];
 	if (lead.city) noteLines.push(`• Woonplaats: ${lead.city}`);
+	if (originalSource) noteLines.push(`• Oorspronkelijke bron: ${originalSource}`);
+	if (pagePath) noteLines.push(`• Pagina: ${pagePath}`);
+	if (lead.serviceType) noteLines.push(`• Dienst: ${lead.serviceType}`);
+	if (lead.projectType) noteLines.push(`• Project: ${lead.projectType}`);
+	if (lead.projectDescription) noteLines.push(`• Opdrachtomschrijving: ${lead.projectDescription}`);
+	if (lead.message) noteLines.push(`• Bericht: ${lead.message}`);
+	if (lead.jobSize) noteLines.push(`• Omvang: ${lead.jobSize}`);
+	if (lead.buyerIntention) noteLines.push(`• Intentie: ${lead.buyerIntention}`);
+	if (lead.urgency) noteLines.push(`• Urgentie: ${lead.urgency}`);
+	if (lead.nicheData) noteLines.push(`• Aanvraagdetails: ${JSON.stringify(lead.nicheData)}`);
+	if (lead.photos?.length) noteLines.push(`• Foto's: ${lead.photos.join("\n")}`);
 	await ctx.db.insert("notes", {
 		workspaceId,
 		contactId,

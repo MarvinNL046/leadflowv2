@@ -1,0 +1,25 @@
+Audit uitgevoerd: 2026-09-12, 15:39 lokale tijd
+LeadFlow basiscommit: 5c3fca7ca67ec09d5c06dc7c34a303dfc208a94b
+Commando: node node_modules/vitest/vitest.mjs run convex/buyerAudit.test.ts
+Vitest 4.1.6; convex-test; edge-runtime; externe fetch geblokkeerd.
+Proces exitcode: 1. Totaal 10 tests: 5 geslaagd, 5 gefaald.
+
+Samenvatting van de tooluitvoer (geen volledige ruwe log):
+PASS: shared purchase debits stored price and creates CRM contact and opportunity
+PASS: exclusive purchase debits stored price and creates CRM contact and opportunity
+PASS: insufficient funds creates no purchase or CRM contact
+PASS: duplicate Stripe session credits wallet once
+PASS: anonymous purchase denied
+
+FAIL: expired lead must not be purchasable
+  verwacht success false; ontvangen true
+FAIL: purchase should enforce niche gate used by feed and detail
+  feed was leeg; aankoop verwacht success false; ontvangen true
+FAIL: installation metadata does not set structured service type
+  verwacht install; ontvangen undefined
+FAIL: CRM handoff should retain job description
+  verwacht opdrachtomschrijving; ontvangen notitie met alleen Marketplace-aankoop, niche Airco, woonplaats Maastricht
+FAIL: signed but unpaid Checkout event must not credit wallet
+  verwacht saldo 0; ontvangen 5000 cent
+
+Deze failures reproduceren openstaande gebreken. Er is geen runtimecode gerepareerd of gepubliceerd tijdens de audit.

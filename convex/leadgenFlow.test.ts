@@ -37,7 +37,7 @@ async function setup(source = 'home:vindaircomonteur.nl') {
   const headers = { Authorization: `Bearer ${rawKey}`, 'Content-Type': 'application/json' };
   const start = async () => {
     const response = await t.fetch('/api/intake/wizard/start', { method: 'POST', headers,
-      body: JSON.stringify({ niche: 'airco', payload, metadata: { source } }) });
+      body: JSON.stringify({ niche: 'airco', payload: {...payload,...(source.startsWith('page:') ? {serviceType:'install'} : {})}, metadata: { source } }) });
     expect(response.status).toBe(200);
     return (await response.json()).token as string;
   };
@@ -61,6 +61,7 @@ test.each(['home:vindaircomonteur.nl', 'page:vindaircomonteur.nl/installatie/air
     expect(await (await verify(token, code)).json()).toMatchObject({ success: true, leadId: first.leadId });
   }
   expect(await t.run(ctx => ctx.db.query('marketplaceLeads').collect())).toHaveLength(1);
+  expect((await t.run(ctx=>ctx.db.get('marketplaceLeads', first.leadId)))?.serviceType).toBe(source.startsWith('page:') ? 'install' : undefined);
   const overview = await admin.query(api.marketplace.admin.listLeads, { paginationOpts: { cursor: null, numItems: 25 }, sourceId: keyId });
   expect(overview.page).toHaveLength(1);
   expect(overview.page[0]).toMatchObject({ source, phoneVerified: true, followUpStatus: 'new', notificationStatus: 'pending' });

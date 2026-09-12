@@ -1763,7 +1763,7 @@ http.route({
     }
 
     // Only completed Checkout Sessions of OUR topup kind are processed.
-    if (event.type !== "checkout.session.completed") {
+    if (event.type !== "checkout.session.completed" && event.type !== "checkout.session.async_payment_succeeded") {
       return jsonResponse({ received: true }, 200);
     }
     const session = event.data.object as Stripe.Checkout.Session;
@@ -1771,11 +1771,21 @@ http.route({
       return jsonResponse({ received: true }, 200);
     }
 
+    // Completion can precede settlement for delayed payment methods.
+    // Acknowledge unpaid sessions; the async success event can credit later.
+    if (session.payment_status !== "paid") {
+      return jsonResponse({ received: true }, 200);
+    }
+    if (session.mode !== "payment" || session.status !== "complete" || session.currency !== "eur" ||
+        typeof session.id !== "string" || !session.id) {
+      return jsonResponse({ error: "invalid_topup_session" }, 400);
+    }
+
     const orgId = session.metadata.marketplaceOrgId;
     const userId = session.metadata.marketplaceUserId;
     const amountCents = session.amount_total ?? 0;
-    if (!orgId || !amountCents) {
-      console.error("[marketplace-stripe] bad metadata", session.metadata);
+    if (!orgId || !Number.isSafeInteger(amountCents) || amountCents < 1000 || amountCents > 500000) {
+      console.error("[marketplace-stripe] invalid topup metadata or amount");
       return jsonResponse({ error: "bad_metadata" }, 400);
     }
 

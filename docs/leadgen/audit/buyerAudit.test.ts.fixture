@@ -1,0 +1,104 @@
+/// <reference types="vite/client" />
+// @vitest-environment edge-runtime
+// Temporary audit reproduction: intentional failures describe missing guards.
+import { convexTest } from 'convex-test';
+import { beforeEach, afterEach, test, expect, vi } from 'vitest';
+import Stripe from 'stripe';
+import schema from './schema';
+import { api, internal } from './_generated/api';
+const modules = import.meta.glob('./**/*.ts');
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.stubGlobal('fetch', vi.fn(() => { throw new Error('External requests forbidden during audit'); }));
+});
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+async function setup(balance = 10000) {
+  const t = convexTest(schema, modules);
+  const ids = await t.run(async ctx => {
+    const userId = await ctx.db.insert('users', { clerkUserId: 'buyer-audit' });
+    const orgId = await ctx.db.insert('orgs', { name: 'Audit only', slug: 'audit', ownerId: userId, marketplaceEnabled: true });
+    const workspaceId = await ctx.db.insert('workspaces', { orgId, name: 'Audit', isDefault: true });
+    await ctx.db.insert('memberships', { orgId, userId, workspaceId, role: 'owner' });
+    await ctx.db.insert('marketplaceWallets', { orgId, balanceCents: balance, updatedAt: Date.now() });
+    const prefsId = await ctx.db.insert('marketplaceBuyerPreferences', { orgId, niches: ['airco'], preferredMode: 'both', notifyOnNewLead: true, notifyChannel: 'email', updatedAt: Date.now() });
+    const pipelineId = await ctx.db.insert('pipelines', { workspaceId, name: 'Audit', isDefault: true });
+    await ctx.db.insert('pipelineStages', { pipelineId, name: 'Nieuw', order: 0, isWonStage: false, isLostStage: false });
+    const apiKeyId = await ctx.db.insert('marketplaceApiKeys', { keyHash: 'audit-only', keyPrefix: 'audit', name: 'audit.invalid', defaultNiche: 'airco', allowedNiches: ['airco'], trusted: true, isActive: true });
+    return { orgId, userId, workspaceId, prefsId, apiKeyId };
+  });
+  const { leadId } = await t.mutation(internal.marketplace.intake.insertLead, {
+    apiKeyId: ids.apiKeyId, firstName: 'Synthetic', lastName: 'Audit', phone: '+31612345678', email: 'audit@example.invalid', postalCode: '6222XD',
+    message: 'Drie slaapkamers met 8 meter leidingwerk.', metadata: { source: 'page:audit.invalid/installatie', serviceType: 'Airco-installatie' },
+  });
+  return { t, ...ids, leadId, buyer: t.withIdentity({ subject: 'buyer-audit' }) };
+}
+
+test.each(['shared', 'exclusive'] as const)('PASS: %s purchase debits stored price and creates CRM contact and opportunity', async mode => {
+  const {t,buyer,leadId} = await setup();
+  const lead = await t.run(ctx => ctx.db.get(leadId));
+  const result = await buyer.mutation(api.marketplace.purchase.purchaseLead, { leadId, mode });
+  expect(result.success).toBe(true);
+  const price = mode === 'shared' ? lead!.priceSharedCents : lead!.priceExclusiveCents;
+  expect((await buyer.query(api.marketplace.wallet.getWallet, {})).wallet.balanceCents).toBe(10000-price);
+  expect(await t.run(ctx => ctx.db.query('contacts').collect())).toHaveLength(1);
+  expect(await t.run(ctx => ctx.db.query('opportunities').collect())).toHaveLength(1);
+  expect((await buyer.mutation(api.marketplace.purchase.purchaseLead, { leadId, mode })).success).toBe(false);
+  expect(await t.run(ctx => ctx.db.query('marketplaceWalletTransactions').collect())).toHaveLength(1);
+});
+
+test('PASS: insufficient funds creates no purchase or CRM contact', async () => {
+  const {t,buyer,leadId} = await setup(0);
+  expect(await buyer.mutation(api.marketplace.purchase.purchaseLead, {leadId,mode:'shared'})).toMatchObject({success:false,error:'insufficient_credits'});
+  expect(await t.run(ctx => ctx.db.query('marketplacePurchases').collect())).toHaveLength(0);
+  expect(await t.run(ctx => ctx.db.query('contacts').collect())).toHaveLength(0);
+});
+
+test('PASS: duplicate Stripe session credits wallet once', async () => {
+  const {t,orgId,buyer} = await setup(0);
+  const args = {orgId,amountCents:5000,sessionId:'cs_audit_only'};
+  expect(await t.mutation(internal.marketplace.wallet.creditTopupIdempotent,args)).toMatchObject({alreadyProcessed:false});
+  expect(await t.mutation(internal.marketplace.wallet.creditTopupIdempotent,args)).toMatchObject({alreadyProcessed:true});
+  expect((await buyer.query(api.marketplace.wallet.getWallet,{})).wallet.balanceCents).toBe(5000);
+});
+
+test('PASS: anonymous purchase denied', async () => {
+  const {t,leadId} = await setup();
+  await expect(t.mutation(api.marketplace.purchase.purchaseLead,{leadId,mode:'shared'})).rejects.toThrow('Not authenticated');
+});
+
+test('GAP: expired lead must not be purchasable', async () => {
+  const {t,buyer,leadId} = await setup();
+  await t.run(ctx=>ctx.db.patch(leadId,{expiresAt:Date.now()-1000}));
+  expect((await buyer.mutation(api.marketplace.purchase.purchaseLead,{leadId,mode:'shared'})).success).toBe(false);
+});
+
+test('GAP: purchase should enforce niche gate used by feed and detail', async () => {
+  const {t,buyer,leadId,prefsId} = await setup();
+  await t.run(ctx=>ctx.db.patch(prefsId,{niches:['loodgieter']}));
+  expect(await buyer.query(api.marketplace.feed.getBuyerFeed,{})).toHaveLength(0);
+  expect((await buyer.mutation(api.marketplace.purchase.purchaseLead,{leadId,mode:'shared'})).success).toBe(false);
+});
+
+test('GAP: installation metadata does not set structured service type', async () => {
+  const {t,leadId} = await setup();
+  expect((await t.run(ctx=>ctx.db.get(leadId)))?.serviceType).toBe('install');
+});
+
+test('GAP: CRM handoff should retain job description', async () => {
+  const {t,buyer,leadId} = await setup();
+  await buyer.mutation(api.marketplace.purchase.purchaseLead,{leadId,mode:'shared'});
+  const notes = await t.run(ctx=>ctx.db.query('notes').collect());
+  expect(notes.map(n=>n.body).join('\n')).toContain('Drie slaapkamers met 8 meter leidingwerk.');
+});
+
+test('GAP: signed but unpaid Checkout event must not credit wallet', async () => {
+  const {t,buyer,orgId,userId} = await setup(0);
+  const secret = 'whsec_audit_local_only';
+  vi.stubEnv('STRIPE_SECRET_KEY','sk_test_audit_local_only');
+  vi.stubEnv('STRIPE_MARKETPLACE_WEBHOOK_SECRET',secret);
+  const body = JSON.stringify({ id:'evt_audit',object:'event',type:'checkout.session.completed',data:{object:{id:'cs_audit_unpaid',object:'checkout.session',amount_total:5000,currency:'eur',payment_status:'unpaid',metadata:{kind:'marketplace_topup',marketplaceOrgId:orgId,marketplaceUserId:userId}}}});
+  const signature = await Stripe.webhooks.generateTestHeaderStringAsync({payload:body,secret});
+  expect((await t.fetch('/webhooks/marketplace-stripe',{method:'POST',headers:{'stripe-signature':signature},body})).status).toBe(200);
+  expect((await buyer.query(api.marketplace.wallet.getWallet,{})).wallet.balanceCents).toBe(0);
+});
