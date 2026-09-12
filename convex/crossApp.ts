@@ -75,7 +75,8 @@ export const contactSuiteSummary = action({
     frostwork: FrostworkSummary | null
   }> => {
     // Auth- + workspace-membership-gate (gooit voor niet-leden).
-    await ctx.runQuery(api.contacts.getDetail, { contactId: args.contactId })
+    const detail = await ctx.runQuery(api.contacts.getDetail, { contactId: args.contactId })
+    if (!detail) return { cashflow: null, frostwork: null }
 
     const [cashflow, frostwork] = await Promise.all([
       fetchSummary<CashflowSummary>(

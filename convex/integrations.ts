@@ -52,6 +52,9 @@ async function requireOrgAccess(
     .first();
 
   if (!membership) throw new Error("Geen toegang tot deze organisatie");
+  if (membership.role !== "owner" && membership.role !== "admin") {
+    throw new Error("Alleen een eigenaar of beheerder kan koppelingen beheren");
+  }
   return { userId, role: membership.role };
 }
 
@@ -72,6 +75,9 @@ async function requireWorkspaceAccess(
     )
     .first();
   if (!membership) throw new Error("Geen toegang tot deze workspace");
+  if (membership.role !== "owner" && membership.role !== "admin") {
+    throw new Error("Alleen een eigenaar of beheerder kan koppelingen beheren");
+  }
 
   return { userId, orgId: workspace.orgId };
 }
@@ -582,6 +588,7 @@ export const getPageForSync = internalQuery({
   handler: async (ctx, args) => {
     const page = await ctx.db.get(args.pageId);
     if (!page) throw new Error("Page niet gevonden");
+    await requireOrgAccess(ctx, page.orgId);
     if (!page.isActive) throw new Error("Page is gedeactiveerd");
     return {
       page: {
@@ -601,6 +608,7 @@ export const getPageForSync = internalQuery({
  */
 export const upsertMetaConnectionInternal = internalMutation({
   args: {
+    authorizedUserId: v.id("users"),
     orgId: v.id("orgs"),
     metaUserId: v.string(),
     accessToken: v.string(),
@@ -613,6 +621,13 @@ export const upsertMetaConnectionInternal = internalMutation({
     ),
   },
   handler: async (ctx, args) => {
+    // The actor comes exclusively from verified OAuth state in http.ts.
+    // Recheck at commit time in case membership was revoked during OAuth.
+    const membership = await ctx.db.query("memberships")
+      .withIndex("by_user_org", q => q.eq("userId", args.authorizedUserId).eq("orgId", args.orgId)).first();
+    if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
+      throw new Error("Geen beheerrechten voor deze organisatie");
+    }
     // Connection: één per org+metaUserId; reuse als bestaand.
     const existingConn = await ctx.db
       .query("metaConnections")
@@ -692,6 +707,9 @@ export const upsertFormInternal = internalMutation({
     formFields: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    await requireOrgAccess(ctx, args.orgId);
+    const page = await ctx.db.get(args.pageId);
+    if (!page?.isActive || page.orgId !== args.orgId) throw new Error("Geen toegang tot deze pagina");
     const existing = await ctx.db
       .query("metaForms")
       .withIndex("by_page_form", (q) =>
@@ -763,6 +781,11 @@ export const linkWhatsapp = action({
     expiresIn?: number;
     error?: string;
   }> => {
+    // Resolve and authorize before reading provider configuration or calling it.
+    const existing: { sessionId: string | null } = await ctx.runQuery(
+      internal.integrations.getWhatsappConfigInternal,
+      { workspaceId: args.workspaceId },
+    );
     const apiKey = process.env.VOIDFIX_API_KEY;
     if (!apiKey) {
       return {
@@ -770,12 +793,6 @@ export const linkWhatsapp = action({
         error: "VOIDFIX_API_KEY niet geconfigureerd in Convex env",
       };
     }
-
-    // Lookup existing config (om sessionId te hergebruiken)
-    const existing: { sessionId: string | null } = await ctx.runQuery(
-      internal.integrations.getWhatsappConfigInternal,
-      { workspaceId: args.workspaceId },
-    );
 
     const body: Record<string, string> = {
       name: `LeadFlow Workspace ${args.workspaceId.slice(0, 8)}`,
@@ -861,15 +878,15 @@ export const checkWhatsappStatus = action({
     status?: string;
     error?: string;
   }> => {
+    const cfg: { sessionId: string | null } = await ctx.runQuery(
+      internal.integrations.getWhatsappConfigInternal,
+      { workspaceId: args.workspaceId },
+    );
     const apiKey = process.env.VOIDFIX_API_KEY;
     if (!apiKey) {
       return { success: false, error: "VOIDFIX_API_KEY niet geconfigureerd" };
     }
 
-    const cfg: { sessionId: string | null } = await ctx.runQuery(
-      internal.integrations.getWhatsappConfigInternal,
-      { workspaceId: args.workspaceId },
-    );
     if (!cfg.sessionId) {
       return { success: false, error: "Nog geen sessie aangemaakt" };
     }
@@ -944,6 +961,7 @@ export const disconnectWhatsapp = mutation({
 export const getWhatsappConfigInternal = internalQuery({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
+    await requireWorkspaceAccess(ctx, args.workspaceId);
     const cfg = await ctx.db
       .query("whatsappWebConfig")
       .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
@@ -959,6 +977,7 @@ export const upsertWhatsappSession = internalMutation({
     isActive: v.boolean(),
   },
   handler: async (ctx, args) => {
+    await requireWorkspaceAccess(ctx, args.workspaceId);
     const existing = await ctx.db
       .query("whatsappWebConfig")
       .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
@@ -986,6 +1005,7 @@ export const updateWhatsappSession = internalMutation({
     phoneNumber: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireWorkspaceAccess(ctx, args.workspaceId);
     const existing = await ctx.db
       .query("whatsappWebConfig")
       .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))

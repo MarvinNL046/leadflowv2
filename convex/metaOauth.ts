@@ -113,7 +113,7 @@ export const userHasOrgAccess = internalQuery({
         q.eq("userId", args.userId).eq("orgId", args.orgId),
       )
       .first();
-    return Boolean(m);
+    return m?.role === "owner" || m?.role === "admin";
   },
 });
 

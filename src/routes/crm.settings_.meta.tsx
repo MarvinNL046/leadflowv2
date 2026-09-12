@@ -53,6 +53,7 @@ export const Route = createFileRoute('/crm/settings_/meta')({
 })
 
 const META_ERROR_LABELS: Record<string, string> = {
+  access_denied: 'Je hebt geen beheerrechten meer voor deze organisatie.',
   missing_oauth_config:
     'Server-config ontbreekt — controleer META_APP_ID/SECRET/STATE_SECRET in Convex env.',
   invalid_state:
@@ -82,6 +83,9 @@ function MetaSettingsPage() {
         </Card>
       </div>
     )
+  }
+  if (tenant?.role !== 'owner' && tenant?.role !== 'admin') {
+    return <div className="space-y-4"><BackLink /><p>Alleen een eigenaar of bedrijfsbeheerder kan deze koppeling beheren.</p></div>
   }
   return <MetaPanel orgId={orgId} />
 }
