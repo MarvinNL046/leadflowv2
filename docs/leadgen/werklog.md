@@ -28,6 +28,9 @@ LeadFlow: 259 tests geslaagd; build geslaagd; Convex-typecheck en deploy-dry-run
 
 ## Pagina's klaar voor vervolg
 
+Vastgelegde implementatiecommits op de lokale branch `codex/leadgen-pilot-20260912`:
+LeadFlow v2 `a5f17b8`; Vindaircomonteur v2 `2dadf6c`. Beide nog niet gepusht of gepubliceerd.
+
 De records hieronder gaan over de site als geheel. Vul bij daadwerkelijk werk de exacte pagina-URL in en voeg een wijzigingsregel hierboven toe. De SEO/content/conversie-aanpak is nog niet gestart in deze taak.
 
 | Site/repo | Laatst gecontroleerd | Laatste inhoudelijke aanpak | Status | Eerstvolgende stap |
