@@ -20,3 +20,15 @@ exacte pagina of bereik, wijziging, controle, commit/PR en publicatiedatum.
 Markeer lokale wijzigingen pas als live nadat publicatie is bevestigd.
 Gebruik `docs/leadgen/inventaris.md` voor repo- en intakecontext; controleer
 de actuele situatie opnieuw voordat je een koppeling wijzigt.
+
+## SEO-context en terugkoppeling
+
+Raadpleeg bij SEO-keuzes en onzekerheid Marvins Obsidian-vault:
+`C:/Users/M_Smi/Documents/webdev/webdev/SEO/`, vanaf
+`00 SEO Playbook (index).md`. Gebruik relevante notities en reference-files;
+noem de gebruikte notities in het advies of werklog. Verifieer actuele
+externe claims bij primaire bronnen. `[CHECK]` is nog niet bevestigd en
+Staycool-bedrijfsclaims gelden niet automatisch voor VindAircoMonteur.
+
+Sluit iedere taak af met: wat gedaan is, wat nog openstaat en de aanbevolen
+eerstvolgende stap. Deze voorkeuren zijn expliciet gevraagd op 2026-09-12.

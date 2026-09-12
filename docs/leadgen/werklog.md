@@ -120,3 +120,12 @@ De records hieronder gaan over de site als geheel. Vul bij daadwerkelijk werk de
 | LG-018 | 2026-09-12 | leadflowv2 | docs/leadgen/programmatic-vervolg.md | Gebruikersblauwdruk vertaald naar plan voor lokale brondata, calculatorvalidatie, afnemersdekking en opbrengstmeting | Gepland | Bijlage gelezen; Google-richtlijnen gecontroleerd; voorbeeldclaims niet overgenomen | Zie git log | — | Eén regio kiezen met echte afnemers en brongegevens |
 
 Productiepilot: dpl_DzD7EqvsL3pMdfGECEH1vHqj9M1N, READY, Next.js, build 31 seconden. De echte installatieaanvraag is deze ronde niet opnieuw verstuurd: providers zijn gesimuleerd in tests. Sms-test blijft voor maandag na inschakelen van de kantoortelefoon. Geen nieuwe partners gekoppeld, geen lokale datapagina's of calculator gepubliceerd. De algemene certificeringsclaims op de homepage en de inhoud van onderhoud/storing zijn niet volledig geaudit in deze ronde; de gewijzigde gedeelde CTA is wel gecontroleerd.
+
+## Afnemersaudit en SEO-context — 12 september 2026
+
+| ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
+|---|---|---|---|---|---|---|---|---|---|
+| LG-019 | 2026-09-12 | leadflowv2 | /feed, wallet, aankoop, intake, CRM-overdracht, ongeclaimde aanvragen | Productie alleen gelezen; 1 afnemer, €0, 0 aankopen, 12 niet als test gemarkeerde gepubliceerde aanvragen; Stripe testmodus; audit met herstelpunten vastgelegd | Audit afgerond; reparaties open | 10 lokale simulaties: 5 geslaagd, 5 tekortkomingen gereproduceerd; geen productieaankopen/berichten | Lokale branch codex/marketplace-audit-20260912; zie git log | — (geen runtimewijziging) | Eerst betaalcontrole, verkoopbaarheid, diensttype en CRM-overdracht herstellen |
+| LG-020 | 2026-09-12 | leadflowv2 + taakcontext | AGENTS.md en docs/leadgen/README.md | Gebruikersvoorkeur vastgelegd: SEO-vault raadplegen en na elke taak gedaan/open/vervolg aangeven | Lokaal vastgelegd | Vault gevonden; SEO-index, lokale SEO, paginameting en Staycool-reference gelezen; CHECK-punten niet als feiten overgenomen | Lokale branch codex/marketplace-audit-20260912; zie git log | — | Vault bij volgende SEO-keuze opnieuw gericht raadplegen |
+
+Details en testbewijs: [afnemers-audit-20260912.md](afnemers-audit-20260912.md). De vijf falende auditassertions staan bewust in een aparte reproductiefixture, buiten de gewone testsuite; ze zijn geen geslaagde regressietests. Aanvraagkwaliteit en werkelijke beschikbaarheid van afnemers zijn niet vastgesteld.
