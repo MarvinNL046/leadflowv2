@@ -2,6 +2,7 @@ import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { query, mutation, type QueryCtx } from "../_generated/server";
 import { getUserId } from "../lib/identity";
+import { coverageForLead, coverageValidator, loadCoverageBuyers } from './coverage';
 
 const followUp = v.union(v.literal("new"), v.literal("contacted"), v.literal("done"));
 
@@ -41,6 +42,7 @@ const leadView = v.object({
   source: v.string(), niche: v.string(), status: v.string(), followUpStatus: followUp,
   notificationStatus: v.string(), phoneVerified: v.boolean(), emailVerified: v.boolean(),
   message: v.union(v.string(),v.null()),
+  coverage: coverageValidator,
   serviceType: v.union(v.string(),v.null()), imported: v.boolean(), originalRequestedAt: v.union(v.number(),v.null()), importedPendingReview: v.boolean(),
   expiresAt:v.union(v.number(),v.null()), unclaimedAt:v.union(v.number(),v.null()), buyerMailsSent:v.number(), buyerMailsFailed:v.number(),
 });
@@ -57,10 +59,13 @@ export const listLeads = query({
       ? ctx.db.query("marketplaceLeads").withIndex("by_api_key", q => q.eq("apiKeyId", args.sourceId))
       : ctx.db.query("marketplaceLeads");
     const result = await base.order("desc").paginate({...args.paginationOpts, numItems: Math.min(args.paginationOpts.numItems, 50)});
+    const coverageBuyers = await loadCoverageBuyers(ctx);
     const page = await Promise.all(result.page.map(async lead => {
       const key = lead.apiKeyId ? await ctx.db.get(lead.apiKeyId) : null;
       const mails = await ctx.db.query('marketplaceBuyerNotifications').withIndex('by_lead_org',q=>q.eq('leadId',lead._id)).take(100);
+      const purchases = await ctx.db.query('marketplacePurchases').withIndex('by_lead',q=>q.eq('leadId',lead._id)).take(101);
       return {id: lead._id, createdAt: lead._creationTime,
+        coverage: coverageForLead(lead,coverageBuyers.buyers,coverageBuyers.complete,purchases),
         ...importHistory(lead.metadata, lead._creationTime), serviceType: lead.serviceType ?? null,
         name: [lead.firstName,lead.lastName].filter(Boolean).join(" ") || "Naam onbekend",
         email: lead.email ?? null, phone: lead.phone ?? null, city: lead.city ?? null, postalCode: lead.postalCode ?? null,

@@ -4,6 +4,7 @@ import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { Button } from '#/components/ui/button'
+import { LeadCoverage } from '#/components/marketplace/lead-coverage'
 
 export const Route = createFileRoute('/crm/leadgen')({ component: LeadgenPage })
 
@@ -67,6 +68,11 @@ function LeadgenOverview() {
       </div>
 
       {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {results.length>0 && <section aria-label="Afnemerdekking" className="rounded-xl border bg-white p-4 text-sm">
+        <h2 className="font-semibold">Afnemerdekking · {results.length} geladen aanvragen</h2>
+        <p className="mt-2">{results.filter(l=>l.coverage.status==='uncovered').length} zonder passende afnemer · {results.filter(l=>l.coverage.status==='covered').length} met passende afnemer · {results.filter(l=>l.coverage.status==='unavailable').length} niet beschikbaar · {results.filter(l=>l.coverage.status==='unknown').length} nog te controleren</p>
+        <p className="mt-2 text-xs text-zinc-500">Gebaseerd op actieve marketplace-profielen, werkgebied, dienst en beschikbare verkoopvorm. Een match is geen aankoop of verstuurde melding. Tegoed en e-mailinstellingen tellen hier niet mee.</p>
+      </section>}
       <section aria-label="Homepageconversie" className="rounded-xl border bg-white p-4">
         <h2 className="font-semibold">Homepageconversie · laatste 30 dagen</h2>
         {!sourceId ? <p className="mt-2 text-sm text-zinc-500">Kies hierboven een leadbron om de meetgegevens te bekijken.</p>
@@ -114,6 +120,7 @@ function LeadgenOverview() {
             {(lead.city || lead.postalCode) && <span className="text-zinc-500">{[lead.postalCode, lead.city].filter(Boolean).join(' · ')}</span>}
           </div>
           {lead.message && <p className="mt-3 whitespace-pre-wrap break-words text-sm text-zinc-600">{lead.message}</p>}
+          <LeadCoverage coverage={lead.coverage} />
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className={`rounded-full px-2.5 py-1 ${lead.phoneVerified ? 'bg-emerald-50 text-emerald-800' : 'bg-zinc-100 text-zinc-500'}`}>Telefoon {lead.phoneVerified ? 'bevestigd' : 'onbevestigd'}</span>
             {lead.email && <span className={`rounded-full px-2.5 py-1 ${lead.emailVerified ? 'bg-emerald-50 text-emerald-800' : 'bg-zinc-100 text-zinc-500'}`}>E-mail {lead.emailVerified ? 'bevestigd' : 'onbevestigd'}</span>}
