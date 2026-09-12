@@ -26,10 +26,25 @@ Statussen: **Geïnventariseerd**, **Gepland**, **In uitvoering**, **Lokaal aange
 
 LeadFlow: 259 tests geslaagd; build geslaagd; Convex-typecheck en deploy-dry-run geslaagd. De volledige root-TypeScript-controle heeft bestaande fouten buiten de gewijzigde bestanden (migratiescripts, e-mailbuilder en ongebruikte imports). Pilot: 22 tests, TypeScript en build geslaagd. De v2-browsercontrole gebruikte de echte componenten met fictieve gegevens; ingelogde productiecontrole volgt na publicatie. Geen productiegegevens aangepast en niets gedeployed.
 
+## Publicatie en vervolg op 12 september 2026
+
+De bovenstaande lokale controles beschrijven de eerste fase. Deze is inmiddels gepubliceerd:
+
+| ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
+|---|---|---|---|---|---|---|---|---|---|
+| LG-011 | 2026-09-12 | leadflowv2 + vindaircomonteur-v2 | LG-003 t/m LG-010 | Eerste ronde gepubliceerd; ingelogd beheer en echte aanvraagroute gecontroleerd | Live | Beide Vercel-deployments READY; beheer bereikbaar | leadflowv2 PR #10 / c7d7461; pilot PR #1 / 286e728 | 2026-09-12 | Aflevering sms controleren |
+| LG-012 | 2026-09-12 | vindaircomonteur.nl | /aanvragen/verify → /aanvragen/bedankt | Eén geautoriseerde TESTAANVRAAG bevestigd per e-mail; lead en beheerdersnotificatie aangemaakt | Gecontroleerd | emailVerified=true, phoneVerified=false; notificatie door provider geaccepteerd; sms blijft Pending op OnePlus 8T | Productiecontrole eerste ronde | 2026-09-12 | Testlead uit verkoop halen met behoud historie; gatewayapp controleren |
+| LG-013 | 2026-09-12 | leadflowv2 | /crm/leadgen, /api/intake/events, wizard | 30-daagse telling per bron: paginaweergave, formulierstart, ingediend, nieuwe bevestigde lead; geen contactgegevens in telling; bewaakte archivering testlead | Gecontroleerd (lokaal) | 261 tests; Convex-typecheck; productiebuild; geen root-TS-fouten in gewijzigde bestanden | Zie git log op codex/leadgen-homepage-metrics-20260912 | — | Publiceren en live teller controleren |
+| LG-014 | 2026-09-12 | vindaircomonteur.nl | /, /privacy, /aanvragen/verify, /aanvragen/bedankt | Eén formulier met optionele toelichting; realistische reactietijd; anonieme meting; kanaalonafhankelijke bevestiging en e-mailalternatief | Gecontroleerd (lokaal) | 24 tests; TypeScript; productiebuild | Zie git log op codex/leadgen-homepage-metrics-20260912 | — | Publiceren en live controleren |
+
+Sms-documentatie: https://gateway.voidfix.com/rest-api/api-documentation en https://gateway.voidfix.com/device-connection.
+WhatsApp is een apart kanaal; sessiecontrole gedocumenteerd op https://wa.voidfix.com/api-docs/#/Sessions/get_api_external_sessions. Voor deze test is geen WhatsApp verstuurd.
+De nieuwe telling start bij publicatie; eerdere bezoekers en de eerste testaanvraag zijn niet achteraf toegevoegd. Paginaweergaven zijn geen unieke bezoekers; herhaalde bevestigingen en dubbele leads tellen niet opnieuw als nieuwe bevestigde lead.
+
 ## Pagina's klaar voor vervolg
 
 Vastgelegde implementatiecommits op de lokale branch `codex/leadgen-pilot-20260912`:
-LeadFlow v2 `a5f17b8`; Vindaircomonteur v2 `2dadf6c`. Beide nog niet gepusht of gepubliceerd.
+LeadFlow v2 `a5f17b8`; Vindaircomonteur v2 `2dadf6c`. Deze eerste ronde is inmiddels gepubliceerd via de PRs bij LG-011.
 
 De records hieronder gaan over de site als geheel. Vul bij daadwerkelijk werk de exacte pagina-URL in en voeg een wijzigingsregel hierboven toe. De SEO/content/conversie-aanpak is nog niet gestart in deze taak.
 
@@ -71,7 +86,7 @@ De records hieronder gaan over de site als geheel. Vul bij daadwerkelijk werk de
 | tosotaircolimburg | 2026-09-12 | — | Geïnventariseerd | Pagina kiezen; formulierbestemming en inhoud controleren |
 | vind-aannemer | 2026-09-12 | — | Geïnventariseerd | Pagina kiezen; formulierbestemming en inhoud controleren |
 | vindaircomonteur | 2026-09-12 | — | Geïnventariseerd | Gebruik vindaircomonteur-v2 voor het huidige Vercel-project |
-| vindaircomonteur-v2 | 2026-09-12 | 2026-09-12 (aanvraagroute) | Gecontroleerd (lokaal) | Publiceren en echte aflevercontrole; daarna inhoud/conversie |
+| vindaircomonteur-v2 | 2026-09-12 | 2026-09-12 (aanvraagroute) | Live (aanvraagroute) | Homepageverbetering en meting publiceren; sms-gateway controleren |
 | vindcvmonteur | 2026-09-12 | — | Geïnventariseerd | Pagina kiezen; formulierbestemming en inhoud controleren |
 | vinddakdekker | 2026-09-12 | — | Geïnventariseerd | Pagina kiezen; formulierbestemming en inhoud controleren |
 | vindelektricien | 2026-09-12 | — | Geïnventariseerd | Pagina kiezen; formulierbestemming en inhoud controleren |

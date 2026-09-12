@@ -103,3 +103,17 @@ export const setKeyTrusted = internalMutation({
 		return { ok: true, apiKeyId, trusted };
 	},
 });
+
+/** Retire an explicitly labelled, unpurchased smoke-test lead without deleting history. */
+export const archiveTestLead = internalMutation({
+  args: { leadId: v.id('marketplaceLeads') },
+  returns: v.null(),
+  handler: async (ctx, { leadId }) => {
+    const lead = await ctx.db.get(leadId);
+    if (!lead || lead.lastName !== 'TESTAANVRAAG') throw new Error('not_a_test_lead');
+    const purchased = await ctx.db.query('marketplacePurchases').withIndex('by_lead', q => q.eq('leadId', leadId)).first();
+    if (purchased) throw new Error('lead_already_purchased');
+    await ctx.db.patch(leadId, {status:'rejected',followUpStatus:'done',followUpUpdatedAt:Date.now(),adminNotes:'Geautoriseerde testaanvraag; uit verkoop gehaald na controle.'});
+    return null;
+  },
+});

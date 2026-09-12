@@ -70,6 +70,28 @@ test('HTTP start → dispatch → verify → admin overview → follow-up, with 
   expect((await t.run(ctx => ctx.db.get(overview.page[0].id)))?.notificationStatus).toBe('sent');
   const mailBodies = fetchMock.mock.calls.filter(([url]) => String(url).includes('resend')).map(([, init]) => JSON.parse(init.body));
   expect(mailBodies.some(body => body.text.includes('https://leadflow.wetry.app/crm/leadgen'))).toBe(true);
+  expect(await admin.query(api.marketplace.metrics.homepageFunnel, {sourceId:keyId})).toMatchObject({submitted:1,verified:1});
+});
+
+test('homepage events only accept the two anonymous counters and metrics require admin', async () => {
+  const {t,admin,buyer,headers,keyId} = await setup();
+  for(const event of ['views','starts']) {
+    expect((await t.fetch('/api/intake/events',{method:'POST',headers,body:JSON.stringify({event})})).status).toBe(200);
+  }
+  expect((await t.fetch('/api/intake/events',{method:'POST',headers,body:JSON.stringify({event:'verified'})})).status).toBe(400);
+  expect((await t.fetch('/api/intake/events',{method:'POST',body:JSON.stringify({event:'views'})})).status).toBe(401);
+  expect(await admin.query(api.marketplace.metrics.homepageFunnel,{sourceId:keyId})).toMatchObject({views:1,starts:1,submitted:0,verified:0});
+  await expect(buyer.query(api.marketplace.metrics.homepageFunnel,{sourceId:keyId})).rejects.toThrow();
+  await expect(t.query(api.marketplace.metrics.homepageFunnel,{sourceId:keyId})).rejects.toThrow();
+});
+
+test('test cleanup refuses real leads and keeps test history out of the feed', async () => {
+  const {t,keyId} = await setup();
+  const real = await t.mutation(internal.marketplace.intake.insertLead,{...payload,apiKeyId:keyId});
+  await expect(t.mutation(internal.marketplace.adminCli.archiveTestLead,{leadId:real.leadId})).rejects.toThrow('not_a_test_lead');
+  const fake = await t.mutation(internal.marketplace.intake.insertLead,{...payload,lastName:'TESTAANVRAAG',apiKeyId:keyId});
+  await t.mutation(internal.marketplace.adminCli.archiveTestLead,{leadId:fake.leadId});
+  expect(await t.run(ctx=>ctx.db.get(fake.leadId))).toMatchObject({status:'rejected',followUpStatus:'done'});
 });
 
 test('email-only delivery enforces cooldown and accepts the email code', async () => {
