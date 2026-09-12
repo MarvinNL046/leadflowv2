@@ -19,7 +19,9 @@ export const SIZE_UPLIFT_PCT: Record<JobSize, number> = {
 	xl: 0.21,
 };
 export const INTENT_UPLIFT_PCT = 0.29;
-export const MAX_SHARED_BUYERS = 4;
+export const MAX_SHARED_BUYERS = 3;
+// Price is an independent commercial choice; changing capacity must not reprice leads.
+export const EXCLUSIVE_PRICE_MULTIPLIER = 4;
 
 export const FALLBACK_RATE = { minCents: 1500, maxCents: 3000 };
 
@@ -42,7 +44,7 @@ export function calculateLeadPrice(
 	const intentUplift = buyerIntention === "yes" ? INTENT_UPLIFT_PCT * range : 0;
 
 	const sharedCents = Math.round(basis + sizeUplift + intentUplift);
-	const exclusiveCents = sharedCents * MAX_SHARED_BUYERS; // plain ×4, NOT re-rounded
+	const exclusiveCents = sharedCents * EXCLUSIVE_PRICE_MULTIPLIER;
 
 	return { sharedCents, exclusiveCents, maxSharedBuyers: MAX_SHARED_BUYERS };
 }

@@ -9,7 +9,7 @@ import {
 import { requireMarketplaceAccess } from "./access";
 import { type Niche, NICHE_LABELS } from "./types";
 import { applyWalletDelta } from "./wallet";
-import { isLeadForSale, matchesServiceTypes } from "./availability";
+import { isLeadForSale, matchesBuyer } from "./availability";
 
 /**
  * Lead purchase (ported from v1 src/lib/actions/marketplace/purchase.ts).
@@ -79,7 +79,7 @@ export const purchaseLead = mutation({
 		if (!prefs?.niches.includes(lead.niche)) {
 			return { success: false, error: "niche_not_allowed" };
 		}
-		if (!matchesServiceTypes(lead, prefs.serviceTypes)) {
+		if (!matchesBuyer(lead, prefs)) {
 			return { success: false, error: "lead_not_available" };
 		}
 
@@ -167,6 +167,7 @@ export const purchaseLead = mutation({
 		});
 		await ctx.db.patch(leadId, {
 			status: mode === "exclusive" ? "sold_exclusive" : "sold_shared",
+			unclaimedAt: undefined, followUpDueAt: undefined,
 		});
 
 		return {

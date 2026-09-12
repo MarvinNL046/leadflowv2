@@ -133,6 +133,8 @@ export async function insertMarketplaceLead(ctx: MutationCtx, p: ObjectType<type
 					? ("pending_review" as const)
 					: ("published" as const);
 		const now = Date.now();
+		const policy = serviceType ? await ctx.db.query("marketplacePolicies")
+			.withIndex("by_niche_serviceType",q=>q.eq("niche",niche).eq("serviceType",serviceType)).unique() : null;
 
 		// 9. Pricing — look up rate via by_combo; fallback if no row.
 		const rateRow = await ctx.db
@@ -195,6 +197,8 @@ export async function insertMarketplaceLead(ctx: MutationCtx, p: ObjectType<type
 			allowExclusive: true,
 			allowShared: true,
 			publishedAt: status === "published" ? now : undefined,
+			expiresAt: status === "published" && policy?.expiryDays ? now + policy.expiryDays * 86_400_000 : undefined,
+			followUpDueAt: status === "published" && policy ? now + policy.followUpHours * 3_600_000 : undefined,
 		});
 
 		// Fire-and-forget key-usage timestamp.
@@ -208,6 +212,7 @@ export async function insertMarketplaceLead(ctx: MutationCtx, p: ObjectType<type
 			internal.marketplace.notify.notifyNewLead,
 			{ leadId },
 		);
+		if (status === "published") await ctx.scheduler.runAfter(0, internal.marketplace.buyerNotifications.queueForLead, { leadId });
 
 		return { ok: true as const, leadId, duplicate: isDup, status };
 }

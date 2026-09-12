@@ -18,10 +18,10 @@ import { requireMarketplaceAccess } from "./access";
 
 const patchArgs = {
 	niches: v.optional(v.array(v.string())),
-	serviceTypes: v.optional(v.array(v.string())),
+	serviceTypes: v.optional(v.union(v.array(v.string()), v.null())),
 	segments: v.optional(v.array(v.string())),
 	regions: v.optional(v.array(v.string())),
-	provinces: v.optional(v.array(v.string())),
+	provinces: v.optional(v.union(v.array(v.string()), v.null())),
 	postalCodePrefixes: v.optional(v.array(v.string())),
 	preferredMode: v.optional(
 		v.union(
@@ -43,10 +43,10 @@ const patchArgs = {
 
 type PatchArgs = {
 	niches?: string[];
-	serviceTypes?: string[];
+	serviceTypes?: string[] | null;
 	segments?: string[];
 	regions?: string[];
-	provinces?: string[];
+	provinces?: string[] | null;
 	postalCodePrefixes?: string[];
 	preferredMode?: "exclusive" | "shared" | "both";
 	notifyOnNewLead?: boolean;
@@ -82,7 +82,12 @@ async function upsertPreferences(
 		.unique();
 
 	if (existing) {
-		await ctx.db.patch(existing._id, { ...patch, updatedAt: Date.now() });
+		const {serviceTypes: _serviceTypes, provinces: _provinces, ...rest} = patch;
+		await ctx.db.patch(existing._id, { ...rest,
+			...(patch.serviceTypes !== undefined ? {serviceTypes: patch.serviceTypes ?? undefined} : {}),
+			...(patch.provinces !== undefined ? {provinces: patch.provinces ?? undefined} : {}),
+			...(patch.notifyOnNewLead === true ? {emailAlertsActivatedAt:Date.now()} : {}),
+			updatedAt: Date.now() });
 		return;
 	}
 
@@ -91,16 +96,17 @@ async function upsertPreferences(
 		niches: patch.niches ?? [],
 		// Optional arrays: only set when explicitly given (undefined = all).
 		...(patch.serviceTypes !== undefined
-			? { serviceTypes: patch.serviceTypes }
+			? { serviceTypes: patch.serviceTypes ?? undefined }
 			: {}),
 		segments: patch.segments ?? ["b2c", "b2b"],
 		...(patch.regions !== undefined ? { regions: patch.regions } : {}),
-		...(patch.provinces !== undefined ? { provinces: patch.provinces } : {}),
+		...(patch.provinces !== undefined ? { provinces: patch.provinces ?? undefined } : {}),
 		...(patch.postalCodePrefixes !== undefined
 			? { postalCodePrefixes: patch.postalCodePrefixes }
 			: {}),
 		preferredMode: patch.preferredMode ?? "both",
 		notifyOnNewLead: patch.notifyOnNewLead ?? true,
+		emailAlertsActivatedAt: patch.notifyOnNewLead === true ? Date.now() : undefined,
 		notifyChannel: patch.notifyChannel ?? "email",
 		updatedAt: Date.now(),
 	});
@@ -129,7 +135,8 @@ export const completeOnboarding = mutation({
 			v.literal("shared"),
 			v.literal("both"),
 		),
-		serviceTypes: v.optional(v.array(v.string())),
+		serviceTypes: v.optional(v.union(v.array(v.string()),v.null())),
+		provinces: v.optional(v.union(v.array(v.string()),v.null())),
 		segments: v.optional(v.array(v.string())),
 		regions: v.optional(v.array(v.string())),
 	},

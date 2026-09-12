@@ -28,8 +28,9 @@ function LeadgenPage() {
 function LeadgenOverview() {
   const sources = useQuery(api.marketplace.admin.listSources)
   const [sourceId, setSourceId] = useState<Id<'marketplaceApiKeys'> | undefined>()
+  const [attentionOnly,setAttentionOnly] = useState(false)
   const { results, status, loadMore } = usePaginatedQuery(
-    api.marketplace.admin.listLeads, sourceId ? { sourceId } : {}, { initialNumItems: 25 },
+    api.marketplace.admin.listLeads, {sourceId,attentionOnly}, { initialNumItems: 25 },
   )
   const updateStatus = useMutation(api.marketplace.admin.setFollowUpStatus)
   const funnel = useQuery(api.marketplace.metrics.homepageFunnel, sourceId ? { sourceId } : 'skip')
@@ -61,6 +62,7 @@ function LeadgenOverview() {
             {sources?.map(source => <option key={source.id} value={source.id}>{source.name}{source.active ? '' : ' (inactief)'}</option>)}
           </select>
         </label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={attentionOnly} onChange={e=>setAttentionOnly(e.target.checked)}/>Alleen opvolging nodig</label>
         <p className="text-sm text-zinc-500">{results.length} geladen{sources ? ` · ${sources.length} bronnen` : ''}</p>
       </div>
 
@@ -90,6 +92,8 @@ function LeadgenOverview() {
               <h2 className="font-semibold text-zinc-900">{lead.name}</h2>
               <p className="mt-1 break-all text-sm text-indigo-700">{lead.source}</p>
               <p className="mt-1 text-xs text-zinc-500">{date(lead.createdAt)} · {lead.niche} · {statuses[lead.status] ?? lead.status}</p>
+              {lead.expiresAt && <p className="mt-1 text-xs text-zinc-500">Verkooptermijn tot {date(lead.expiresAt)}</p>}
+              {lead.unclaimedAt && <p className="mt-2 rounded-md bg-amber-50 p-2 text-sm font-medium text-amber-900">Opvolging nodig: nog geen koper bij het verstrijken van de opvolgtermijn.</p>}
             </div>
             <label className="grid gap-1 text-xs text-zinc-500">
               Opvolging
@@ -110,7 +114,9 @@ function LeadgenOverview() {
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className={`rounded-full px-2.5 py-1 ${lead.phoneVerified ? 'bg-emerald-50 text-emerald-800' : 'bg-zinc-100 text-zinc-500'}`}>Telefoon {lead.phoneVerified ? 'bevestigd' : 'onbevestigd'}</span>
             {lead.email && <span className={`rounded-full px-2.5 py-1 ${lead.emailVerified ? 'bg-emerald-50 text-emerald-800' : 'bg-zinc-100 text-zinc-500'}`}>E-mail {lead.emailVerified ? 'bevestigd' : 'onbevestigd'}</span>}
-            <span className={`rounded-full px-2.5 py-1 ${lead.notificationStatus === 'failed' ? 'bg-red-50 text-red-700' : 'bg-zinc-100 text-zinc-600'}`}>{notifications[lead.notificationStatus] ?? lead.notificationStatus}</span>
+            <span className={`rounded-full px-2.5 py-1 ${lead.notificationStatus === 'failed' ? 'bg-red-50 text-red-700' : 'bg-zinc-100 text-zinc-600'}`}>Beheer: {notifications[lead.notificationStatus] ?? lead.notificationStatus}</span>
+            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-zinc-600">Afnemersmail: {lead.buyerMailsSent} door provider geaccepteerd</span>
+            {lead.buyerMailsFailed>0 && <span className="rounded-full bg-red-50 px-2.5 py-1 text-red-700">{lead.buyerMailsFailed} afnemersmeldingen mislukt</span>}
           </div>
         </article>
       ))}</div>}

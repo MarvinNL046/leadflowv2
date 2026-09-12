@@ -8,6 +8,7 @@ import { Switch } from '#/components/ui/switch.tsx'
 import { cn } from '#/lib/utils.ts'
 import { humanizeConvexError } from '#/lib/errors.ts'
 import { api } from '../../../convex/_generated/api'
+const ALL_NL_PROVINCES = ['Groningen','Friesland','Drenthe','Overijssel','Flevoland','Gelderland','Utrecht','Noord-Holland','Zuid-Holland','Zeeland','Noord-Brabant','Limburg']
 
 /**
  * Buyer preferences form (ported from v1
@@ -19,7 +20,7 @@ import { api } from '../../../convex/_generated/api'
  *
  * `serviceTypes === null` means "accept all" (preserves the
  * undefined/[] distinction the backend honours). On save we send
- * `undefined` for null so the optional field is left unset on the row.
+ * explicit null to clear a previously selected service filter.
  */
 
 type BuyerMode = 'exclusive' | 'shared' | 'both'
@@ -186,6 +187,7 @@ export interface PreferencesInitial {
   notifyOnNewLead: boolean
   serviceTypes?: ServiceType[] | null
   segments?: Segment[]
+  provinces?: string[] | null
 }
 
 interface Props {
@@ -245,6 +247,7 @@ export function PreferencesForm({ mode, initial, onSaved }: Props) {
       : ['b2c', 'b2b'],
   )
   const [saving, setSaving] = useState(false)
+  const [provinces, setProvinces] = useState<string[] | null>(initial?.provinces ?? null)
 
   const showNotifyToggle = mode === 'settings'
 
@@ -289,15 +292,16 @@ export function PreferencesForm({ mode, initial, onSaved }: Props) {
     }
     setSaving(true)
     try {
-      // null serviceTypes → omit (backend treats undefined = accept all).
+      // Explicit null clears a saved filter; omitting it would keep the old selection.
       const serviceTypesArg =
-        serviceTypes === null ? undefined : serviceTypes
+        serviceTypes
       if (mode === 'onboarding') {
         await completeOnboarding({
           niches,
           preferredMode,
           serviceTypes: serviceTypesArg,
           segments,
+          provinces,
         })
         toast.success('Welkom! Je feed is klaar.')
       } else {
@@ -305,8 +309,10 @@ export function PreferencesForm({ mode, initial, onSaved }: Props) {
           niches,
           preferredMode,
           notifyOnNewLead,
+          notifyChannel: 'email',
           serviceTypes: serviceTypesArg,
           segments,
+          provinces,
         })
         toast.success('Instellingen opgeslagen')
       }
@@ -366,7 +372,7 @@ export function PreferencesForm({ mode, initial, onSaved }: Props) {
           Type werk (optioneel)
         </h2>
         <p className="mb-4 text-sm text-zinc-600">
-          Niet aangevinkt = alle typen. Leads zonder type zie je altijd.
+          Kies de diensten die je uitvoert. Als alle typen aanstaan, zie je ook aanvragen waarvan het type nog onbekend is.
         </p>
         <div className="grid grid-cols-3 gap-2">
           {ALL_SERVICE_TYPES.map((st) => {
@@ -403,11 +409,24 @@ export function PreferencesForm({ mode, initial, onSaved }: Props) {
       </section>
 
       <section>
+        <h2 className="mb-1 text-lg font-semibold text-zinc-900">Werkgebied</h2>
+        <p className="mb-4 text-sm text-zinc-600">Deze provincies bepalen welke aanvragen je ziet en welke meldingen je krijgt.</p>
+        <button type="button" aria-pressed={provinces===null} className="mb-3 rounded-md border px-3 py-2 text-sm" onClick={()=>setProvinces(null)}>Alle provincies</button>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {ALL_NL_PROVINCES.map(province=><Toggle key={province} active={provinces===null || provinces.includes(province)} onClick={()=>setProvinces(prev=>{
+            const values=prev??ALL_NL_PROVINCES;
+            return values.includes(province)?values.filter(v=>v!==province):[...values,province];
+          })}>{province}</Toggle>)}
+        </div>
+        {provinces?.length===0 && <p className="mt-2 text-sm text-amber-700">Geen provincie geselecteerd: je ontvangt geen passende aanvragen.</p>}
+      </section>
+
+      <section>
         <h2 className="mb-1 text-lg font-semibold text-zinc-900">
           Hoe wil je leads kopen?
         </h2>
         <p className="mb-4 text-sm text-zinc-600">
-          Je kunt dit later wijzigen. Beide opties blijven per lead beschikbaar.
+          Je kunt dit later wijzigen. Exclusief is beschikbaar totdat de eerste gedeelde aankoop is gedaan.
         </p>
         <div className="space-y-2">
           {MODE_OPTIONS.map((opt) => (
@@ -415,6 +434,7 @@ export function PreferencesForm({ mode, initial, onSaved }: Props) {
               key={opt.value}
               type="button"
               onClick={() => setPreferredMode(opt.value)}
+              aria-pressed={preferredMode === opt.value}
               className={cn(
                 'flex w-full items-start gap-3 rounded-md border p-3 text-left transition-colors',
                 preferredMode === opt.value
@@ -448,12 +468,13 @@ export function PreferencesForm({ mode, initial, onSaved }: Props) {
           </h2>
           <div className="flex items-center justify-between rounded-md border border-zinc-200 p-3">
             <div>
-              <Label>Mail me bij nieuwe leads</Label>
+              <Label htmlFor="buyer-lead-email">Mail me bij nieuwe leads</Label>
               <p className="text-xs text-zinc-500">
                 Je krijgt een mail zodra een matchende lead binnenkomt.
               </p>
             </div>
             <Switch
+              id="buyer-lead-email"
               checked={notifyOnNewLead}
               onCheckedChange={setNotifyOnNewLead}
             />

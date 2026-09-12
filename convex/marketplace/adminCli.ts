@@ -2,6 +2,47 @@ import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
 import { hashApiKey } from "./apiKeys";
 import { ALL_NICHES, marketplaceNiche } from "./types";
+import { MAX_SHARED_BUYERS } from "./leadPricing";
+
+/** Explicitly authorized pilot setup; does not send notifications for old leads. */
+export const configureStaycoolPilot = internalMutation({
+  args:{orgId:v.id('orgs')},returns:v.object({orgId:v.id('orgs'),email:v.union(v.string(),v.null())}),
+  handler:async(ctx,{orgId})=>{
+    const org=await ctx.db.get(orgId);
+    if(org?.name!=='Staycool Airconditioning') throw new Error('unexpected_pilot_org');
+    const prefs=await ctx.db.query('marketplaceBuyerPreferences').withIndex('by_org',q=>q.eq('orgId',orgId)).unique();
+    const values={niches:['airco'],serviceTypes:['install'],provinces:['Limburg'],segments:['b2c','b2b'],preferredMode:'both' as const,notifyOnNewLead:true,notifyChannel:'email' as const,emailAlertsActivatedAt:Date.now(),updatedAt:Date.now()};
+    if(prefs) await ctx.db.patch(prefs._id,{...values,regions:undefined,postalCodePrefixes:undefined});
+    else await ctx.db.insert('marketplaceBuyerPreferences',{orgId,...values,onboardingCompletedAt:Date.now()});
+    await ctx.db.patch(orgId,{marketplaceEnabled:true});
+    const owner=await ctx.db.get(org.ownerId);
+    return {orgId,email:owner?.email??null};
+  },
+});
+
+export const setAircoInstallPolicy = internalMutation({
+  args:{expiryDays:v.union(v.literal(7),v.literal(14),v.null())},returns:v.null(),
+  handler:async(ctx,{expiryDays})=>{
+    const row=await ctx.db.query('marketplacePolicies').withIndex('by_niche_serviceType',q=>q.eq('niche','airco').eq('serviceType','install')).unique();
+    const values={niche:'airco' as const,serviceType:'install' as const,expiryDays:expiryDays??undefined,followUpHours:24,updatedAt:Date.now()};
+    if(row) await ctx.db.patch(row._id,values);else await ctx.db.insert('marketplacePolicies',values);
+    return null;
+  },
+});
+
+export const capUnpurchasedLeads = internalMutation({
+  args:{cursor:v.optional(v.union(v.string(),v.null()))},returns:v.object({changed:v.number(),isDone:v.boolean(),cursor:v.string()}),
+  handler:async(ctx,{cursor})=>{
+    const page=await ctx.db.query('marketplaceLeads').withIndex('by_status_published',q=>q.eq('status','published')).paginate({cursor:cursor??null,numItems:100});
+    let changed=0;
+    for(const lead of page.page){
+      if(lead.maxSharedBuyers<=MAX_SHARED_BUYERS) continue;
+      const purchase=await ctx.db.query('marketplacePurchases').withIndex('by_lead',q=>q.eq('leadId',lead._id)).first();
+      if(!purchase){await ctx.db.patch(lead._id,{maxSharedBuyers:MAX_SHARED_BUYERS});changed++;}
+    }
+    return {changed,isDone:page.isDone,cursor:page.continueCursor};
+  },
+});
 
 /**
  * Internal, CLI-only setup helpers for marketplace go-live / buyer onboarding.

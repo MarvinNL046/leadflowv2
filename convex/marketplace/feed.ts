@@ -3,7 +3,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { type QueryCtx, query } from "../_generated/server";
 import { requireMarketplaceAccess } from "./access";
 import { maskEmail, maskName, maskPhone } from "./mask";
-import { isLeadForSale, matchesServiceTypes } from "./availability";
+import { isLeadForSale, matchesServiceTypes, matchesBuyer } from "./availability";
 import {
 	type BuyerIntention,
 	type JobSize,
@@ -55,6 +55,7 @@ export interface MaskedLead {
 	allowExclusive: boolean;
 	allowShared: boolean;
 	createdAt: number;
+	expiresAt: number | null;
 	projectType: string | null;
 	projectDescription: string | null;
 	jobSize: JobSize | null;
@@ -105,6 +106,7 @@ function toMaskedLead(
 		allowExclusive,
 		allowShared,
 		createdAt: lead._creationTime,
+		expiresAt: lead.expiresAt ?? null,
 		projectType: lead.projectType ?? null,
 		projectDescription: lead.projectDescription ?? null,
 		jobSize: (lead.jobSize ?? null) as JobSize | null,
@@ -235,7 +237,7 @@ async function getBeschikbaarFeed(
 	const nicheSet = new Set<string>(prefs.buyerNiches);
 	const segmentSet = new Set<string>(prefs.buyerSegments);
 	const provinceSet =
-		prefs.buyerProvinces && prefs.buyerProvinces.length > 0
+		prefs.buyerProvinces !== null
 			? new Set(prefs.buyerProvinces)
 			: null;
 	const qLower = opts.q ? opts.q.toLowerCase() : null;
@@ -290,7 +292,7 @@ async function getBeschikbaarFeed(
 	const results: MaskedLead[] = [];
 	for (const lead of candidates) {
 		const counts = await countPurchasesByMode(ctx, lead._id);
-		const maxShared = lead.maxSharedBuyers ?? 4;
+		const maxShared = lead.maxSharedBuyers;
 		const sharedSlotsAvailable = Math.max(0, maxShared - counts.shared);
 
 		const exclusiveActuallyAllowed = lead.allowExclusive && counts.shared === 0;
@@ -382,7 +384,7 @@ export const getMaskedLeadDetail = query({
 			.unique();
 		const buyerNiches = (prefs?.niches as Niche[] | undefined) ?? [];
 		if (!buyerNiches.includes(lead.niche as Niche)) return null;
-		if (!matchesServiceTypes(lead, prefs?.serviceTypes)) return null;
+		if (!matchesBuyer(lead, prefs)) return null;
 
 		const allPurchases = await ctx.db
 			.query("marketplacePurchases")
