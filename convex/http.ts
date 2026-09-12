@@ -71,6 +71,10 @@ http.route({
     if (!payload) {
       return redirectToFrontend(siteUrl, "invalid_state");
     }
+    const hasAccess = await ctx.runQuery(internal.metaOauth.userHasOrgAccess, {
+      userId: payload.userId, orgId: payload.orgId,
+    });
+    if (!hasAccess) return redirectToFrontend(siteUrl, "access_denied");
 
     const redirectUri = `${process.env.CONVEX_SITE_URL}/auth/meta/callback`;
 
@@ -157,6 +161,7 @@ http.route({
 
       // 6) Upsert via internal mutation (tokens al versleuteld)
       await ctx.runMutation(internal.integrations.upsertMetaConnectionInternal, {
+        authorizedUserId: payload.userId,
         orgId: payload.orgId,
         metaUserId: meJson.id,
         accessToken: await encryptSecret(longLivedToken),

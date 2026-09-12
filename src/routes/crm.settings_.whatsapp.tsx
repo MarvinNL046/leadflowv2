@@ -48,6 +48,9 @@ function WhatsappSettingsPage() {
       <NoWorkspaceFallback />
     )
   }
+  if (tenant?.role !== 'owner' && tenant?.role !== 'admin') {
+    return <div className="space-y-4"><BackLink /><p>Alleen een eigenaar of bedrijfsbeheerder kan deze koppeling beheren.</p></div>
+  }
   return <WhatsappConnector workspaceId={workspaceId} />
 }
 
