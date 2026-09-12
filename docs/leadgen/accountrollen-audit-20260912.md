@@ -52,3 +52,9 @@ Aanbevolen vervolg: eerst het gedeelde serverzijdige rechtenmodel met twee ficti
 `convex/accountAccess.test.ts` controleert nieuwe en onbevestigde accounts, toegang van een ander bedrijf, gewone leden, owner/admin-toegang met gesimuleerde providers, rechtenintrekking en onbekende contact-ID's. De bestaande marketplace-tests controleren koop- en afschermingsgedrag.
 
 Bekeken: `userProfiles.ts`, `lib/identity.ts`, `lib/identityLogic.ts`, `auth.config.ts`, `schema.ts`, `marketplace/access.ts`, `marketplace/admin.ts`, `marketplace/apiKeys.ts`, `marketplace/purchase.ts`, `marketplace/buyerPreferences.ts`, CRM-lidmaatschaphelpers, `integrations.ts`, `metaOauth.ts`, `http.ts`, `crossApp.ts`, `files.ts`, `messaging.ts`, `googleCalendar.ts`, `aiAgentConfig.ts` en registratie-/sidebarcomponenten. Geen SEO-werk in deze ronde.
+
+## Oplevering
+
+Publicatiebevestiging LG-035: Vercel dpl_48Qvg8wXqVAN2DBjKerAGxWW9CGh READY, productiecommit 6c3680d9496caed8c8d91f7a7dc23faed2e83393. Live: 12 hervatknoppen en 0 pauzeerknoppen in Leadgenbeheer; beheerder kan Meta-status lezen. Twee anonieme queryverzoeken (leadgenbronnen en Meta-status) leveren geen gegevens en worden geweigerd; productiefoutdetails zijn afgeschermd. Autorisatieoorzaken en owner/admin/member-scheiding afzonderlijk geverifieerd met regressietests. Geen echte koppeling of bericht uitgevoerd. Openstaande aandachtspunten en aanbevolen rechtenmodel staan in de accountrollen-audit.
+
+Validatie: 366 volledige regressietests en daarna 12 gerichte tests (367 unieke tests), Convex-TypeScript en Vite-build geslaagd. Algemene TypeScriptcontrole bevat bestaande fouten buiten het gewijzigde bereik; dat is niet als volledig groen aangemerkt.
