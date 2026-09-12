@@ -265,3 +265,11 @@ Publicatiebevestiging LG-039: Live op 12 september 2026 via PR #35, commit 63017
 [Exact bereik en inrichting](eigen-email-20260912.md). Geen echte koppeling geactiveerd, providerinstellingen veranderd of berichten verstuurd. E-mailantwoorden worden nog niet als mailbox ingelezen. Geen SEO-werk.
 
 Publicatiebevestiging LG-040: Vercel dpl_BkCkdWSXot6nWpRSWvzUo65paDBd READY, productiecommit 07902b342ef103480a186c924427af77ec881d61. Live vanuit Instellingen op Eigen e-mailkoppeling geklikt: juiste pagina, uitleg, lege configuratie en voorbereidingsknop zichtbaar. Bestaande providerstatus blijft configuratie aanwezig tonen. Alleen-lezen productiecontrole bevestigt geldige encryptiesleutelconfiguratie en beschikbaar webhookbasisadres; geen secrets uitgelezen in output. Geen productieconcept of echte providerkoppeling aangemaakt.
+
+## Eigen WhatsApp en bedrijfshandleiding — 12 september 2026
+
+| ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
+|---|---|---|---|---|---|---|---|---|---|
+| LG-041 | 2026-09-12 | leadflowv2 | /crm/settings/eigen-whatsapp, /crm/settings/handleiding, instellingen/e-maillinks; companyWhatsappConnections; messaging; /webhooks/voidfix-wa-company; routing en legacy-bewaking | Eigen key/sessie/nummer verifiëren, versleuteld opslaan, gescheiden verzending/ontvangst en pauzeren. Bedrijfshandleiding voor e-mail/WhatsApp in app en Markdown | Gecontroleerd, publicatie volgt | 441 tests/47 bestanden; Convex-TypeScript en Vite-build; algemene TypeScript bestaande diagnostiek | codex/bedrijf-whatsapp-20260912 | — | Echte providerproef, eigen SMS en bewaking, daarna bedrijfsregistratie |
+
+[Technisch bereik](eigen-whatsapp-20260912.md); [bedrijfshandleiding](bedrijfshandleiding-koppelingen.md). Geen echte providerconfiguratie of telefoon gewijzigd, geen berichten verstuurd. Sessiestatuscontrole is niet hetzelfde als bevestigde webhookontvangst. Geen SEO-werk.

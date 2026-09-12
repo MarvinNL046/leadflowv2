@@ -1,5 +1,5 @@
 import {useState} from 'react'
-import {createFileRoute} from '@tanstack/react-router'
+import {createFileRoute,Link} from '@tanstack/react-router'
 import {useAction,useMutation,useQuery} from 'convex/react'
 import {api} from '../../convex/_generated/api'
 import type {Id} from '../../convex/_generated/dataModel'
@@ -14,6 +14,7 @@ function EmailSettings(){
   const [error,setError]=useState<string|null>(null),[busy,setBusy]=useState(false)
   async function run(fn:()=>Promise<unknown>){setBusy(true);setError(null);try{await fn()}catch(e){setError(e instanceof Error?e.message:'Opslaan mislukt')}finally{setBusy(false)}}
   return <div className="mx-auto max-w-3xl space-y-5"><h1 className="text-2xl font-bold">Eigen e-mailkoppeling</h1>
+    <Link className="text-violet-700 underline" to="/crm/settings/handleiding">Handleiding voor bedrijven: e-mail en WhatsApp</Link>
     <p className="text-sm text-zinc-600">Gebruik je eigen Resend-account voor CRM-berichten en campagnes. Dit koppelt verzending en bezorgstatussen; antwoorden op e-mails worden nog niet als mailbox ingelezen.</p>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {rows===undefined?<p role="status">Koppelingen laden…</p>:<>

@@ -11,6 +11,7 @@ export const whatsappWorkspace = internalQuery({
     const matches=await ctx.db.query('whatsappWebConfig').withIndex('by_session',q=>q.eq('sessionId',args.sessionId!)).take(2);
     if(matches.length!==1)return null;
     const ws=matches[0].workspaceId;
+    if(await ctx.db.query('companyWhatsappConnections').withIndex('by_workspaceId',q=>q.eq('workspaceId',ws)).first())return null;
     return await hasWorkspaceProviders(ctx,ws) ? ws:null;
   },
 });
@@ -30,7 +31,7 @@ export async function findLegacyReceipt(ctx:QueryCtx,externalId:string,channel:'
   if(rows.length>100)return null;
   const matches=[];
   for(const row of rows){
-    if(row.emailConnectionId || row.channel!==channel || row.direction!=='outbound' || (workspaceId && row.workspaceId!==workspaceId))continue;
+    if(row.whatsappConnectionId || row.emailConnectionId || row.channel!==channel || row.direction!=='outbound' || (workspaceId && row.workspaceId!==workspaceId))continue;
     if(await hasWorkspaceProviders(ctx,row.workspaceId))matches.push(row);
   }
   return matches.length===1 ? matches[0]:null;
@@ -41,4 +42,10 @@ export async function findCompanyEmailReceipt(ctx:QueryCtx,externalId:string,id:
   const rows=await ctx.db.query('messages').withIndex('by_emailConnection_external',q=>q.eq('emailConnectionId',id).eq('externalMessageId',externalId)).take(2);
   if(rows.length!==1 || rows[0].channel!=='email' || rows[0].direction!=='outbound')return null;
   const ws=await ctx.db.get(rows[0].workspaceId);return ws?.orgId===connection.orgId ? rows[0]:null;
+}
+
+export async function findCompanyWhatsappReceipt(ctx:QueryCtx,externalId:string,id:Id<'companyWhatsappConnections'>){
+ const r=await ctx.db.get(id);if(!r)return null;
+ const rows=await ctx.db.query('messages').withIndex('by_whatsappConnectionId_and_externalMessageId',q=>q.eq('whatsappConnectionId',id).eq('externalMessageId',externalId)).take(2);
+ return rows.length===1 && rows[0].workspaceId===r.workspaceId && rows[0].channel==='whatsapp' && rows[0].direction==='outbound'?rows[0]:null;
 }
