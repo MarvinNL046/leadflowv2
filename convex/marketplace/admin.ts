@@ -1,8 +1,9 @@
 import { paginationOptsValidator } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { query, mutation, type QueryCtx } from "../_generated/server";
 import { getUserId } from "../lib/identity";
 import { coverageForLead, coverageValidator, loadCoverageBuyers } from './coverage';
+import {marketplaceServiceType, nicheHasSubservices} from './types';
 
 const followUp = v.union(v.literal("new"), v.literal("contacted"), v.literal("done"));
 
@@ -23,6 +24,7 @@ export async function requireAdmin(ctx: QueryCtx) {
   if (!userId) throw new Error("Niet ingelogd");
   const profile = await ctx.db.query("userProfiles").withIndex("by_user", q => q.eq("userId", userId)).unique();
   if (!profile?.isSuperAdmin) throw new Error("Alleen voor beheerders");
+  return userId;
 }
 
 export const listSources = query({
@@ -43,6 +45,8 @@ const leadView = v.object({
   notificationStatus: v.string(), phoneVerified: v.boolean(), emailVerified: v.boolean(),
   message: v.union(v.string(),v.null()),
   coverage: coverageValidator,
+  serviceTypeRevision:v.number(), canEditServiceType:v.boolean(),
+  latestServiceReview:v.union(v.null(),v.object({at:v.number(),note:v.string()})),
   serviceType: v.union(v.string(),v.null()), imported: v.boolean(), originalRequestedAt: v.union(v.number(),v.null()), importedPendingReview: v.boolean(),
   expiresAt:v.union(v.number(),v.null()), unclaimedAt:v.union(v.number(),v.null()), buyerMailsSent:v.number(), buyerMailsFailed:v.number(),
 });
@@ -64,7 +68,11 @@ export const listLeads = query({
       const key = lead.apiKeyId ? await ctx.db.get(lead.apiKeyId) : null;
       const mails = await ctx.db.query('marketplaceBuyerNotifications').withIndex('by_lead_org',q=>q.eq('leadId',lead._id)).take(100);
       const purchases = await ctx.db.query('marketplacePurchases').withIndex('by_lead',q=>q.eq('leadId',lead._id)).take(101);
+      const review=await ctx.db.query('marketplaceServiceReviews').withIndex('by_lead',q=>q.eq('leadId',lead._id)).order('desc').first();
       return {id: lead._id, createdAt: lead._creationTime,
+        serviceTypeRevision:lead.serviceTypeRevision??0,
+        canEditServiceType:nicheHasSubservices(lead.niche)&&purchases.length===0&&lead.status!=='sold_shared'&&lead.status!=='sold_exclusive',
+        latestServiceReview:review?{at:review.reviewedAt,note:review.note}:null,
         coverage: coverageForLead(lead,coverageBuyers.buyers,coverageBuyers.complete,purchases),
         ...importHistory(lead.metadata, lead._creationTime), serviceType: lead.serviceType ?? null,
         name: [lead.firstName,lead.lastName].filter(Boolean).join(" ") || "Naam onbekend",
@@ -87,6 +95,29 @@ export const setFollowUpStatus = mutation({
     await requireAdmin(ctx);
     if (!await ctx.db.get(args.leadId)) throw new Error("Lead niet gevonden");
     await ctx.db.patch(args.leadId, {followUpStatus: args.status, followUpUpdatedAt: Date.now(),...(args.status!=='new'?{unclaimedAt:undefined,followUpDueAt:undefined}:{})});
+    return null;
+  },
+});
+
+export const reviewServiceType = mutation({
+  args:{leadId:v.id('marketplaceLeads'),serviceType:v.union(marketplaceServiceType,v.null()),
+    expectedServiceType:v.union(marketplaceServiceType,v.null()),expectedRevision:v.number(),note:v.string()},
+  returns:v.null(),
+  handler:async(ctx,args)=>{
+    const userId=await requireAdmin(ctx);
+    const lead=await ctx.db.get(args.leadId);
+    if(!lead) throw new ConvexError('Aanvraag niet gevonden.');
+    if(!nicheHasSubservices(lead.niche)) throw new ConvexError('Dit vakgebied gebruikt geen installatie-, onderhoud- of reparatiekeuze.');
+    const note=args.note.trim();
+    if(note.length<3||note.length>500) throw new ConvexError('Vul een korte toelichting in (3 tot 500 tekens).');
+    if(!Number.isSafeInteger(args.expectedRevision)||args.expectedRevision<0
+      ||(lead.serviceTypeRevision??0)!==args.expectedRevision||(lead.serviceType??null)!==args.expectedServiceType)
+      throw new ConvexError('Deze aanvraag is ondertussen gewijzigd. Herlaad het overzicht en controleer de actuele gegevens.');
+    const purchased=await ctx.db.query('marketplacePurchases').withIndex('by_lead',q=>q.eq('leadId',lead._id)).first();
+    if(purchased||lead.status==='sold_shared'||lead.status==='sold_exclusive') throw new ConvexError('Het type werk van een verkochte aanvraag kan niet worden gewijzigd.');
+    const revision=(lead.serviceTypeRevision??0)+1;
+    await ctx.db.insert('marketplaceServiceReviews',{leadId:lead._id,before:lead.serviceType??null,after:args.serviceType,reviewedBy:userId,reviewedAt:Date.now(),note,revision});
+    await ctx.db.patch(lead._id,{serviceType:args.serviceType??undefined,serviceTypeRevision:revision});
     return null;
   },
 });
