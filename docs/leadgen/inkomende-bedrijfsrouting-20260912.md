@@ -25,4 +25,4 @@ Een echte inkomende WhatsApp-/SMS-test blijft nodig. De publiek leesbare Voidfix
 
 Volgende stap: veilige registratie van eigen provideraccounts met versleutelde credentials, unieke inkomende endpoint-/accountbinding en afzenderverificatie. Voeg daarbij een zichtbaar overzicht van overgeslagen webhooks en gecontroleerd opnieuw verwerken toe. Inkomende e-mailantwoorden zijn nog geen volwaardige afzonderlijke mailboxkoppeling. Pas na die inrichting en tests bedrijfsregistratie/teamuitnodigingen openen. Bestaande website-/suite-intake en marketplace-OTP/platformmeldingen zijn buiten dit bereik.
 
-Status: getest; publicatie volgt.
+Live op 12 september 2026 via PR #33, commit 4a856fd8083f896e81931b370fbcbebbf111fab9. Vercel dpl_Bp1cbpxaajqoMNLBV7sJh4ss58Yj READY. Alleen-lezen productiequeries bevestigen dat zowel de bestaande WhatsApp-sessie als het legacy-SMS-account naar de bestaande Staycool-workspace wijzen. Geen echte webhook met klantbericht ingestuurd; daadwerkelijke providerpayloadtest blijft open.
