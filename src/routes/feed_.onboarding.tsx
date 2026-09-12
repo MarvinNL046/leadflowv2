@@ -43,6 +43,7 @@ function OnboardingGate() {
   if (!access.ok) {
     return <RedirectTo to="/crm" label="Geen marketplace-toegang…" />
   }
+  if (!access.canManage) return <p className="p-6">Vraag de eigenaar of bedrijfsbeheerder om het werkgebied in te stellen.</p>
   return <OnboardingContent />
 }
 

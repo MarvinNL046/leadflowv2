@@ -1,10 +1,9 @@
+import {requireWorkspacePermission, type CompanyPermission} from './lib/permissions';
 import { v } from "convex/values";
-import { getUserId } from "./lib/identity";
 import {
   mutation,
   query,
   internalQuery,
-  type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -19,21 +18,8 @@ import { encryptSecret } from "./lib/crypto";
  */
 
 // Gedeelde guard — zelfde patroon als crmSettings / pipelines / workflows.
-async function requireWorkspaceMembership(
-  ctx: QueryCtx | MutationCtx,
-  workspaceId: Id<"workspaces">,
-): Promise<void> {
-  const userId = await getUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
-  const workspace = await ctx.db.get(workspaceId);
-  if (!workspace) throw new Error("Workspace not found");
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user_org", (q) =>
-      q.eq("userId", userId).eq("orgId", workspace.orgId),
-    )
-    .first();
-  if (!membership) throw new Error("Not a member of this workspace");
+async function requireWorkspaceMembership(ctx: QueryCtx, workspaceId: Id<"workspaces">, permission: CompanyPermission = 'crm') {
+  return (await requireWorkspacePermission(ctx, workspaceId, permission)).userId;
 }
 
 export const DEFAULT_AI_CONFIG = {
@@ -97,7 +83,7 @@ export const update = mutation({
     anthropicApiKey: v.optional(v.string()), // plaintext input → encrypted opgeslagen
   },
   handler: async (ctx, args) => {
-    await requireWorkspaceMembership(ctx, args.workspaceId);
+    await requireWorkspaceMembership(ctx, args.workspaceId, 'manage');
 
     const {
       workspaceId,

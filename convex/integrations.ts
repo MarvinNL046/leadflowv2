@@ -1,5 +1,6 @@
+import {requireCompanyPermission, requireWorkspacePermission} from './lib/permissions';
 import { v } from "convex/values";
-import { getUserId } from "./lib/identity";
+
 import {
   action,
   internalMutation,
@@ -43,43 +44,14 @@ async function requireOrgAccess(
   ctx: QueryCtx | MutationCtx,
   orgId: Id<"orgs">,
 ): Promise<{ userId: Id<"users">; role: "owner" | "admin" | "member" }> {
-  const userId = await getUserId(ctx);
-  if (!userId) throw new Error("Niet ingelogd");
-
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user_org", (q) => q.eq("userId", userId).eq("orgId", orgId))
-    .first();
-
-  if (!membership) throw new Error("Geen toegang tot deze organisatie");
-  if (membership.role !== "owner" && membership.role !== "admin") {
-    throw new Error("Alleen een eigenaar of beheerder kan koppelingen beheren");
-  }
-  return { userId, role: membership.role };
+  const {userId,membership}=await requireCompanyPermission(ctx,orgId,'manage');return {userId,role:membership.role};
 }
 
 async function requireWorkspaceAccess(
   ctx: QueryCtx | MutationCtx,
   workspaceId: Id<"workspaces">,
 ): Promise<{ userId: Id<"users">; orgId: Id<"orgs"> }> {
-  const userId = await getUserId(ctx);
-  if (!userId) throw new Error("Niet ingelogd");
-
-  const workspace = await ctx.db.get(workspaceId);
-  if (!workspace) throw new Error("Workspace niet gevonden");
-
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user_org", (q) =>
-      q.eq("userId", userId).eq("orgId", workspace.orgId),
-    )
-    .first();
-  if (!membership) throw new Error("Geen toegang tot deze workspace");
-  if (membership.role !== "owner" && membership.role !== "admin") {
-    throw new Error("Alleen een eigenaar of beheerder kan koppelingen beheren");
-  }
-
-  return { userId, orgId: workspace.orgId };
+  const {userId,orgId}=await requireWorkspacePermission(ctx,workspaceId,'manage');return {userId,orgId};
 }
 
 // ══════════════════════════════════════════════════════════════════════

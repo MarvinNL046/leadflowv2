@@ -8,7 +8,9 @@ import {
 import {
   Authenticated,
   Unauthenticated,
+  useQuery,
 } from 'convex/react'
+import { api } from '../../convex/_generated/api'
 import {
   Sheet,
   SheetContent,
@@ -33,6 +35,9 @@ function CrmLayout() {
 }
 
 function CrmShell() {
+  const tenants = useQuery(api.userProfiles.myTenants)
+  const tenant = tenants?.find(t => t.workspace !== null)
+  const canManage = tenants?.some(t => t.org?.id === tenant?.org?.id && (t.role === 'owner' || t.role === 'admin')) ?? false
   const [drawerOpen, setDrawerOpen] = useState(false)
   const pathname = useRouterState({ select: (s) => s.location.pathname })
 
@@ -60,7 +65,9 @@ function CrmShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <CrmTopbar onMenuClick={() => setDrawerOpen(true)} />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          <Outlet />
+          {['/crm/settings','/crm/workflows','/crm/campaigns'].some(path => pathname === path || pathname.startsWith(path + '/')) && !canManage
+            ? <p>{tenants === undefined ? 'Rechten laden…' : 'Alleen een eigenaar of bedrijfsbeheerder kan deze instellingen beheren.'}</p>
+            : <Outlet />}
         </main>
       </div>
     </div>

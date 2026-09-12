@@ -42,6 +42,8 @@ const TXN_LABEL: Record<string, string> = {
 }
 
 function WalletPage() {
+  const access = useQuery(api.marketplace.access.marketplaceAccess)
+  const canManage = access?.ok && access.canManage
   const data = useQuery(api.marketplace.wallet.getWallet)
   const createTopup = useAction(api.marketplace.stripe.createTopup)
 
@@ -49,6 +51,7 @@ function WalletPage() {
   const [pending, setPending] = useState<number | 'custom' | null>(null)
 
   async function startTopup(amountCents: number, tag: number | 'custom') {
+    if (!canManage) return
     if (amountCents < MIN_CENTS || amountCents > MAX_CENTS) {
       toast.error(
         `Kies een bedrag tussen ${euro(MIN_CENTS)} en ${euro(MAX_CENTS)}.`,
@@ -109,6 +112,7 @@ function WalletPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Saldo opwaarderen</CardTitle>
+          {!canManage && <p className="text-sm">Alleen een eigenaar of bedrijfsbeheerder kan tegoed opwaarderen.</p>}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
@@ -116,7 +120,7 @@ function WalletPage() {
               <Button
                 key={cents}
                 variant="outline"
-                disabled={pending !== null}
+                disabled={pending !== null || !canManage}
                 onClick={() => startTopup(cents, cents)}
               >
                 <Plus className="h-4 w-4" />
@@ -145,7 +149,7 @@ function WalletPage() {
               />
             </div>
             <Button
-              disabled={pending !== null || !customValid}
+              disabled={pending !== null || !customValid || !canManage}
               onClick={() => startTopup(customCents, 'custom')}
             >
               {pending === 'custom' ? 'Bezig…' : 'Opwaarderen'}

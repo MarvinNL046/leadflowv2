@@ -1,29 +1,15 @@
+import {requireWorkspacePermission, type CompanyPermission} from './lib/permissions';
 import { v } from "convex/values";
-import { getUserId } from "./lib/identity";
 import {
   mutation,
   query,
-  type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { renderBlocksToHtml } from "./emailBlocks";
 
-async function requireWorkspaceMembership(
-  ctx: QueryCtx | MutationCtx,
-  workspaceId: Id<"workspaces">,
-): Promise<void> {
-  const userId = await getUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
-  const workspace = await ctx.db.get(workspaceId);
-  if (!workspace) throw new Error("Workspace not found");
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user_org", (q) =>
-      q.eq("userId", userId).eq("orgId", workspace.orgId),
-    )
-    .first();
-  if (!membership) throw new Error("Not a member of this workspace");
+async function requireWorkspaceMembership(ctx: QueryCtx, workspaceId: Id<"workspaces">, permission: CompanyPermission = 'crm') {
+  return (await requireWorkspacePermission(ctx, workspaceId, permission)).userId;
 }
 
 /**
@@ -74,7 +60,7 @@ export const create = mutation({
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await requireWorkspaceMembership(ctx, args.workspaceId);
+    await requireWorkspaceMembership(ctx, args.workspaceId, 'manage');
     if (!args.name.trim()) throw new Error("Naam mag niet leeg zijn");
     if (!args.subject.trim()) throw new Error("Onderwerp mag niet leeg zijn");
     if (!args.body.trim()) throw new Error("Body mag niet leeg zijn");
@@ -103,7 +89,7 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const tpl = await ctx.db.get(args.templateId);
     if (!tpl) throw new Error("Template niet gevonden");
-    await requireWorkspaceMembership(ctx, tpl.workspaceId);
+    await requireWorkspaceMembership(ctx, tpl.workspaceId, 'manage');
 
     const patch: Partial<{
       name: string;
@@ -141,7 +127,7 @@ export const update = mutation({
 export const seedExampleTemplates = mutation({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
-    await requireWorkspaceMembership(ctx, args.workspaceId);
+    await requireWorkspaceMembership(ctx, args.workspaceId, 'manage');
 
     const existing = await ctx.db
       .query("emailTemplates")
@@ -267,7 +253,7 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const tpl = await ctx.db.get(args.templateId);
     if (!tpl) throw new Error("Template niet gevonden");
-    await requireWorkspaceMembership(ctx, tpl.workspaceId);
+    await requireWorkspaceMembership(ctx, tpl.workspaceId, 'manage');
     await ctx.db.delete(args.templateId);
     return null;
   },

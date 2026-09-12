@@ -18,6 +18,7 @@ export function InlineEditText({
   placeholder,
   maxLength = 80,
   ariaLabel,
+  disabled = false,
 }: {
   value: string
   onSave: (next: string) => Promise<void> | void
@@ -28,6 +29,7 @@ export function InlineEditText({
   placeholder?: string
   maxLength?: number
   ariaLabel?: string
+  disabled?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
@@ -47,6 +49,7 @@ export function InlineEditText({
   }, [editing])
 
   async function commit() {
+    if (disabled) return
     const trimmed = draft.trim()
     if (trimmed === value || !trimmed) {
       setDraft(value)
@@ -71,6 +74,7 @@ export function InlineEditText({
     setEditing(false)
   }
 
+  if (disabled) return <span className={className}>{value}</span>
   if (editing) {
     return (
       <input

@@ -1,5 +1,5 @@
+import {requireWorkspacePermission, type CompanyPermission} from './lib/permissions';
 import { v } from "convex/values";
-import { getUserId } from "./lib/identity";
 import {
   mutation,
   query,
@@ -48,25 +48,8 @@ export async function insertDefaultStages(
   }
 }
 
-async function requireWorkspaceMembership(
-  ctx: QueryCtx | MutationCtx,
-  workspaceId: Id<"workspaces">,
-): Promise<Id<"users">> {
-  const userId = await getUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
-
-  const workspace = await ctx.db.get(workspaceId);
-  if (!workspace) throw new Error("Workspace not found");
-
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user_org", (q) =>
-      q.eq("userId", userId).eq("orgId", workspace.orgId),
-    )
-    .first();
-  if (!membership) throw new Error("Not a member of this workspace");
-
-  return userId;
+async function requireWorkspaceMembership(ctx: QueryCtx, workspaceId: Id<"workspaces">, permission: CompanyPermission = 'crm') {
+  return (await requireWorkspacePermission(ctx, workspaceId, permission)).userId;
 }
 
 /**
@@ -102,7 +85,7 @@ export const getDefault = query({
 export const seedDefault = mutation({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
-    await requireWorkspaceMembership(ctx, args.workspaceId);
+    await requireWorkspaceMembership(ctx, args.workspaceId, 'manage');
 
     const existing = await ctx.db
       .query("pipelines")
@@ -133,7 +116,7 @@ export const createPipeline = mutation({
     name: v.string(),
   },
   handler: async (ctx, args) => {
-    await requireWorkspaceMembership(ctx, args.workspaceId);
+    await requireWorkspaceMembership(ctx, args.workspaceId, 'manage');
 
     const result = validatePipelineName(args.name);
     if ("error" in result) throw new Error(result.error);
@@ -169,7 +152,7 @@ export const renamePipeline = mutation({
   handler: async (ctx, args) => {
     const pipeline = await ctx.db.get(args.pipelineId);
     if (!pipeline) throw new Error("Pipeline niet gevonden");
-    await requireWorkspaceMembership(ctx, pipeline.workspaceId);
+    await requireWorkspaceMembership(ctx, pipeline.workspaceId, 'manage');
 
     const result = validatePipelineName(args.name);
     if ("error" in result) throw new Error(result.error);
@@ -190,7 +173,7 @@ export const renameStage = mutation({
     if (!stage) throw new Error("Stage niet gevonden");
     const pipeline = await ctx.db.get(stage.pipelineId);
     if (!pipeline) throw new Error("Pipeline niet gevonden");
-    await requireWorkspaceMembership(ctx, pipeline.workspaceId);
+    await requireWorkspaceMembership(ctx, pipeline.workspaceId, 'manage');
 
     const trimmed = args.name.trim();
     if (!trimmed) throw new Error("Naam mag niet leeg zijn");
@@ -215,7 +198,7 @@ export const addStage = mutation({
   handler: async (ctx, args) => {
     const pipeline = await ctx.db.get(args.pipelineId);
     if (!pipeline) throw new Error("Pipeline niet gevonden");
-    await requireWorkspaceMembership(ctx, pipeline.workspaceId);
+    await requireWorkspaceMembership(ctx, pipeline.workspaceId, 'manage');
 
     const trimmed = args.name.trim();
     if (!trimmed) throw new Error("Naam mag niet leeg zijn");
@@ -266,7 +249,7 @@ export const deleteStage = mutation({
     if (!stage) throw new Error("Stage niet gevonden");
     const pipeline = await ctx.db.get(stage.pipelineId);
     if (!pipeline) throw new Error("Pipeline niet gevonden");
-    await requireWorkspaceMembership(ctx, pipeline.workspaceId);
+    await requireWorkspaceMembership(ctx, pipeline.workspaceId, 'manage');
 
     // Refuse als opps in deze stage staan.
     const oppInStage = await ctx.db
@@ -344,7 +327,7 @@ export const reorderStages = mutation({
   handler: async (ctx, args) => {
     const pipeline = await ctx.db.get(args.pipelineId);
     if (!pipeline) throw new Error("Pipeline niet gevonden");
-    await requireWorkspaceMembership(ctx, pipeline.workspaceId);
+    await requireWorkspaceMembership(ctx, pipeline.workspaceId, 'manage');
 
     const stages = await ctx.db
       .query("pipelineStages")
@@ -381,7 +364,7 @@ export const updateStageColor = mutation({
     if (!stage) throw new Error("Stage niet gevonden");
     const pipeline = await ctx.db.get(stage.pipelineId);
     if (!pipeline) throw new Error("Pipeline niet gevonden");
-    await requireWorkspaceMembership(ctx, pipeline.workspaceId);
+    await requireWorkspaceMembership(ctx, pipeline.workspaceId, 'manage');
 
     // Hex-validatie: #rgb, #rrggbb of #rrggbbaa.
     if (!/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(args.color)) {
@@ -415,7 +398,7 @@ export const setStageRole = mutation({
     if (!stage) throw new Error("Stage niet gevonden");
     const pipeline = await ctx.db.get(stage.pipelineId);
     if (!pipeline) throw new Error("Pipeline niet gevonden");
-    await requireWorkspaceMembership(ctx, pipeline.workspaceId);
+    await requireWorkspaceMembership(ctx, pipeline.workspaceId, 'manage');
 
     const siblings = await ctx.db
       .query("pipelineStages")
@@ -514,7 +497,7 @@ export const setStageNoResurface = mutation({
     if (!stage) throw new Error("Stage niet gevonden");
     const pipeline = await ctx.db.get(stage.pipelineId);
     if (!pipeline) throw new Error("Pipeline niet gevonden");
-    await requireWorkspaceMembership(ctx, pipeline.workspaceId);
+    await requireWorkspaceMembership(ctx, pipeline.workspaceId, 'manage');
     if (stage.isWonStage || stage.isLostStage) {
       throw new Error(
         "Alleen actieve stages kunnen worden vastgehouden (niet Gewonnen/Verloren)",
@@ -540,7 +523,7 @@ export const setStageFollowUpDays = mutation({
     if (!stage) throw new Error("Stage niet gevonden");
     const pipeline = await ctx.db.get(stage.pipelineId);
     if (!pipeline) throw new Error("Pipeline niet gevonden");
-    await requireWorkspaceMembership(ctx, pipeline.workspaceId);
+    await requireWorkspaceMembership(ctx, pipeline.workspaceId, 'manage');
     if (stage.isWonStage || stage.isLostStage) {
       throw new Error(
         "Follow-up-interval geldt alleen voor actieve stages (niet Gewonnen/Verloren)",

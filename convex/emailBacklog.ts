@@ -1,20 +1,10 @@
+import {requireWorkspacePermission, type CompanyPermission} from './lib/permissions';
 import { v } from "convex/values";
-import { getUserId } from "./lib/identity";
 import { query, mutation, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
-async function requireWorkspace(ctx: QueryCtx, workspaceId: Id<"workspaces">) {
-  const userId = await getUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
-  const workspace = await ctx.db.get(workspaceId);
-  if (!workspace) throw new Error("Workspace not found");
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user_org", (q) =>
-      q.eq("userId", userId).eq("orgId", workspace.orgId),
-    )
-    .first();
-  if (!membership) throw new Error("Not a member of this workspace");
+async function requireWorkspace(ctx: QueryCtx, workspaceId: Id<"workspaces">, permission: CompanyPermission = 'crm') {
+  return (await requireWorkspacePermission(ctx, workspaceId, permission)).userId;
 }
 
 export const list = query({
@@ -39,7 +29,7 @@ export const create = mutation({
     pageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await requireWorkspace(ctx, args.workspaceId);
+    await requireWorkspace(ctx, args.workspaceId, 'manage');
     const existing = await ctx.db
       .query("emailBacklog")
       .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
@@ -74,7 +64,7 @@ export const update = mutation({
     const { id, ...fields } = args;
     const row = await ctx.db.get(id);
     if (!row) throw new Error("Item not found");
-    await requireWorkspace(ctx, row.workspaceId);
+    await requireWorkspace(ctx, row.workspaceId, 'manage');
     const patch: Record<string, string | undefined> = {};
     if (fields.title !== undefined) patch.title = fields.title;
     if (fields.type !== undefined) patch.type = fields.type;
@@ -93,7 +83,7 @@ export const setStatus = mutation({
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.id);
     if (!row) throw new Error("Item not found");
-    await requireWorkspace(ctx, row.workspaceId);
+    await requireWorkspace(ctx, row.workspaceId, 'manage');
     await ctx.db.patch(args.id, {
       status: args.status,
       sentAt: args.status === "sent" ? Date.now() : undefined,
@@ -106,7 +96,7 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.id);
     if (!row) throw new Error("Item not found");
-    await requireWorkspace(ctx, row.workspaceId);
+    await requireWorkspace(ctx, row.workspaceId, 'manage');
     await ctx.db.delete(args.id);
   },
 });
@@ -742,7 +732,7 @@ const DRAFTS: Array<{
 export const seedBacklogDrafts = mutation({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
-    await requireWorkspace(ctx, args.workspaceId);
+    await requireWorkspace(ctx, args.workspaceId, 'manage');
     const items = await ctx.db
       .query("emailBacklog")
       .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
@@ -764,7 +754,7 @@ export const seedBacklogDrafts = mutation({
 export const seedDefaults = mutation({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
-    await requireWorkspace(ctx, args.workspaceId);
+    await requireWorkspace(ctx, args.workspaceId, 'manage');
     // Idempotent: if any row already exists for this workspace, skip
     const existing = await ctx.db
       .query("emailBacklog")

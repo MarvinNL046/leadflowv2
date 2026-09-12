@@ -1,6 +1,6 @@
+import {requireWorkspacePermission, type CompanyPermission} from './lib/permissions';
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { getUserId } from "./lib/identity";
 import {
   query,
   mutation,
@@ -23,16 +23,8 @@ const RESEND_BATCH_URL = "https://api.resend.com/emails/batch";
 const BATCH_SIZE = 100;
 const BATCH_DELAY_MS = 10_000;
 
-async function requireWorkspace(ctx: QueryCtx, workspaceId: Id<"workspaces">) {
-  const userId = await getUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
-  const workspace = await ctx.db.get(workspaceId);
-  if (!workspace) throw new Error("Workspace not found");
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user_org", (q) => q.eq("userId", userId).eq("orgId", workspace.orgId))
-    .first();
-  if (!membership) throw new Error("Not a member of this workspace");
+async function requireWorkspace(ctx: QueryCtx, workspaceId: Id<"workspaces">, permission: CompanyPermission = 'crm') {
+  return (await requireWorkspacePermission(ctx, workspaceId, permission)).userId;
 }
 
 const ZERO_STATS = { total: 0, sent: 0, delivered: 0, bounced: 0, unsubscribed: 0, failed: 0 };
@@ -152,7 +144,9 @@ export const create = mutation({
     segmentId: v.id("segments"),
   },
   handler: async (ctx, args) => {
-    await requireWorkspace(ctx, args.workspaceId);
+    await requireWorkspace(ctx, args.workspaceId, 'manage');
+    const segment = await ctx.db.get(args.segmentId);
+    if (!segment || segment.workspaceId !== args.workspaceId) throw new Error('Ongeldig segment');
     return await ctx.db.insert("broadcasts", {
       workspaceId: args.workspaceId,
       name: args.name,
@@ -171,7 +165,7 @@ export const cancel = mutation({
   handler: async (ctx, args) => {
     const b = await ctx.db.get(args.broadcastId);
     if (!b) return;
-    await requireWorkspace(ctx, b.workspaceId);
+    await requireWorkspace(ctx, b.workspaceId, 'manage');
     if (b.status === "scheduled" || b.status === "sending") {
       if (b.scheduledJobId) await ctx.scheduler.cancel(b.scheduledJobId);
       await ctx.db.patch(args.broadcastId, { status: "cancelled" });
@@ -188,7 +182,7 @@ export const update = mutation({
   handler: async (ctx, { broadcastId, ...fields }) => {
     const b = await ctx.db.get(broadcastId);
     if (!b) throw new Error("Campagne niet gevonden.");
-    await requireWorkspace(ctx, b.workspaceId);
+    await requireWorkspace(ctx, b.workspaceId, 'manage');
     if (b.status !== "draft") throw new Error("Zet de campagne eerst terug naar concept.");
     const segment = await ctx.db.get(fields.segmentId);
     if (!segment || segment.workspaceId !== b.workspaceId) throw new Error("Ongeldig segment.");
@@ -204,7 +198,7 @@ export const restoreDraft = mutation({
   handler: async (ctx, { broadcastId }) => {
     const b = await ctx.db.get(broadcastId);
     if (!b) throw new Error("Campagne niet gevonden.");
-    await requireWorkspace(ctx, b.workspaceId);
+    await requireWorkspace(ctx, b.workspaceId, 'manage');
     if (b.status !== "cancelled" && b.status !== "scheduled") throw new Error("Deze campagne kan niet worden hersteld.");
     const recipient = await ctx.db.query("broadcastRecipients")
       .withIndex("by_broadcast_status", q => q.eq("broadcastId", broadcastId)).first();
@@ -256,6 +250,7 @@ async function runSendPipeline(
   // Stap 1: haal alle ontvangers op via gepagineerde internalQuery
   const seg = await ctx.runQuery(internal.broadcasts.loadSegment, { segmentId: b.segmentId });
   if (!seg) throw new Error("Segment niet gevonden");
+  if (seg.workspaceId !== b.workspaceId) throw new Error('Segment hoort niet bij deze workspace');
 
   const allRecipients: Array<{
     contactId: Id<"contacts">;
@@ -336,7 +331,7 @@ export const schedule = mutation({
   handler: async (ctx, args) => {
     const b = await ctx.db.get(args.broadcastId);
     if (!b) throw new Error("Broadcast niet gevonden");
-    await requireWorkspace(ctx, b.workspaceId);
+    await requireWorkspace(ctx, b.workspaceId, 'manage');
     if (b.status !== "draft" && b.status !== "scheduled") {
       throw new Error("Alleen een concept of ingeplande campagne kan worden ingepland.");
     }
@@ -397,7 +392,7 @@ export const assertBroadcastAccess = internalQuery({
   handler: async (ctx, args) => {
     const b = await ctx.db.get(args.broadcastId);
     if (!b) throw new Error("Broadcast niet gevonden");
-    await requireWorkspace(ctx, b.workspaceId);
+    await requireWorkspace(ctx, b.workspaceId, 'manage');
     return null;
   },
 });

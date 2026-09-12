@@ -1,9 +1,8 @@
+import {requireWorkspacePermission, type CompanyPermission} from './lib/permissions';
 import { v } from "convex/values";
-import { getUserId } from "./lib/identity";
 import {
   mutation,
   query,
-  type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -16,25 +15,8 @@ import { computePipelineStats } from "./pipelineStats";
  * opportunityStageHistory voor audit-trail.
  */
 
-async function requireWorkspaceMembership(
-  ctx: QueryCtx | MutationCtx,
-  workspaceId: Id<"workspaces">,
-): Promise<Id<"users">> {
-  const userId = await getUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
-
-  const workspace = await ctx.db.get(workspaceId);
-  if (!workspace) throw new Error("Workspace not found");
-
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user_org", (q) =>
-      q.eq("userId", userId).eq("orgId", workspace.orgId),
-    )
-    .first();
-  if (!membership) throw new Error("Not a member of this workspace");
-
-  return userId;
+async function requireWorkspaceMembership(ctx: QueryCtx, workspaceId: Id<"workspaces">, permission: CompanyPermission = 'crm') {
+  return (await requireWorkspacePermission(ctx, workspaceId, permission)).userId;
 }
 
 /**
@@ -196,6 +178,10 @@ export const create = mutation({
     if (!contact || contact.workspaceId !== args.workspaceId) {
       throw new Error("Contact hoort niet bij deze workspace");
     }
+    const pipeline = await ctx.db.get(args.pipelineId);
+    if (!pipeline || pipeline.workspaceId !== args.workspaceId) {
+      throw new Error("Pipeline hoort niet bij deze workspace");
+    }
     const stage = await ctx.db.get(args.stageId);
     if (!stage || stage.pipelineId !== args.pipelineId) {
       throw new Error("Stage hoort niet bij deze pipeline");
@@ -237,6 +223,11 @@ export const moveToStage = mutation({
     const opp = await ctx.db.get(args.opportunityId);
     if (!opp) throw new Error("Opportunity not found");
     const userId = await requireWorkspaceMembership(ctx, opp.workspaceId);
+    const pipeline = await ctx.db.get(opp.pipelineId);
+    const linkedContact = await ctx.db.get(opp.contactId);
+    if (!pipeline || pipeline.workspaceId !== opp.workspaceId || !linkedContact || linkedContact.workspaceId !== opp.workspaceId) {
+      throw new Error("Opportunity hoort niet bij deze workspace");
+    }
 
     if (opp.stageId === args.toStageId) return; // no-op
 

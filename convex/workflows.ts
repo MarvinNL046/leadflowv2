@@ -1,9 +1,8 @@
+import {requireWorkspacePermission, type CompanyPermission} from './lib/permissions';
 import { v } from "convex/values";
-import { getUserId } from "./lib/identity";
 import {
   mutation,
   query,
-  type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -14,22 +13,8 @@ import type { Id } from "./_generated/dataModel";
  * seed-script of migration.ts-mutations aangemaakt).
  */
 
-async function requireWorkspaceMembership(
-  ctx: QueryCtx | MutationCtx,
-  workspaceId: Id<"workspaces">,
-): Promise<Id<"users">> {
-  const userId = await getUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
-  const workspace = await ctx.db.get(workspaceId);
-  if (!workspace) throw new Error("Workspace not found");
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user_org", (q) =>
-      q.eq("userId", userId).eq("orgId", workspace.orgId),
-    )
-    .first();
-  if (!membership) throw new Error("Not a member of this workspace");
-  return userId;
+async function requireWorkspaceMembership(ctx: QueryCtx, workspaceId: Id<"workspaces">, permission: CompanyPermission = 'crm') {
+  return (await requireWorkspacePermission(ctx, workspaceId, permission)).userId;
 }
 
 /**
@@ -318,7 +303,7 @@ export const createLinear = mutation({
     activate: v.boolean(),
   },
   handler: async (ctx, args) => {
-    await requireWorkspaceMembership(ctx, args.workspaceId);
+    await requireWorkspaceMembership(ctx, args.workspaceId, 'manage');
 
     const name = args.name.trim();
     if (name.length === 0) throw new Error("Naam mag niet leeg zijn");
@@ -426,7 +411,7 @@ export const replaceContent = mutation({
   handler: async (ctx, args) => {
     const wf = await ctx.db.get(args.workflowId);
     if (!wf) throw new Error("Workflow niet gevonden");
-    await requireWorkspaceMembership(ctx, wf.workspaceId);
+    await requireWorkspaceMembership(ctx, wf.workspaceId, 'manage');
 
     const name = args.name.trim();
     if (name.length === 0) throw new Error("Naam mag niet leeg zijn");
@@ -541,7 +526,7 @@ export const permanentDelete = mutation({
   handler: async (ctx, args) => {
     const wf = await ctx.db.get(args.workflowId);
     if (!wf) throw new Error("Workflow niet gevonden");
-    await requireWorkspaceMembership(ctx, wf.workspaceId);
+    await requireWorkspaceMembership(ctx, wf.workspaceId, 'manage');
     const nodes = await ctx.db
       .query("workflowNodes")
       .withIndex("by_workflow", (q) => q.eq("workflowId", args.workflowId))
@@ -573,7 +558,7 @@ export const setStatus = mutation({
   handler: async (ctx, args) => {
     const wf = await ctx.db.get(args.workflowId);
     if (!wf) throw new Error("Workflow niet gevonden");
-    await requireWorkspaceMembership(ctx, wf.workspaceId);
+    await requireWorkspaceMembership(ctx, wf.workspaceId, 'manage');
     await ctx.db.patch(args.workflowId, { status: args.status });
   },
 });
@@ -584,7 +569,7 @@ export const setStatus = mutation({
 export const createAiFirstResponseWorkflow = mutation({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, { workspaceId }) => {
-    await requireWorkspaceMembership(ctx, workspaceId);
+    await requireWorkspaceMembership(ctx, workspaceId, 'manage');
     const workflowId = await ctx.db.insert("workflows", {
       workspaceId,
       name: "AI eerste reactie op nieuwe lead",
