@@ -1,3 +1,4 @@
+import {findLegacyReceipt} from './providerRouting';
 import {requireWorkspacePermission, type CompanyPermission} from './lib/permissions';
 import { requireWorkspaceProviders } from "./companyProviders";
 import { v } from "convex/values";
@@ -628,13 +629,10 @@ export const bumpStatFromExternalId = internalMutation({
     ),
   },
   handler: async (ctx, args) => {
-    const message = await ctx.db
-      .query("messages")
-      .withIndex("by_external_id", (q) => q.eq("externalMessageId", args.externalMessageId))
-      .first();
+    const message = await findLegacyReceipt(ctx,args.externalMessageId,'email');
     if (!message || message.relatedEntityType !== "broadcast" || !message.relatedEntityId) return;
     const b = await ctx.db.get(message.relatedEntityId as Id<"broadcasts">);
-    if (!b) return;
+    if (!b || b.workspaceId!==message.workspaceId) return;
     await ctx.db.patch(b._id, {
       stats: { ...b.stats, [args.field]: (b.stats[args.field] ?? 0) + 1 },
     });

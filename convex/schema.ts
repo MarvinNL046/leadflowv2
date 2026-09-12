@@ -521,11 +521,14 @@ export default defineSchema({
     sentAt: v.optional(v.number()),
     deliveredAt: v.optional(v.number()),
     readAt: v.optional(v.number()),
+    deliveryReceiptAt: v.optional(v.number()),
+    bounceReceiptAt: v.optional(v.number()),
     // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
     legacyId: v.optional(v.number()),
   }).index("by_contact_sent", ["contactId", "sentAt"])
     .index("by_workspace_channel_sent", ["workspaceId", "channel", "sentAt"])
     .index("by_external_id", ["externalMessageId"])
+    .index("by_workspace_channel_external", ["workspaceId", "channel", "externalMessageId"])
     .index("by_thread_sent", ["threadId", "sentAt"])
     .index("by_legacyId", ["legacyId"]),
 

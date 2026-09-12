@@ -235,3 +235,11 @@ Publicatiebevestiging LG-036: Vercel dpl_8kDWjCmNFUHnNov9YgRbZibqoKKz READY, pro
 [Exact bereik en beperkingen](bedrijfscommunicatie-20260912.md). Dit is de eerste isolatiestap; nieuwe bedrijven kunnen nog geen eigen provideraccounts activeren. Geen productiecredentials gewijzigd of berichten verstuurd. Geen SEO-wijzigingen. Platformverificatie en marketplace-meldingen blijven platformcommunicatie. Bedrijfsregistratie blijft gesloten tot inkomende en uitgaande communicatie compleet zijn gescheiden.
 
 Publicatiebevestiging LG-037: Vercel dpl_BcgVyEZnRdJpj5Y5dPvAvGPPcm6T READY, commit 436b5a81f155ff21a00c5e5e82e9d50afac33950. Live /crm/settings toont Communicatie voor jouw bedrijf en configuratie aanwezig voor e-mail, SMS, WhatsApp, agenda en suite. Alleen-lezen controle; geen echte verzending of koppeling uitgevoerd. Vervolg: inkomende berichten en delivery receipts aan bedrijf/provider koppelen voordat eigen accounts voor nieuwe bedrijven actief worden.
+
+## Inkomende bedrijfsrouting — 12 september 2026
+
+| ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
+|---|---|---|---|---|---|---|---|---|---|
+| LG-038 | 2026-09-12 | leadflowv2 | /webhooks/voidfix-wa, /webhooks/voidfix-sms, /webhooks/resend; providerRouting, messaging, consent, broadcasts, messages-index/receiptvelden | Sessie/account/kanaalgebonden verwerking; onbekende mapping overslaan; dedup per workspace/kanaal; atomaire status/counters/bounce met FK-controle | Getest; publicatie volgt | 407 tests/44 bestanden; Convex-TypeScript en productiebuild; algemene TypeScript bestaande diagnostiek | codex/inkomende-bedrijfsrouting-20260912 | — | Echte inboundtest; eigen providerregistratie, afzenderverificatie en overzicht overgeslagen webhooks |
+
+[Exact bereik en beperkingen](inkomende-bedrijfsrouting-20260912.md). Geen echte berichten verstuurd of providerconfiguratie gewijzigd. Onbekende mapping geeft skipped zonder klantdata op te slaan; nog geen quarantaine/replay. Nieuwe bedrijven blijven geblokkeerd voor legacy-accounts. Geen SEO-werk.
