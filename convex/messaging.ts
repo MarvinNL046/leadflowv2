@@ -1,5 +1,5 @@
 import {recordSignal} from './webhookSignals';
-import {findLegacyReceipt} from './providerRouting';
+import {findLegacyReceipt,findCompanyEmailReceipt} from './providerRouting';
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { getUserId } from "./lib/identity";
@@ -74,7 +74,8 @@ export const send = action({
     }
     const { contact, workspaceId, userId, recipient } = ctxData;
 
-    await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
+    const emailTransport = args.channel==='email' ? await ctx.runQuery(internal.companyEmail.transport,{workspaceId}) : null;
+    if(args.channel!=='email')await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
     const waSession = args.channel === 'whatsapp' ? await ctx.runQuery(internal.companyProviders.whatsappSession,{workspaceId}) : undefined;
 
     // Insert messages-row pending
@@ -89,6 +90,7 @@ export const send = action({
         subject: args.subject,
         htmlBody: args.htmlBody,
         sentById: userId,
+        emailConnectionId:emailTransport?.connectionId,
       },
     );
 
@@ -97,6 +99,7 @@ export const send = action({
       let externalId: string | undefined;
       if (args.channel === "email") {
         externalId = await sendViaResend({
+          apiKey:emailTransport!.apiKey,from:emailTransport!.from,
           to: recipient,
           subject: args.subject ?? "(geen onderwerp)",
           text: args.body,
@@ -163,7 +166,8 @@ export const sendInternal = internalAction({
       throw new Error(data.error);
     }
     const { workspaceId, recipient } = data;
-    await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
+    const emailTransport = args.channel==='email' ? await ctx.runQuery(internal.companyEmail.transport,{workspaceId}) : null;
+    if(args.channel!=='email')await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
     const waSession = args.channel === 'whatsapp' ? await ctx.runQuery(internal.companyProviders.whatsappSession,{workspaceId}) : undefined;
 
     const messageId = await ctx.runMutation(
@@ -177,6 +181,7 @@ export const sendInternal = internalAction({
         subject: args.subject,
         htmlBody: args.htmlBody,
         sentById: args.sentById,
+        emailConnectionId:emailTransport?.connectionId,
       },
     );
 
@@ -184,6 +189,7 @@ export const sendInternal = internalAction({
       let externalId: string | undefined;
       if (args.channel === "email") {
         externalId = await sendViaResend({
+          apiKey:emailTransport!.apiKey,from:emailTransport!.from,
           to: recipient,
           subject: args.subject ?? "(geen onderwerp)",
           text: args.body,
@@ -281,6 +287,7 @@ export const resolveForSend = internalQuery({
 export const insertPending = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
+    emailConnectionId:v.optional(v.id("companyEmailConnections")),
     contactId: v.id("contacts"),
     channel: v.union(
       v.literal("sms"),
@@ -296,6 +303,7 @@ export const insertPending = internalMutation({
   handler: async (ctx, args) => {
     return await ctx.db.insert("messages", {
       workspaceId: args.workspaceId,
+      emailConnectionId:args.emailConnectionId,
       contactId: args.contactId,
       channel: args.channel,
       direction: "outbound",
@@ -313,6 +321,7 @@ export const insertPending = internalMutation({
 export const insertPendingInternal = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
+    emailConnectionId:v.optional(v.id("companyEmailConnections")),
     contactId: v.id("contacts"),
     channel: v.union(
       v.literal("sms"),
@@ -328,6 +337,7 @@ export const insertPendingInternal = internalMutation({
   handler: async (ctx, args) => {
     return await ctx.db.insert("messages", {
       workspaceId: args.workspaceId,
+      emailConnectionId:args.emailConnectionId,
       contactId: args.contactId,
       channel: args.channel,
       direction: "outbound",
@@ -434,6 +444,7 @@ export const markConversationRead = mutation({
 export const updateStatusByExternalId = internalMutation({
   args: {
     externalMessageId: v.string(),
+    emailConnectionId:v.optional(v.id("companyEmailConnections")),
     channel: v.union(v.literal('email'),v.literal('sms'),v.literal('whatsapp')),
     workspaceId: v.optional(v.id('workspaces')),
     complaint: v.optional(v.boolean()),
@@ -447,7 +458,7 @@ export const updateStatusByExternalId = internalMutation({
     errorMessage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const msg = await findLegacyReceipt(ctx,args.externalMessageId,args.channel,args.workspaceId);
+    const msg = args.emailConnectionId ? (args.channel==='email' ? await findCompanyEmailReceipt(ctx,args.externalMessageId,args.emailConnectionId):null) : await findLegacyReceipt(ctx,args.externalMessageId,args.channel,args.workspaceId);
     if (!msg) {await recordSignal(ctx,args.channel,'unmatched_receipt');return { matched: false, firstRead: false };}
 
     const patch: Record<string, unknown> = { status: args.newStatus };
@@ -1074,13 +1085,13 @@ export const listByWorkspace = query({
 // ──────────────────────────────────────────────────────────────────────
 
 async function sendViaResend(args: {
+  apiKey:string;from:string;
   to: string;
   subject: string;
   text: string;
   html?: string;
 }): Promise<string> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "noreply@example.com";
+  const {apiKey,from}=args;
   if (!apiKey) throw new Error("RESEND_API_KEY niet geconfigureerd");
 
   const res = await fetch(RESEND_URL, {

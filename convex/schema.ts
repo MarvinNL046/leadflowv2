@@ -35,6 +35,7 @@ import {
 } from "./marketplace/types";
 
 export default defineSchema({
+  companyEmailConnections:defineTable({orgId:v.id('orgs'),status:v.union(v.literal('draft'),v.literal('active'),v.literal('disabled')),createdBy:v.id('users'),encryptedApiKey:v.optional(v.string()),encryptedWebhookSecret:v.optional(v.string()),fromEmail:v.optional(v.string()),fromName:v.optional(v.string()),domainId:v.optional(v.string()),webhookId:v.optional(v.string()),verifiedAt:v.optional(v.number()),disabledAt:v.optional(v.number())}).index('by_org_status',['orgId','status']).index('by_org',['orgId']),
   webhookSignals:defineTable({channel:webhookChannel,reason:webhookReason,count:v.number(),firstSeenAt:v.number(),lastSeenAt:v.number(),open:v.boolean(),reviewedCount:v.optional(v.number()),lastReviewedAt:v.optional(v.number()),lastReviewNote:v.optional(v.string())})
     .index('by_channel_reason',['channel','reason']).index('by_open_lastSeenAt',['open','lastSeenAt']).index('by_lastSeenAt',['lastSeenAt']),
   webhookSignalReviews:defineTable({signalId:v.id('webhookSignals'),reviewedBy:v.id('users'),reviewedAt:v.number(),count:v.number(),note:v.string()}).index('by_signal',['signalId']),
@@ -508,6 +509,7 @@ export default defineSchema({
       v.literal("rate_limited")
     ),
     externalMessageId: v.optional(v.string()),  // Resend/Voidfix/Meta id
+    emailConnectionId:v.optional(v.id('companyEmailConnections')),
     to: v.string(),
     from: v.optional(v.string()),
     subject: v.optional(v.string()),            // email only
@@ -532,6 +534,7 @@ export default defineSchema({
   }).index("by_contact_sent", ["contactId", "sentAt"])
     .index("by_workspace_channel_sent", ["workspaceId", "channel", "sentAt"])
     .index("by_external_id", ["externalMessageId"])
+    .index('by_emailConnection_external',['emailConnectionId','externalMessageId'])
     .index("by_workspace_channel_external", ["workspaceId", "channel", "externalMessageId"])
     .index("by_thread_sent", ["threadId", "sentAt"])
     .index("by_legacyId", ["legacyId"]),

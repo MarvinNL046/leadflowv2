@@ -1,6 +1,6 @@
 import {findLegacyReceipt} from './providerRouting';
 import {requireWorkspacePermission, type CompanyPermission} from './lib/permissions';
-import { requireWorkspaceProviders } from "./companyProviders";
+import {loadEmailTransport} from "./companyEmail";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import {
@@ -234,7 +234,7 @@ export const sendTest = action({
         html,
         text: htmlToPlainText(html),
       },
-    ]);
+    ], b.emailApiKey);
     return { ok: true };
   },
 });
@@ -404,7 +404,7 @@ export const loadForSend = internalQuery({
   handler: async (ctx, args) => {
     const b = await ctx.db.get(args.broadcastId);
     if (!b) return null;
-    await requireWorkspaceProviders(ctx,b.workspaceId);
+    const transport=await loadEmailTransport(ctx,b.workspaceId);
     const settings = await ctx.db
       .query("crmSettings")
       .withIndex("by_workspace", (q) => q.eq("workspaceId", b.workspaceId))
@@ -413,10 +413,10 @@ export const loadForSend = internalQuery({
     const org = ws ? await ctx.db.get(ws.orgId) : null;
     const companyName = settings?.companyName ?? org?.name ?? "Uw bedrijf";
     // Afzender-adres komt uit EMAIL_FROM (gedeelde, in Resend geverifieerde
-    // sender). Bevat de env al een display-naam ("Naam <addr>") dan gebruiken
+    // sender). Bevat het transport al een display-naam ("Naam <addr>") dan gebruiken
     // we die ongewijzigd; bij een kaal adres zetten we de workspace-bedrijfsnaam
     // ervoor → per-tenant afzender-naam zonder per-workspace config.
-    const fromAddress = process.env.EMAIL_FROM ?? "noreply@example.com";
+    const fromAddress = transport.from;
     const from = fromAddress.includes("<")
       ? fromAddress
       : `${companyName} <${fromAddress}>`;
@@ -424,6 +424,8 @@ export const loadForSend = internalQuery({
       ...b,
       companyName,
       from,
+      emailApiKey:transport.apiKey,
+      emailConnectionId:transport.connectionId,
     };
   },
 });
@@ -533,6 +535,7 @@ export const recordSends = internalMutation({
   args: {
     broadcastId: v.id("broadcasts"),
     workspaceId: v.id("workspaces"),
+    emailConnectionId:v.optional(v.id("companyEmailConnections")),
     subject: v.string(),
     sends: v.array(
       v.object({
@@ -558,6 +561,7 @@ export const recordSends = internalMutation({
       // Insert messages-rij (VERPLICHT: Resend-webhook gebruikt by_external_id)
       await ctx.db.insert("messages", {
         workspaceId: args.workspaceId,
+        emailConnectionId:args.emailConnectionId,
         contactId: s.contactId,
         channel: "email",
         direction: "outbound",
@@ -693,7 +697,7 @@ export const runBatch = internalAction({
     let results: Array<{ id?: string }> = [];
     let batchFailed = false;
     try {
-      results = await postBatch(emails.map(({ _recipientId: _r, _contactId: _c, ...e }) => e));
+      results = await postBatch(emails.map(({ _recipientId: _r, _contactId: _c, ...e }) => e), b.emailApiKey);
     } catch {
       batchFailed = true;
     }
@@ -708,6 +712,7 @@ export const runBatch = internalAction({
     await ctx.runMutation(internal.broadcasts.recordSends, {
       broadcastId: args.broadcastId,
       workspaceId: b.workspaceId,
+      emailConnectionId:b.emailConnectionId,
       subject: b.subject,
       sends: emails.map((e, i) => ({
         recipientId: e._recipientId,
@@ -827,8 +832,8 @@ async function postBatch(
     text: string;
     headers?: Record<string, string>;
   }>,
+  apiKey: string,
 ): Promise<Array<{ id?: string }>> {
-  const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error("RESEND_API_KEY niet geconfigureerd");
   const res = await fetch(RESEND_BATCH_URL, {
     method: "POST",

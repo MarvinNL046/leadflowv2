@@ -20,6 +20,7 @@ import type * as contactSearch from "../contactSearch.js";
 import type * as companyProviders from "../companyProviders.js";
 import type * as providerRouting from "../providerRouting.js";
 import type * as webhookSignals from "../webhookSignals.js";
+import type * as companyEmail from "../companyEmail.js";
 import type * as contacts from "../contacts.js";
 import type * as contactsBackfill from "../contactsBackfill.js";
 import type * as contactsRead from "../contactsRead.js";
@@ -125,6 +126,7 @@ declare const fullApi: ApiFromModules<{
   companyProviders: typeof companyProviders;
   providerRouting: typeof providerRouting;
   webhookSignals: typeof webhookSignals;
+  companyEmail: typeof companyEmail;
   contacts: typeof contacts;
   contactsBackfill: typeof contactsBackfill;
   contactsRead: typeof contactsRead;

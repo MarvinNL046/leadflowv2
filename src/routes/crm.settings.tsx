@@ -87,6 +87,7 @@ const SECTIONS: HubSection[] = [
     title: 'Integraties',
     description: 'Externe diensten die leads inbrengen of berichten versturen',
     items: [
+      {to:'/crm/settings/email',title:'Eigen e-mailkoppeling',description:'Resend-account, geverifieerde afzender en bezorgmeldingen voor jouw bedrijf',icon:Mail,iconColor:'bg-blue-100 text-blue-700'},
       {
         to: '/crm/settings/meta',
         title: 'Meta (Facebook & Instagram)',
