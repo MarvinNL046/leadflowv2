@@ -26,3 +26,5 @@ De bestaande platformkoppeling wordt niet gemigreerd of verwijderd. Een overstap
 Bron: officiële Voidfix API-documentatie, gelezen op 12 september 2026: https://wa.voidfix.com/api-docs/ en de bijbehorende swagger-ui-init.js (sessions en send-message).
 
 Vervolg: echte WhatsApp/SMS-proef wanneer de kantoor-telefoon beschikbaar is; eigen SMS-inrichting en bewaking van eigen WhatsApp voordat externe bedrijfsregistratie breed wordt geopend.
+
+Live bevestigd via PR #39, commit 5af6906eaa13386d9c05c4019fa197ab233019b1; Vercel dpl_8H95nJGcdCa89XAqe4ryN5xx32cr READY. Navigatie vanuit Instellingen naar WhatsApp en door naar de bedrijfshandleiding alleen-lezen gecontroleerd. Geen echte koppeling aangemaakt.
