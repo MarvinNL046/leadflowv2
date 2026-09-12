@@ -1,6 +1,7 @@
+import {requireActiveInbound as requireActiveSmsInbound} from './companySms';
 import {requireActiveInbound} from './companyWhatsapp';
 import {recordSignal} from './webhookSignals';
-import {findLegacyReceipt,findCompanyEmailReceipt,findCompanyWhatsappReceipt} from './providerRouting';
+import {findLegacyReceipt,findCompanyEmailReceipt,findCompanyWhatsappReceipt,findCompanySmsReceipt} from './providerRouting';
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { getUserId } from "./lib/identity";
@@ -77,7 +78,8 @@ export const send = action({
 
     const emailTransport = args.channel==='email' ? await ctx.runQuery(internal.companyEmail.transport,{workspaceId}) : null;
     const ownWa=args.channel==='whatsapp'?await ctx.runQuery(internal.companyWhatsapp.transport,{workspaceId}):null;
-    if(args.channel!=='email' && !ownWa)await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
+    const ownSms=args.channel==='sms'?await ctx.runQuery(internal.companySms.transport,{workspaceId}):null;
+    if(args.channel!=='email' && !ownWa && !ownSms)await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
     const waSession = args.channel === 'whatsapp' ? (ownWa?.sessionId ?? await ctx.runQuery(internal.companyProviders.whatsappSession,{workspaceId})) : undefined;
 
     // Insert messages-row pending
@@ -94,6 +96,7 @@ export const send = action({
         sentById: userId,
         emailConnectionId:emailTransport?.connectionId,
         whatsappConnectionId:ownWa?.connectionId,
+        smsConnectionId:ownSms?.connectionId,
       },
     );
 
@@ -110,6 +113,7 @@ export const send = action({
         });
       } else if (args.channel === "sms") {
         externalId = await sendViaVoidfixSms({
+          key:ownSms?.apiKey ?? process.env.VOIDFIX_SMS_API_SECRET ?? '',devices:ownSms?.deviceId ?? process.env.VOIDFIX_SMS_DEVICE_ID ?? '',
           to: recipient,
           message: args.body,
         });
@@ -172,7 +176,8 @@ export const sendInternal = internalAction({
     const { workspaceId, recipient } = data;
     const emailTransport = args.channel==='email' ? await ctx.runQuery(internal.companyEmail.transport,{workspaceId}) : null;
     const ownWa=args.channel==='whatsapp'?await ctx.runQuery(internal.companyWhatsapp.transport,{workspaceId}):null;
-    if(args.channel!=='email' && !ownWa)await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
+    const ownSms=args.channel==='sms'?await ctx.runQuery(internal.companySms.transport,{workspaceId}):null;
+    if(args.channel!=='email' && !ownWa && !ownSms)await ctx.runQuery(internal.companyProviders.assertWorkspace, {workspaceId});
     const waSession = args.channel === 'whatsapp' ? (ownWa?.sessionId ?? await ctx.runQuery(internal.companyProviders.whatsappSession,{workspaceId})) : undefined;
 
     const messageId = await ctx.runMutation(
@@ -188,6 +193,7 @@ export const sendInternal = internalAction({
         sentById: args.sentById,
         emailConnectionId:emailTransport?.connectionId,
         whatsappConnectionId:ownWa?.connectionId,
+        smsConnectionId:ownSms?.connectionId,
       },
     );
 
@@ -203,6 +209,7 @@ export const sendInternal = internalAction({
         });
       } else if (args.channel === "sms") {
         externalId = await sendViaVoidfixSms({
+          key:ownSms?.apiKey ?? process.env.VOIDFIX_SMS_API_SECRET ?? '',devices:ownSms?.deviceId ?? process.env.VOIDFIX_SMS_DEVICE_ID ?? '',
           to: recipient,
           message: args.body,
         });
@@ -294,7 +301,7 @@ export const resolveForSend = internalQuery({
 export const insertPending = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
-    emailConnectionId:v.optional(v.id("companyEmailConnections")), whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")),
+    emailConnectionId:v.optional(v.id("companyEmailConnections")), whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")), smsConnectionId:v.optional(v.id("companySmsConnections")),
     contactId: v.id("contacts"),
     channel: v.union(
       v.literal("sms"),
@@ -312,6 +319,7 @@ export const insertPending = internalMutation({
       workspaceId: args.workspaceId,
       emailConnectionId:args.emailConnectionId,
       whatsappConnectionId:args.whatsappConnectionId,
+      smsConnectionId:args.smsConnectionId,
       contactId: args.contactId,
       channel: args.channel,
       direction: "outbound",
@@ -329,7 +337,7 @@ export const insertPending = internalMutation({
 export const insertPendingInternal = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
-    emailConnectionId:v.optional(v.id("companyEmailConnections")), whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")),
+    emailConnectionId:v.optional(v.id("companyEmailConnections")), whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")), smsConnectionId:v.optional(v.id("companySmsConnections")),
     contactId: v.id("contacts"),
     channel: v.union(
       v.literal("sms"),
@@ -347,6 +355,7 @@ export const insertPendingInternal = internalMutation({
       workspaceId: args.workspaceId,
       emailConnectionId:args.emailConnectionId,
       whatsappConnectionId:args.whatsappConnectionId,
+      smsConnectionId:args.smsConnectionId,
       contactId: args.contactId,
       channel: args.channel,
       direction: "outbound",
@@ -453,7 +462,7 @@ export const markConversationRead = mutation({
 export const updateStatusByExternalId = internalMutation({
   args: {
     externalMessageId: v.string(),
-    emailConnectionId:v.optional(v.id("companyEmailConnections")), whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")),
+    emailConnectionId:v.optional(v.id("companyEmailConnections")), whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")), smsConnectionId:v.optional(v.id("companySmsConnections")),
     channel: v.union(v.literal('email'),v.literal('sms'),v.literal('whatsapp')),
     workspaceId: v.optional(v.id('workspaces')),
     complaint: v.optional(v.boolean()),
@@ -467,7 +476,7 @@ export const updateStatusByExternalId = internalMutation({
     errorMessage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const msg = args.whatsappConnectionId ? (args.channel==='whatsapp'?await findCompanyWhatsappReceipt(ctx,args.externalMessageId,args.whatsappConnectionId):null) : args.emailConnectionId ? (args.channel==='email' ? await findCompanyEmailReceipt(ctx,args.externalMessageId,args.emailConnectionId):null) : await findLegacyReceipt(ctx,args.externalMessageId,args.channel,args.workspaceId);
+    const msg = args.smsConnectionId ? (args.channel==='sms'?await findCompanySmsReceipt(ctx,args.externalMessageId,args.smsConnectionId):null) : args.whatsappConnectionId ? (args.channel==='whatsapp'?await findCompanyWhatsappReceipt(ctx,args.externalMessageId,args.whatsappConnectionId):null) : args.emailConnectionId ? (args.channel==='email' ? await findCompanyEmailReceipt(ctx,args.externalMessageId,args.emailConnectionId):null) : await findLegacyReceipt(ctx,args.externalMessageId,args.channel,args.workspaceId);
     if (!msg) {await recordSignal(ctx,args.channel,'unmatched_receipt');return { matched: false, firstRead: false };}
 
     const patch: Record<string, unknown> = { status: args.newStatus };
@@ -518,7 +527,7 @@ export const updateStatusByExternalId = internalMutation({
 export const recordInbound = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
-    whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")),
+    whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")), smsConnectionId:v.optional(v.id("companySmsConnections")),
     channel: v.union(
       v.literal("sms"),
       v.literal("whatsapp"),
@@ -532,10 +541,11 @@ export const recordInbound = internalMutation({
     receivedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    if(args.smsConnectionId){if(args.channel!=='sms')throw new Error('Wrong channel');await requireActiveSmsInbound(ctx,args.smsConnectionId,args.workspaceId);}
     if(args.whatsappConnectionId){if(args.channel!=='whatsapp')throw new Error('Wrong channel');await requireActiveInbound(ctx,args.whatsappConnectionId,args.workspaceId);}
     // Idempotency: skip als externalId al binnenkwam
     if (args.externalMessageId) {
-      const existing = args.whatsappConnectionId ? await ctx.db.query('messages').withIndex('by_whatsappConnectionId_and_externalMessageId',q=>q.eq('whatsappConnectionId',args.whatsappConnectionId).eq('externalMessageId',args.externalMessageId)).first() : await ctx.db
+      const existing = args.smsConnectionId ? await ctx.db.query('messages').withIndex('by_smsConnectionId_and_externalMessageId',q=>q.eq('smsConnectionId',args.smsConnectionId).eq('externalMessageId',args.externalMessageId)).first() : args.whatsappConnectionId ? await ctx.db.query('messages').withIndex('by_whatsappConnectionId_and_externalMessageId',q=>q.eq('whatsappConnectionId',args.whatsappConnectionId).eq('externalMessageId',args.externalMessageId)).first() : await ctx.db
         .query("messages")
         .withIndex("by_workspace_channel_external", (q) =>
           q.eq("workspaceId",args.workspaceId).eq("channel",args.channel).eq("externalMessageId", args.externalMessageId),
@@ -601,6 +611,7 @@ export const recordInbound = internalMutation({
     const messageId = await ctx.db.insert("messages", {
       workspaceId: args.workspaceId,
       whatsappConnectionId:args.whatsappConnectionId,
+      smsConnectionId:args.smsConnectionId,
       contactId,
       channel: args.channel,
       direction: "inbound",
@@ -629,7 +640,7 @@ export const recordInbound = internalMutation({
 export const recordOutbound = internalMutation({
   args: {
     workspaceId: v.id("workspaces"),
-    whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")),
+    whatsappConnectionId:v.optional(v.id("companyWhatsappConnections")), smsConnectionId:v.optional(v.id("companySmsConnections")),
     channel: v.union(
       v.literal("sms"),
       v.literal("whatsapp"),
@@ -644,11 +655,12 @@ export const recordOutbound = internalMutation({
     sentAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    if(args.smsConnectionId){if(args.channel!=='sms')throw new Error('Wrong channel');await requireActiveSmsInbound(ctx,args.smsConnectionId,args.workspaceId);}
     if(args.whatsappConnectionId){if(args.channel!=='whatsapp')throw new Error('Wrong channel');await requireActiveInbound(ctx,args.whatsappConnectionId,args.workspaceId);}
     // Idempotency: skip als externalId al bestaat (bv. Leadflow stuurde 't zelf
     // via de Voidfix-API → markSent zette dezelfde externalMessageId).
     if (args.externalMessageId) {
-      const existing = args.whatsappConnectionId ? await ctx.db.query('messages').withIndex('by_whatsappConnectionId_and_externalMessageId',q=>q.eq('whatsappConnectionId',args.whatsappConnectionId).eq('externalMessageId',args.externalMessageId)).first() : await ctx.db
+      const existing = args.smsConnectionId ? await ctx.db.query('messages').withIndex('by_smsConnectionId_and_externalMessageId',q=>q.eq('smsConnectionId',args.smsConnectionId).eq('externalMessageId',args.externalMessageId)).first() : args.whatsappConnectionId ? await ctx.db.query('messages').withIndex('by_whatsappConnectionId_and_externalMessageId',q=>q.eq('whatsappConnectionId',args.whatsappConnectionId).eq('externalMessageId',args.externalMessageId)).first() : await ctx.db
         .query("messages")
         .withIndex("by_workspace_channel_external", (q) =>
           q.eq("workspaceId",args.workspaceId).eq("channel",args.channel).eq("externalMessageId", args.externalMessageId),
@@ -710,6 +722,7 @@ export const recordOutbound = internalMutation({
     const messageId = await ctx.db.insert("messages", {
       workspaceId: args.workspaceId,
       whatsappConnectionId:args.whatsappConnectionId,
+      smsConnectionId:args.smsConnectionId,
       contactId,
       channel: args.channel,
       direction: "outbound",
@@ -1132,6 +1145,7 @@ async function sendViaResend(args: {
 }
 
 async function sendViaVoidfixSms(args: {
+  key:string;devices:string;
   to: string;
   message: string;
 }): Promise<string> {
@@ -1139,8 +1153,8 @@ async function sendViaVoidfixSms(args: {
   // Eigen API-key (VOIDFIX_SMS_API_SECRET), als `key`-formveld — NIET de
   // WhatsApp X-API-Key. Veldnamen per v1's werkende client: key/number/
   // message/devices/type/prioritize. Response: { success, data: { messages:[{ID}] } }.
-  const key = process.env.VOIDFIX_SMS_API_SECRET;
-  const devices = process.env.VOIDFIX_SMS_DEVICE_ID;
+  const key = args.key;
+  const devices = args.devices;
   if (!key) throw new Error("VOIDFIX_SMS_API_SECRET niet geconfigureerd");
   if (!devices) throw new Error("VOIDFIX_SMS_DEVICE_ID niet geconfigureerd");
 

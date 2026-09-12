@@ -1,4 +1,4 @@
-# Bedrijfshandleiding: e-mail en WhatsApp aansluiten
+# Bedrijfshandleiding: e-mail, SMS en WhatsApp aansluiten
 
 Versie 12 september 2026. Voor eigenaren en bedrijfsbeheerders in LeadFlow.
 
@@ -62,10 +62,38 @@ WhatsAppcontrole mislukt: controleer je eigen account, de exacte sessie-ID, verb
 
 Geen inkomende WhatsApp: controleer het volledige webhookadres, de geselecteerde gebeurtenissen en de sessie. Stuur een nieuw testbericht. Een groene sessie bij Voidfix bewijst op zichzelf niet dat de webhook naar LeadFlow werkt.
 
-Bericht komt niet aan: controleer het ontvangersnummer, de verbinding in Voidfix en de foutstatus in LeadFlow. De verbindingstatus in LeadFlow is de controle bij het aansluiten, geen continue beschikbaarheidsgarantie. Eigen koppelingen hebben nog geen automatische storingsmail of ingebouwde QR-herkoppeling.
+Bericht komt niet aan: controleer het ontvangersnummer, de verbinding in Voidfix en de foutstatus in LeadFlow. WhatsApp wordt elke vijftien minuten opnieuw gecontroleerd; dit is geen continue beschikbaarheidsgarantie. Eigen koppelingen hebben nog geen automatische storingsmail of ingebouwde QR-herkoppeling.
 
 Hulp nodig: geef de beheerder het tijdstip, de betreffende werkruimte, de stap die mislukte en de foutmelding. Deel geen API-key, volledig persoonlijk webhookadres of klantgesprekken.
 
+## SMS: wat heb je nodig?
+
+Een eigen SMS Voidfix-account, een Android-telefoon met de gateway-app en een werkende SIM. Houd de telefoon ingeschakeld en verbonden volgens de instructies van de provider. Het SMS-account en de SMS API-key staan los van WhatsApp. Gebruik een apart SMS-provideraccount voor deze werkruimte zodat je geen webhook van een ander systeem overschrijft.
+
+## SMS: stap voor stap
+
+1. Koppel het Android-apparaat via de instructies op sms.voidfix.com. Open Devices & SIMs en noteer de apparaat-ID en de exacte apparaatnaam. Controleer dat er een SIM gekoppeld is.
+
+2. Open LeadFlow → Instellingen → Eigen SMS-koppeling. Vul apparaat-ID, exacte apparaatnaam en de API-key uit API Integration van jouw SMS-account in. Klik Controleren en activeren.
+
+3. LeadFlow controleert de apparaatlijst van jouw account en de aanwezigheid van een SIM. Dit is geen onlinecontrole en er wordt geen SMS verstuurd. Controleer op de telefoon welke SIM de gateway standaard gebruikt; er is nog geen SIM-slotkeuze in LeadFlow. SMS-kosten lopen via jouw provider/SIM.
+
+4. Klik Webhookadres tonen. Kopieer dit volledige, geheime adres naar Add WebHook for received messages op de API Integration-pagina van SMS Voidfix en sla het daar op. Verberg daarna het adres in LeadFlow.
+
+5. Stuur zelf één CRM-test-SMS naar een tweede telefoon die je beheert. Antwoord vanaf die telefoon en controleer het gesprek in LeadFlow. Een bericht dat de gateway heeft geaccepteerd is nog niet bewezen afgeleverd; controleer de telefoon en eventuele bezorgstatus.
+
+6. Geen ontvangst: controleer dat de telefoon aanstaat, de app is verbonden, de webhook klopt en het juiste apparaat wordt gebruikt. LeadFlow verwerkt alleen callbacks met de apparaat-ID van jouw koppeling. Last webhook ontvangen bevestigt een passende callback, niet automatisch een geslaagd gesprek.
+
+SMS pauzeren blokkeert nieuwe verzendingen en nieuwe inkomende SMS in LeadFlow. Reeds gestarte verzendingen kunnen afronden; oude bezorgmeldingen blijven verwerkt. Er is geen terugval naar de platformkey. Voor hervatten maak je een nieuwe geverifieerde koppeling en werk je het webhookadres bij. De gateway-app en het provideraccount worden niet door deze knop uitgeschakeld.
+
+## WhatsApp: bewaking en herstel
+
+LeadFlow controleert eigen actieve WhatsApp-koppelingen iedere vijftien minuten met de eigen accountkey. Onder Eigen WhatsApp-koppeling zie je Verbinding bevestigd, Verbinding verbroken of nummer gewijzigd, of Verbinding niet bevestigd, met controletijd. Nu controleren vraagt direct opnieuw de status op en verstuurt geen bericht.
+
+Bij een verbroken verbinding, een afwijkend telefoonnummer of een mislukte providercontrole blokkeert LeadFlow nieuwe WhatsApp-verzendingen. Open Voidfix, herstel de sessie met het juiste nummer en klik Nu controleren. Zodra de controle slaagt kunnen nieuwe berichten weer worden verzonden. Eerder mislukte berichten worden niet automatisch opnieuw verstuurd; controleer die afzonderlijk in Berichten.
+
+Een onbekende status kan ook een tijdelijke providerstoring zijn. De bewaking blijft proberen zolang de koppeling actief is. Pauzeren schakelt de periodieke controle van die koppeling uit. Een controle die al liep kan nog afronden maar activeert een gepauzeerde koppeling niet opnieuw. Er zijn nog geen storingsmails of pushmeldingen voor eigen koppelingen: bekijk de status in LeadFlow. Controle van de verbinding vervangt de webhook- en gesprekstest niet.
+
 ## Wat komt later?
 
-Eigen SMS-accounts, automatische bewaking van eigen WhatsApp-accounts, e-mailantwoorden in de inbox en zelfstandig bedrijven aanmelden zijn nog vervolgstappen.
+Automatische storingsmeldingen buiten de app, e-mailantwoorden in de inbox en zelfstandig bedrijven aanmelden zijn nog vervolgstappen. De eerste echte telefoon- en afleveringstest van de nieuwe koppelingen staat nog open.

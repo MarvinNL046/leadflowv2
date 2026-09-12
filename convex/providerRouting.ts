@@ -23,7 +23,9 @@ export const legacySmsWorkspace = internalQuery({
     const workspaces=await ctx.db.query('workspaces').withIndex('by_org',q=>q.eq('orgId',orgId)).take(2);
     // One signed legacy SMS account, one workspace. Multiple workspaces require
     // explicit device routing before this endpoint can accept messages.
-    return workspaces.length===1 ? workspaces[0]._id:null;
+    if(workspaces.length!==1)return null;
+    if(await ctx.db.query('companySmsConnections').withIndex('by_workspaceId',q=>q.eq('workspaceId',workspaces[0]._id)).first())return null;
+    return workspaces[0]._id;
   },
 });
 export async function findLegacyReceipt(ctx:QueryCtx,externalId:string,channel:'email'|'sms'|'whatsapp',workspaceId?:Id<'workspaces'>){
@@ -31,7 +33,7 @@ export async function findLegacyReceipt(ctx:QueryCtx,externalId:string,channel:'
   if(rows.length>100)return null;
   const matches=[];
   for(const row of rows){
-    if(row.whatsappConnectionId || row.emailConnectionId || row.channel!==channel || row.direction!=='outbound' || (workspaceId && row.workspaceId!==workspaceId))continue;
+    if(row.smsConnectionId || row.whatsappConnectionId || row.emailConnectionId || row.channel!==channel || row.direction!=='outbound' || (workspaceId && row.workspaceId!==workspaceId))continue;
     if(await hasWorkspaceProviders(ctx,row.workspaceId))matches.push(row);
   }
   return matches.length===1 ? matches[0]:null;
@@ -48,4 +50,10 @@ export async function findCompanyWhatsappReceipt(ctx:QueryCtx,externalId:string,
  const r=await ctx.db.get(id);if(!r)return null;
  const rows=await ctx.db.query('messages').withIndex('by_whatsappConnectionId_and_externalMessageId',q=>q.eq('whatsappConnectionId',id).eq('externalMessageId',externalId)).take(2);
  return rows.length===1 && rows[0].workspaceId===r.workspaceId && rows[0].channel==='whatsapp' && rows[0].direction==='outbound'?rows[0]:null;
+}
+
+export async function findCompanySmsReceipt(ctx:QueryCtx,externalId:string,id:Id<'companySmsConnections'>){
+ const r=await ctx.db.get(id);if(!r)return null;
+ const rows=await ctx.db.query('messages').withIndex('by_smsConnectionId_and_externalMessageId',q=>q.eq('smsConnectionId',id).eq('externalMessageId',externalId)).take(2);
+ return rows.length===1 && rows[0].workspaceId===r.workspaceId && rows[0].channel==='sms' && rows[0].direction==='outbound'?rows[0]:null;
 }

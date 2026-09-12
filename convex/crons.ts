@@ -36,4 +36,6 @@ crons.interval(
 
 crons.interval("marketplace-verval-en-opvolging", {minutes:5}, internal.marketplace.lifecycle.sweep, {});
 
+crons.interval('eigen-whatsapp-bewaking',{minutes:15},internal.companyWhatsappHealth.sweep,{});
+
 export default crons;

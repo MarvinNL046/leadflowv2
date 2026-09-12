@@ -7,8 +7,8 @@ import {VOIDFIX_WA_BASE} from './lib/voidfix';
 import type {Id} from './_generated/dataModel';
 
 export const list=query({
-  args:{workspaceId:v.id('workspaces')},returns:v.array(v.object({id:v.id('companyWhatsappConnections'),status:v.union(v.literal('active'),v.literal('disabled')),sessionId:v.string(),phoneNumber:v.string(),verifiedAt:v.number(),lastWebhookAt:v.union(v.number(),v.null())})),
-  handler:async(ctx,args)=>{await requireWorkspacePermission(ctx,args.workspaceId,'manage');const rows=await ctx.db.query('companyWhatsappConnections').withIndex('by_workspaceId',q=>q.eq('workspaceId',args.workspaceId)).order('desc').take(20);return rows.map(r=>({id:r._id,status:r.status,sessionId:r.sessionId,phoneNumber:r.phoneNumber,verifiedAt:r.verifiedAt,lastWebhookAt:r.lastWebhookAt??null}));},
+  args:{workspaceId:v.id('workspaces')},returns:v.array(v.object({id:v.id('companyWhatsappConnections'),status:v.union(v.literal('active'),v.literal('disabled')),sessionId:v.string(),phoneNumber:v.string(),verifiedAt:v.number(),lastWebhookAt:v.union(v.number(),v.null()),health:v.union(v.literal('connected'),v.literal('disconnected'),v.literal('unknown')),lastCheckedAt:v.union(v.number(),v.null()),healthReason:v.union(v.string(),v.null())})),
+  handler:async(ctx,args)=>{await requireWorkspacePermission(ctx,args.workspaceId,'manage');const rows=await ctx.db.query('companyWhatsappConnections').withIndex('by_workspaceId',q=>q.eq('workspaceId',args.workspaceId)).order('desc').take(20);return rows.map(r=>({id:r._id,status:r.status,sessionId:r.sessionId,phoneNumber:r.phoneNumber,verifiedAt:r.verifiedAt,lastWebhookAt:r.lastWebhookAt??null,health:r.health??'unknown',lastCheckedAt:r.lastCheckedAt??null,healthReason:r.healthReason??null}));},
 });
 export const authorize=internalQuery({args:{workspaceId:v.id('workspaces')},returns:v.null(),handler:async(ctx,args)=>{await requireWorkspacePermission(ctx,args.workspaceId,'manage');return null;}});
 export const activate=action({
@@ -40,7 +40,7 @@ export const commit=internalMutation({
     if(legacy || args.sessionId===process.env.VOIDFIX_WA_SESSION_ID)throw new ConvexError('Deze sessie wordt al door de bestaande koppeling gebruikt.');
     if((await ctx.db.query('companyWhatsappConnections').withIndex('by_workspaceId',q=>q.eq('workspaceId',args.workspaceId)).take(20)).length>=20)throw new ConvexError('Neem contact op met de platformbeheerder voor meer koppelingen.');
     if(!args.encryptedApiKey.startsWith('v1:') || !args.encryptedWebhookSecret.startsWith('v1:'))throw new ConvexError('Versleutelde sleutels vereist');
-    return ctx.db.insert('companyWhatsappConnections',{...args,createdBy:userId,status:'active',verifiedAt:Date.now()});
+    return ctx.db.insert('companyWhatsappConnections',{...args,createdBy:userId,status:'active',verifiedAt:Date.now(),health:'connected',lastCheckedAt:Date.now()});
   },
 });
 export const disable=mutation({args:{id:v.id('companyWhatsappConnections')},returns:v.null(),handler:async(ctx,args)=>{const r=await ctx.db.get(args.id);if(!r)throw new ConvexError('Koppeling niet gevonden');await requireWorkspacePermission(ctx,r.workspaceId,'manage');await ctx.db.patch(r._id,{status:'disabled',disabledAt:Date.now()});return null;}});
@@ -50,6 +50,7 @@ export const setupUrl=action({args:{id:v.id('companyWhatsappConnections')},retur
 export const authorizedSecret=internalQuery({args:{id:v.id('companyWhatsappConnections')},returns:v.string(),handler:async(ctx,args)=>{const r=await ctx.db.get(args.id);if(!r || r.status!=='active')throw new ConvexError('Geen actieve koppeling');await requireWorkspacePermission(ctx,r.workspaceId,'manage');return decryptSecret(r.encryptedWebhookSecret);}});
 export const transport=internalQuery({args:{workspaceId:v.id('workspaces')},returns:v.union(v.object({apiKey:v.string(),sessionId:v.string(),connectionId:v.id('companyWhatsappConnections')}),v.null()),handler:async(ctx,args)=>{
   const r=await ctx.db.query('companyWhatsappConnections').withIndex('by_workspaceId_and_status',q=>q.eq('workspaceId',args.workspaceId).eq('status','active')).unique();
+  if(r?.health && r.health!=='connected')throw new ConvexError('WhatsApp-verbinding niet bevestigd. Controleer de koppeling bij Instellingen.');
   if(r)return {apiKey:await decryptSecret(r.encryptedApiKey),sessionId:r.sessionId,connectionId:r._id};
   if(await ctx.db.query('companyWhatsappConnections').withIndex('by_workspaceId',q=>q.eq('workspaceId',args.workspaceId)).first())throw new ConvexError('Eigen WhatsApp-koppeling is gepauzeerd.');return null;
 }});

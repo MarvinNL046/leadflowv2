@@ -792,6 +792,93 @@ http.route({
     );
   }),
 });
+http.route({
+  path: "/webhooks/voidfix-sms-company",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const id=new URL(request.url).searchParams.get('connectionId');if(!id)return jsonResponse({error:'Missing connection'},400);
+    let connection;try{connection=await ctx.runQuery(internal.companySms.webhookContext,{id:id as Id<'companySmsConnections'>});}catch{return jsonResponse({error:'Invalid connection'},400);}
+    if(!connection)return jsonResponse({error:'Invalid connection'},401);const secret=connection.secret;const connectionId=id as Id<'companySmsConnections'>;
+
+    const rawBody = await request.text();
+    // Auth: óf een geldige HMAC-signature (x-sg-signature), óf het gedeelde
+    // secret via ?secret= / x-webhook-secret. Voidfix biedt bij webhooks alleen
+    // een URL-veld, dus de query-param is de praktische weg — consistent met de
+    // WA-webhook hieronder.
+    const signature = request.headers.get("x-sg-signature");
+    const headerSecret =
+      request.headers.get("x-webhook-secret") ||
+      new URL(request.url).searchParams.get("secret");
+    const hmacOk =
+      !!signature && (await isValidHmacSignature(rawBody, signature, secret));
+    const secretOk =
+      !!headerSecret && timingSafeStringEqual(headerSecret, secret);
+    if (!hmacOk && !secretOk) {
+      console.warn("[voidfix-sms-webhook] invalid auth");
+      return jsonResponse({ error: "Invalid auth" }, 401);
+    }
+
+    // Voidfix SMS POST't form-urlencoded met een `messages`-JSON-array.
+    // Elk item: { ID, number (afzender), message (tekst), status:
+    // "Received" | "Sent" | "Delivered" | "Failed", ... }. (Fallback: los JSON.)
+    let messages: VoidfixSmsMessage[];
+    try {
+      const raw = new URLSearchParams(rawBody).get("messages");
+      const parsed = JSON.parse(raw ?? rawBody);
+      messages = Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      await ctx.runMutation(internal.webhookSignals.record,{channel:'sms',reason:'invalid_payload'});
+      return jsonResponse({ error: "Invalid payload" }, 400);
+    }
+
+    const statusMap: Record<
+      string,
+      "delivered" | "failed" | "bounced" | "read" | null
+    > = { Sent: null, Delivered: "delivered", Failed: "failed" };
+
+    // The verified legacy secret identifies one company account; require one workspace.
+    const wsId=connection.workspaceId;
+    let inbound = 0;
+    for (const m of messages) {
+      if(!m || typeof m!=='object' || String(m.deviceID)!==connection.deviceId){await ctx.runMutation(internal.webhookSignals.record,{channel:'sms',reason:'unmapped_account'});continue;}
+      await ctx.runMutation(internal.companySms.seen,{id:connectionId});
+      if(m.status==='Received' && connection.status!=='active')continue;
+      const from = m.number ?? m.from;
+      const body = m.message ?? m.body;
+      const extId = m.ID != null ? String(m.ID) : (m.messageId ?? undefined);
+      if(m.status==='Received' && (!from || !body)){await ctx.runMutation(internal.webhookSignals.record,{channel:'sms',reason:!from?'missing_sender':'invalid_payload'});continue;}
+      if (m.status === "Received" && from && body) {
+        if (!wsId) {
+          return jsonResponse({ error: "Workspace not provisioned" }, 500);
+        }
+        await ctx.runMutation(internal.messaging.recordInbound, {
+          workspaceId: wsId,
+          smsConnectionId:connectionId,
+          channel: "sms",
+          from,
+          body,
+          externalMessageId: extId,
+        });
+        inbound++;
+      } else {
+        const ns = statusMap[m.status ?? ""];
+        if (ns && extId) {
+          await ctx.runMutation(internal.messaging.updateStatusByExternalId, {
+            externalMessageId: extId,
+            smsConnectionId:connectionId,
+            channel:'sms',
+            workspaceId:wsId ?? undefined,
+            newStatus: ns,
+          });
+        }
+      }
+    }
+    return jsonResponse(
+      { received: true, inbound, total: messages.length },
+      200,
+    );
+  }),
+});
 
 // ════════════════════════════════════════════════════════════════════
 // VOIDFIX WA WEBHOOK — inbound replies + delivery
@@ -2091,6 +2178,7 @@ interface ResendEvent {
 }
 
 interface VoidfixSmsMessage {
+  deviceID?:string|number;
   ID?: number;
   number?: string; // afzender (inbound) / ontvanger
   message?: string; // tekst
