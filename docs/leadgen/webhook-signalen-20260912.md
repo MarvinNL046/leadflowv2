@@ -22,4 +22,4 @@ Registratie begint met deze publicatie. Eerder overgeslagen berichten kunnen nie
 
 Volgende stap: de echte inkomende WhatsApp-/SMS-test uitvoeren wanneer de telefoon beschikbaar is, en veilige inrichting van eigen provideraccounts voorbereiden (versleutelde credentials, accountbinding en afzenderverificatie). Eventuele opslag voor gecontroleerd opnieuw verwerken vraagt apart bewaarbeleid en toegangscontrole. Geen SEO-werk.
 
-Status: getest; publicatie volgt.
+Live op 12 september 2026 via PR #35, commit 630177547e74047059b660fe17bc884f37a0dc7e. Vercel dpl_GwY32BWmmKt7y6dDv3zE3SwB6yUw READY. Live /crm/webhook-signalen gecontroleerd: kop, uitleg, standaard open-filter en alle-signalenfilter werken; beide tonen momenteel een lege registratie. Geen productiesignalen aangemaakt of gecontroleerd voor deze test.
