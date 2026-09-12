@@ -1,4 +1,5 @@
 import {requireWorkspacePermission, type CompanyPermission} from './lib/permissions';
+import { requireWorkspaceProviders } from "./companyProviders";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import {
@@ -67,7 +68,7 @@ export const previewHtml = query({
       .first();
     const ws = await ctx.db.get(b.workspaceId);
     const org = ws ? await ctx.db.get(ws.orgId) : null;
-    const companyName = settings?.companyName ?? org?.name ?? "StayCool Airco";
+    const companyName = settings?.companyName ?? org?.name ?? "Uw bedrijf";
     const vars = leadTemplateVars({ firstName: "Voorbeeld", lastName: "" }, companyName);
     const subject = renderTemplate(b.subject, vars);
     return {
@@ -402,13 +403,14 @@ export const loadForSend = internalQuery({
   handler: async (ctx, args) => {
     const b = await ctx.db.get(args.broadcastId);
     if (!b) return null;
+    await requireWorkspaceProviders(ctx,b.workspaceId);
     const settings = await ctx.db
       .query("crmSettings")
       .withIndex("by_workspace", (q) => q.eq("workspaceId", b.workspaceId))
       .first();
     const ws = await ctx.db.get(b.workspaceId);
     const org = ws ? await ctx.db.get(ws.orgId) : null;
-    const companyName = settings?.companyName ?? org?.name ?? "StayCool Airco";
+    const companyName = settings?.companyName ?? org?.name ?? "Uw bedrijf";
     // Afzender-adres komt uit EMAIL_FROM (gedeelde, in Resend geverifieerde
     // sender). Bevat de env al een display-naam ("Naam <addr>") dan gebruiken
     // we die ongewijzigd; bij een kaal adres zetten we de workspace-bedrijfsnaam

@@ -1,3 +1,5 @@
+import {useQuery} from 'convex/react'
+import {api} from '../../convex/_generated/api'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   Settings,
@@ -106,6 +108,9 @@ const SECTIONS: HubSection[] = [
 ]
 
 function SettingsHubPage() {
+  const tenants=useQuery(api.userProfiles.myTenants)
+  const workspaceId=tenants?.find(t=>t.workspace)?.workspace?.id
+  const providers=useQuery(api.companyProviders.status,workspaceId ? {workspaceId} : 'skip')
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -120,6 +125,13 @@ function SettingsHubPage() {
         </div>
       </div>
 
+      {providers && <Card><CardContent className="p-4 space-y-2">
+        <h2 className="text-sm font-semibold">Communicatie voor jouw bedrijf</h2>
+        <p className="text-sm text-zinc-600">{providers.assigned
+          ? 'Deze koppelingen zijn aan jouw bedrijf toegewezen. Aanwezig betekent dat de configuratie klaarstaat; de verbinding is hiermee niet live getest.'
+          : 'Er zijn nog geen afzenders of koppelingen toegewezen. Berichten, campagnes en agenda-export blijven uit totdat de platformbeheerder jouw eigen koppelingen heeft ingericht.'}</p>
+        <ul className="text-sm space-y-1">{([['email','E-mail'],['sms','SMS'],['whatsapp','WhatsApp'],['calendar','Agenda'],['suite','Cashflow / Frostwork']] as const).map(([key,label])=><li key={key}>{label}: {providers[key] ? 'Configuratie aanwezig' : 'Niet ingesteld of niet actief'}</li>)}</ul>
+      </CardContent></Card>}
       <div className="space-y-6">
         {SECTIONS.map((section) => (
           <div key={section.title} className="space-y-3">

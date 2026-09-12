@@ -758,6 +758,7 @@ export const linkWhatsapp = action({
       internal.integrations.getWhatsappConfigInternal,
       { workspaceId: args.workspaceId },
     );
+    await ctx.runQuery(internal.companyProviders.assertWorkspace,{workspaceId:args.workspaceId});
     const apiKey = process.env.VOIDFIX_API_KEY;
     if (!apiKey) {
       return {
@@ -854,6 +855,7 @@ export const checkWhatsappStatus = action({
       internal.integrations.getWhatsappConfigInternal,
       { workspaceId: args.workspaceId },
     );
+    await ctx.runQuery(internal.companyProviders.assertWorkspace,{workspaceId:args.workspaceId});
     const apiKey = process.env.VOIDFIX_API_KEY;
     if (!apiKey) {
       return { success: false, error: "VOIDFIX_API_KEY niet geconfigureerd" };
