@@ -30,8 +30,15 @@ export async function findLegacyReceipt(ctx:QueryCtx,externalId:string,channel:'
   if(rows.length>100)return null;
   const matches=[];
   for(const row of rows){
-    if(row.channel!==channel || row.direction!=='outbound' || (workspaceId && row.workspaceId!==workspaceId))continue;
+    if(row.emailConnectionId || row.channel!==channel || row.direction!=='outbound' || (workspaceId && row.workspaceId!==workspaceId))continue;
     if(await hasWorkspaceProviders(ctx,row.workspaceId))matches.push(row);
   }
   return matches.length===1 ? matches[0]:null;
+}
+
+export async function findCompanyEmailReceipt(ctx:QueryCtx,externalId:string,id:Id<'companyEmailConnections'>){
+  const connection=await ctx.db.get(id);if(!connection || connection.status==='draft')return null;
+  const rows=await ctx.db.query('messages').withIndex('by_emailConnection_external',q=>q.eq('emailConnectionId',id).eq('externalMessageId',externalId)).take(2);
+  if(rows.length!==1 || rows[0].channel!=='email' || rows[0].direction!=='outbound')return null;
+  const ws=await ctx.db.get(rows[0].workspaceId);return ws?.orgId===connection.orgId ? rows[0]:null;
 }

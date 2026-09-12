@@ -569,6 +569,83 @@ http.route({
   }),
 });
 
+http.route({
+  path: "/webhooks/resend-company",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const rawId=new URL(request.url).searchParams.get('connectionId');
+    if(!rawId)return jsonResponse({error:'Missing connection'},400);
+    let secret:string|null;
+    try{secret=await ctx.runQuery(internal.companyEmail.webhookSecret,{id:rawId as Id<'companyEmailConnections'>});}catch{return jsonResponse({error:'Invalid connection'},400);}
+    const timestamp=Number(request.headers.get('svix-timestamp'));
+    if(!Number.isFinite(timestamp) || Math.abs(Date.now()/1000-timestamp)>300)return jsonResponse({error:'Invalid timestamp'},401);
+    if (!secret) return jsonResponse({ error: "Server misconfigured" }, 500);
+
+    const svixId = request.headers.get("svix-id");
+    const svixTimestamp = request.headers.get("svix-timestamp");
+    const svixSignature = request.headers.get("svix-signature");
+    if (!svixId || !svixTimestamp || !svixSignature) {
+      return jsonResponse({ error: "Missing svix headers" }, 401);
+    }
+
+    const rawBody = await request.text();
+    if (!(await isValidSvixSignature(
+      svixId, svixTimestamp, rawBody, svixSignature, secret,
+    ))) {
+      console.warn("[resend-webhook] invalid svix signature");
+      return jsonResponse({ error: "Invalid signature" }, 401);
+    }
+
+    let payload: ResendEvent;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      await ctx.runMutation(internal.webhookSignals.record,{channel:'email',reason:'invalid_payload'});
+      return jsonResponse({ error: "Invalid JSON" }, 400);
+    }
+
+    const externalId = payload.data?.email_id;
+    if (!externalId) {
+      return jsonResponse({ received: true, ignored: payload.type }, 200);
+    }
+
+    // Map Resend event-type naar messages.status enum
+    const statusMap: Record<
+      string,
+      "delivered" | "failed" | "bounced" | "read" | null
+    > = {
+      "email.delivered": "delivered",
+      "email.bounced": "bounced",
+      "email.complained": "bounced",
+      "email.delivery_delayed": null,  // negeer
+      "email.opened": "read",
+      "email.clicked": null,
+      "email.sent": null,
+    };
+    const newStatus = statusMap[payload.type];
+    if (!newStatus) {
+      return jsonResponse({ received: true, ignored: payload.type }, 200);
+    }
+
+    await ctx.runMutation(internal.messaging.updateStatusByExternalId, {
+      externalMessageId: externalId,
+      channel: 'email',
+      emailConnectionId:rawId as Id<'companyEmailConnections'>,
+      complaint: payload.type === 'email.complained',
+      newStatus,
+      deliveredAt: payload.created_at
+        ? new Date(payload.created_at).getTime()
+        : undefined,
+      errorMessage:
+        newStatus === "bounced" && payload.data?.bounce
+          ? `${payload.data.bounce.type}: ${payload.data.bounce.message ?? ""}`
+          : undefined,
+    });
+
+    return jsonResponse({ received: true, type: payload.type }, 200);
+  }),
+});
+
 // ════════════════════════════════════════════════════════════════════
 // PUBLIEKE UNSUBSCRIBE — GET (mens) + POST (Gmail one-click List-Unsubscribe)
 // URL: {CONVEX_SITE_URL}/unsubscribe?token=<token>
@@ -597,8 +674,8 @@ const UNSUB_PAGE = (ok: boolean) =>
 .card{border:1px solid #e4e4e7;border-radius:12px;padding:2rem;text-align:center}</style></head>
 <body><div class="card">${
     ok
-      ? "<h1>Je bent afgemeld</h1><p>Je ontvangt geen marketingmails meer van StayCool Airco. Offertes en serviceberichten blijven gewoon werken.</p>"
-      : "<h1>Link verlopen of ongeldig</h1><p>Neem contact op via info@staycoolairco.nl als je je wilt afmelden.</p>"
+      ? "<h1>Je bent afgemeld</h1><p>Je ontvangt geen marketingmails meer van deze afzender. Offertes en serviceberichten blijven gewoon werken.</p>"
+      : "<h1>Link verlopen of ongeldig</h1><p>Neem contact op met de afzender als je je wilt afmelden.</p>"
   }</div></body></html>`;
 
 http.route({

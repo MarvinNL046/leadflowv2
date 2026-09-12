@@ -255,3 +255,11 @@ Publicatiebevestiging LG-038: Live op 12 september 2026 via PR #33, commit 4a856
 [Exact bereik en beperkingen](webhook-signalen-20260912.md). Geen echte berichten of testwebhooks naar productie gestuurd; geen providerconfiguratie gewijzigd. Geen historische reconstructie, berichtinhoud, secrets of automatische meldingen. Controle markeert alleen de signalengroep. Geen SEO-wijzigingen.
 
 Publicatiebevestiging LG-039: Live op 12 september 2026 via PR #35, commit 630177547e74047059b660fe17bc884f37a0dc7e. Vercel dpl_GwY32BWmmKt7y6dDv3zE3SwB6yUw READY. Live /crm/webhook-signalen gecontroleerd: kop, uitleg, standaard open-filter en alle-signalenfilter werken; beide tonen momenteel een lege registratie. Geen productiesignalen aangemaakt of gecontroleerd voor deze test.
+
+## Eigen bedrijfse-mail — 12 september 2026
+
+| ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
+|---|---|---|---|---|---|---|---|---|---|
+| LG-040 | 2026-09-12 | leadflowv2 | /crm/settings/email; companyEmailConnections; CRM/workflow/campagneverzending; /webhooks/resend-company; receipt-routing; afmeldtekst | Resend per bedrijf met geverifieerde afzender/webhook, versleutelde credentials en owner/admin-beheer; koppelinggebonden berichten en receipts; pauzeren zonder legacy-terugval | Gecontroleerd, publicatie volgt | 429 tests/46 bestanden; Convex-TypeScript en productiebuild; algemene TypeScript bestaande diagnostiek | Featurebranch codex/bedrijf-email-20260912 | — | Eigen WhatsApp/SMS-koppelingen en echte providerproef, daarna onboarding |
+
+[Exact bereik en inrichting](eigen-email-20260912.md). Geen echte koppeling geactiveerd, providerinstellingen veranderd of berichten verstuurd. E-mailantwoorden worden nog niet als mailbox ingelezen. Geen SEO-werk.

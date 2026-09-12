@@ -36,8 +36,11 @@ export const status = query({
     await requireWorkspacePermission(ctx,args.workspaceId,'manage');
     const assigned=await hasWorkspaceProviders(ctx,args.workspaceId);
     const wa=assigned ? await ctx.db.query('whatsappWebConfig').withIndex('by_workspace',q=>q.eq('workspaceId',args.workspaceId)).unique():null;
-    return {assigned,
-      email:assigned && !!process.env.RESEND_API_KEY && !!process.env.EMAIL_FROM,
+    const ws=await ctx.db.get(args.workspaceId);
+    const ownEmail=ws?await ctx.db.query('companyEmailConnections').withIndex('by_org_status',q=>q.eq('orgId',ws.orgId).eq('status','active')).unique():null;
+    const pausedEmail=ws?await ctx.db.query('companyEmailConnections').withIndex('by_org_status',q=>q.eq('orgId',ws.orgId).eq('status','disabled')).first():null;
+    return {assigned:assigned || !!ownEmail,
+      email:!!ownEmail || (!pausedEmail && assigned && !!process.env.RESEND_API_KEY && !!process.env.EMAIL_FROM),
       sms:assigned && !!process.env.VOIDFIX_SMS_API_SECRET && !!process.env.VOIDFIX_SMS_DEVICE_ID,
       whatsapp:assigned && !!process.env.VOIDFIX_API_KEY && !!(wa ? wa.isActive && wa.sessionId : process.env.VOIDFIX_WA_SESSION_ID),
       calendar:assigned && !!process.env.GOOGLE_CALENDAR_ID && !!process.env.GOOGLE_CALENDAR_CLIENT_EMAIL && !!process.env.GOOGLE_CALENDAR_PRIVATE_KEY,
