@@ -5,6 +5,18 @@ import { getUserId } from "../lib/identity";
 
 const followUp = v.union(v.literal("new"), v.literal("contacted"), v.literal("done"));
 
+/** Historical import evidence only; never changes sale or verification status. */
+export function importHistory(metadata: unknown, storedAt: number) {
+  const m = metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+    ? metadata as Record<string, unknown> : {};
+  const imported = m.v1Import === true;
+  const raw = m.v1CreatedAt;
+  const parsed = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(raw) ? Date.parse(raw) : NaN;
+  const originalRequestedAt = imported && Number.isFinite(parsed) && parsed > 0 && parsed <= storedAt
+    && new Date(parsed).toISOString() === raw ? parsed : null;
+  return { imported, originalRequestedAt, importedPendingReview: imported && m.v1Status === 'pending_review' };
+}
+
 export async function requireAdmin(ctx: QueryCtx) {
   const userId = await getUserId(ctx);
   if (!userId) throw new Error("Niet ingelogd");
@@ -29,6 +41,7 @@ const leadView = v.object({
   source: v.string(), niche: v.string(), status: v.string(), followUpStatus: followUp,
   notificationStatus: v.string(), phoneVerified: v.boolean(), emailVerified: v.boolean(),
   message: v.union(v.string(),v.null()),
+  serviceType: v.union(v.string(),v.null()), imported: v.boolean(), originalRequestedAt: v.union(v.number(),v.null()), importedPendingReview: v.boolean(),
   expiresAt:v.union(v.number(),v.null()), unclaimedAt:v.union(v.number(),v.null()), buyerMailsSent:v.number(), buyerMailsFailed:v.number(),
 });
 
@@ -48,6 +61,7 @@ export const listLeads = query({
       const key = lead.apiKeyId ? await ctx.db.get(lead.apiKeyId) : null;
       const mails = await ctx.db.query('marketplaceBuyerNotifications').withIndex('by_lead_org',q=>q.eq('leadId',lead._id)).take(100);
       return {id: lead._id, createdAt: lead._creationTime,
+        ...importHistory(lead.metadata, lead._creationTime), serviceType: lead.serviceType ?? null,
         name: [lead.firstName,lead.lastName].filter(Boolean).join(" ") || "Naam onbekend",
         email: lead.email ?? null, phone: lead.phone ?? null, city: lead.city ?? null, postalCode: lead.postalCode ?? null,
         source: typeof lead.metadata?.source === "string" ? lead.metadata.source : key?.name ?? "Bron onbekend",
