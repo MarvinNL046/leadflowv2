@@ -3,6 +3,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { type QueryCtx, query } from "../_generated/server";
 import { requireMarketplaceAccess } from "./access";
 import { maskEmail, maskName, maskPhone } from "./mask";
+import { isLeadForSale, matchesServiceTypes } from "./availability";
 import {
 	type BuyerIntention,
 	type JobSize,
@@ -246,7 +247,7 @@ async function getBeschikbaarFeed(
 	// LIMIT applied at the DB. Convex's index keys one status value, so we
 	// scan both statuses (publishedAt desc) and merge-sort, applying every
 	// pre-mode filter in JS, then slice [offset, offset+limit]. The LIMIT
-	// is applied BEFORE the mode/serviceType post-filter (Step C) to
+	// is applied BEFORE the mode post-filter (Step C) to
 	// preserve v1's under-fill semantics.
 	const STATUSES = ["published", "sold_shared"] as const;
 	const matched: Doc<"marketplaceLeads">[] = [];
@@ -257,6 +258,7 @@ async function getBeschikbaarFeed(
 			.order("desc")
 			.collect();
 		for (const lead of rows) {
+			if (!isLeadForSale(lead) || !matchesServiceTypes(lead, prefs.buyerServiceTypes)) continue;
 			if (!nicheSet.has(lead.niche)) continue;
 			if (!segmentSet.has(lead.segment)) continue;
 			if (provinceSet && !(lead.province && provinceSet.has(lead.province)))
@@ -274,7 +276,7 @@ async function getBeschikbaarFeed(
 	}
 
 	// Merge-sort the two status streams by publishedAt desc (createdAt as
-	// tiebreak), then page BEFORE the mode/serviceType post-filter.
+	// tiebreak), then page before the mode post-filter.
 	matched.sort((a, b) => {
 		const pa = a.publishedAt ?? a._creationTime;
 		const pb = b.publishedAt ?? b._creationTime;
@@ -284,19 +286,9 @@ async function getBeschikbaarFeed(
 	const candidates = matched.slice(opts.offset, opts.offset + opts.limit);
 	if (candidates.length === 0) return [];
 
-	// Step C — per-candidate slot computation + mode/serviceType filter.
+	// Step C — per-candidate slot computation + mode filter.
 	const results: MaskedLead[] = [];
 	for (const lead of candidates) {
-		// service-type post-filter (null serviceType on lead always passes).
-		if (
-			prefs.buyerServiceTypes &&
-			prefs.buyerServiceTypes.length > 0 &&
-			lead.serviceType &&
-			!prefs.buyerServiceTypes.includes(lead.serviceType as ServiceType)
-		) {
-			continue;
-		}
-
 		const counts = await countPurchasesByMode(ctx, lead._id);
 		const maxShared = lead.maxSharedBuyers ?? 4;
 		const sharedSlotsAvailable = Math.max(0, maxShared - counts.shared);
@@ -382,7 +374,7 @@ export const getMaskedLeadDetail = query({
 		const { orgId } = await requireMarketplaceAccess(ctx);
 
 		const lead = await ctx.db.get(leadId);
-		if (!lead) return null;
+		if (!lead || !isLeadForSale(lead)) return null;
 
 		const prefs = await ctx.db
 			.query("marketplaceBuyerPreferences")
@@ -390,6 +382,7 @@ export const getMaskedLeadDetail = query({
 			.unique();
 		const buyerNiches = (prefs?.niches as Niche[] | undefined) ?? [];
 		if (!buyerNiches.includes(lead.niche as Niche)) return null;
+		if (!matchesServiceTypes(lead, prefs?.serviceTypes)) return null;
 
 		const allPurchases = await ctx.db
 			.query("marketplacePurchases")
