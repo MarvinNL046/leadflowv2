@@ -99,9 +99,7 @@ export function SidebarContent({
   )
   const openTaskCount = openTasks ?? 0
 
-  // Marketplace-item alleen tonen mét toegang — /feed heeft een server-side
-  // gate die zonder toegang terug naar /crm stuurt, dus een altijd-zichtbare
-  // link zou een dode knop zijn.
+  // Zonder actieve marketplace leidt /feed naar de bedrijfsactivering.
   const marketplaceAccess = useQuery(api.marketplace.access.marketplaceAccess)
   const hasMarketplace = marketplaceAccess?.ok === true
 
@@ -206,12 +204,12 @@ export function SidebarContent({
           </section>
         )}
 
-        {hasMarketplace && (
+        {marketplaceAccess !== undefined && (
           <section aria-label="Marketplace" className="mt-3 border-t border-zinc-200 pt-3">
             <h2 className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
               Marketplace
             </h2>
-            {MARKETPLACE_NAV.filter(item => item.to !== '/feed/settings' || (marketplaceAccess?.ok && marketplaceAccess.canManage)).map((item) => {
+            {(hasMarketplace ? MARKETPLACE_NAV : [{ to: '/feed', label: 'Leads kopen', icon: Store }]).filter(item => item.to !== '/feed/settings' || (marketplaceAccess?.ok && marketplaceAccess.canManage)).map((item) => {
               const Icon = item.icon
               const isActive = item.to === '/feed'
                 ? location.pathname === '/feed' || location.pathname.startsWith('/feed/lead/')

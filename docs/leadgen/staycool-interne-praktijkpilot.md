@@ -54,3 +54,9 @@ Het meetbestand markeert bedrijfscontext en CRM-opvolging als Bezig; overige pra
 ## Opvolgtaken op een contact (in ontwikkeling, LG-065)
 
 Open een contact en ga naar Opvolging. Lees eerst de bestaande taken en controleer de afspraakstatus. Vul voor een nieuwe taak de handeling in, vermeld de verantwoordelijke in de toelichting en kies zo nodig een uiterste datum. Taak opslaan maakt een interne taak; er wordt geen klantbericht gestuurd. Afronden sluit uitsluitend die taak, Heropenen maakt hem weer open. Een verkoopfase of afspraak verandert hierdoor niet. De lijst toont maximaal 50 recentste taken. Verantwoordelijke is voorlopig tekst, geen formele toewijzing of notificatie aan een teamlid. Deze interface is nog niet live gepubliceerd.
+
+## Publicatie en leads kopen — LG-066
+
+Het opvolgblok is op 13 september 2026 gepubliceerd en in Chrome getest met een normaal testbedrijf: opslaan, herladen, afronden en heropenen werken. Eén synthetische testtaak is als afgerond bewaard.
+
+Voor bedrijven zonder marketplace is een startscherm toegevoegd (publicatie nog te bevestigen): open Leads kopen in de sidebar. De eigenaar of beheerder kan de marketplace voor het eigen bedrijf activeren. Dit koopt geen lead. De bestaande standaardinstelling schakelt nieuwe-leadmeldingen per e-mail in; controleer daarna Werkgebied en meldingen, diensten en voorkeuren. Medewerkers vragen de eigenaar/beheerder om activering. Leadgenbeheer blijft alleen voor de platform-superadmin.

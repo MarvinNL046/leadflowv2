@@ -478,3 +478,11 @@ Bereik: src/components/crm/contact-tasks.tsx en /crm/contacts/$id. Bestaande bev
 Controle: Vite productiebuild geslaagd, twee gerichte UI-tests geslaagd (dubbele submit, behoud invoer na fout). Algemene TypeScript-controle bevat bestaande projectdiagnostiek; geen diagnostiek voor contact-tasks of contactdetail. React-check: onvoorwaardelijke hooks, gelabelde invoer, pending-state, serverautoriteit via bestaande mutaties. Geen live browserproef; wijziging nog niet gepubliceerd.
 
 Open: afspraakstatus pilot P-001, echte opvolging door Marvin, formele teamlidtoewijzing en directe offerteverwijzing. Suite-summary levert alleen aantallen; document-ID moet vanuit geautoriseerde Cashflow-data komen, niet worden gegokt. Eerstvolgende stap: opvolgblok publiceren en als normaal bedrijfsaccount controleren; daarna gerichte Cashflow-documentkoppeling toevoegen. Publicatiedatum: nog niet live.
+
+## LG-066 — 13 september 2026: opvolgblok live en marketplace-ingang hersteld
+
+Opvolgblok gepubliceerd via PR #65, merge 8342f179766b1227e7733f490ba3b3d7ad997062, productie dpl_4mf7ka9jVWzNLF7o2JeE3zQc8Luf READY. Live Chrome-proef als normaal testbedrijf: synthetisch contact zonder communicatiegegevens, één TEST-taak met datum 14 september. Opslaan, herladen, afronden en heropenen bevestigd; sidebar-teller reageert. Testtaak uiteindelijk afgerond, testcontact bewaard. Geen echte klant benaderd. Vijftien gerichte rechten/UI-tests geslaagd. Preview bleef leeg en is niet als browserbewijs gebruikt.
+
+Gebruiker constateerde ontbrekende marketplace in testsidebar. Oorzaak: link was uitsluitend zichtbaar bij marketplaceEnabled; bestaande owner/admin-activeringsmutatie had geen UI. Bereik: sidebar, /feed-toegangsscherm, nieuw MarketplaceStart. Inactieve bedrijven zien Leads kopen. /feed toont uitleg en alleen voor eigenaar/admin een expliciete activeringsknop; medewerkers krijgen uitleg. Backendguards ongewijzigd; geen automatische activering, betaling of suite-rechten. Standaard e-mailmeldingen van bestaande activatie worden vooraf vermeld.
+
+Controle herstel: Vite-build geslaagd, 22 tests geslaagd (sidebar, activeringsscherm, bedrijfsrechten). Algemene tsc heeft fouten buiten gewijzigde componenten. Publicatie van marketplaceherstel en live verificatie volgen in aanvulling. Open: directe offertelinks, formele taaktoewijzing en echte P-001-opvolging.
