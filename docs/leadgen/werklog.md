@@ -745,3 +745,9 @@ Bereik: .github/workflows/quality.yml en docs/quality-checks.md. Nieuwe GitHub A
 Echte GitHub-run 34779984873 op PR #76 / head b1c0ba747162932680a82b602d72ce25d999037f geslaagd: typecheck-job 103785106921 groen, test-job 103785107053 groen (55 bestanden, 516 tests). Ook installatie uit de lockfile slaagde op beide schone Ubuntu-runners. PR #76 samengevoegd als 1ed9c0d0920d7724205961b217fa45718a0fada2; workflow actief op main. De PR bevat ook de eerder openstaande LG-105-releasebeschrijving. Geen appcode aangepast.
 
 Open: verplichte statuschecks via branchbeveiliging zijn afzonderlijk en niet ingesteld door deze workflow. Aanbevolen technisch vervolg: typecheck en test verplicht maken vóór samenvoegen. Praktijkvervolg blijft de drie Staycool-dossiers vanaf 14 september met klantenservice doorlopen. Bronnen voor actionconfiguratie: officiële actions/checkout- en actions/setup-node-repositories.
+
+## LG-107 — 13 september 2026: verplichte checks voorbereid, GitHub-herauthenticatie open
+
+Bestaande bescherming gecontroleerd: geen klassieke branchregels en rulesets-lijst leeg. In GitHub voor exact main voorbereid: PR verplicht, typecheck en test verplicht (bron GitHub Actions), actuele main verplicht, regels ook voor beheerders. Geen verplichte reviewgoedkeuring; force push en verwijdering niet toegestaan. Create aangeklikt, maar GitHub onderbreekt opslaan met Confirm access/sudo-herauthenticatie. GitHub Mobile-verificatie gestart. De regel is nog niet als opgeslagen of actief bevestigd.
+
+Open: Marvin bevestigt GitHub Mobile-aanvraag; daarna opgeslagen regel controleren en docs/quality-checks.md actualiseren. Geen codewijziging of deployment. Aanbevolen eerstvolgende stap: GitHub-bevestiging afronden in de open Chrome-tab.
