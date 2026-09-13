@@ -91,3 +91,7 @@ Gebruik in Cashflow het bestaande account van het bedrijf waarin de klant en off
 Browserproef op 13 september 2026: de link bereikt Cashflow, maar de huidige sessie landt op onboarding. Klantdetail en offerte zijn daardoor nog niet live geverifieerd. Er is geen bedrijf, klant of offerte aangemaakt of gewijzigd.
 
 LG-073: op Welkom bij Cashflow staat bovenaan Uitloggen. Gebruik deze knop om naar het inlogscherm te gaan en met het bestaande bedrijfsaccount aan te melden. Open daarna opnieuw Klant & offertes in LeadFlow.
+
+## Klant/offertecontrole afgerond — LG-074
+
+Op 13 september 2026 is de eerder vastgestelde LeadFlow-klantdeeplink geopend binnen het bestaande Staycool-Cashflow-bedrijf. De juiste klant en diens offertedetail openen succesvol. De offerte is verlopen en dateert van februari, vóór de aanvraag van september. Gebruik de suite-teller daarom alleen als klanthistorie: controleer altijd status, datum en werkzaamheden voordat je aanneemt dat de huidige aanvraag al een offerte heeft. Er is niets verstuurd of gewijzigd. Open blijft: afspraakstatus controleren en vaststellen of een nieuwe of aangepaste offerte nodig is. Productvervolg: offertestatus en datum zichtbaar maken bij de LeadFlow-suiteverwijzing.
