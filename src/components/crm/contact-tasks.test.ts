@@ -13,7 +13,7 @@ beforeEach(() => { mock.create.mockReset(); mock.error.mockReset() })
 
 it('keeps entered follow-up on a failed save so the user can retry', async () => {
   mock.create.mockRejectedValue(new Error('Opslaan mislukt'))
-  render(createElement(ContactTasks, { contactId: 'contact-a' as Id<'contacts'> }))
+  render(createElement(ContactTasks, { contactId: 'contact-a' as Id<'contacts'>, workspaceId: 'workspace-a' as Id<'workspaces'> }))
   fireEvent.change(screen.getByLabelText('Nieuwe opvolgtaak'), { target: { value: 'Afspraak controleren' } })
   fireEvent.click(screen.getByRole('button', { name: 'Taak opslaan' }))
   await waitFor(() => expect(mock.error).toHaveBeenCalled())
@@ -22,7 +22,7 @@ it('keeps entered follow-up on a failed save so the user can retry', async () =>
 
 it('prevents a second submission while saving and uses the current contact', async () => {
   mock.create.mockReturnValue(new Promise(() => {}))
-  render(createElement(ContactTasks, { contactId: 'contact-a' as Id<'contacts'> }))
+  render(createElement(ContactTasks, { contactId: 'contact-a' as Id<'contacts'>, workspaceId: 'workspace-a' as Id<'workspaces'> }))
   fireEvent.change(screen.getByLabelText('Nieuwe opvolgtaak'), { target: { value: 'Afspraak controleren' } })
   const form = screen.getByRole('button', { name: 'Taak opslaan' }).closest('form')!
   fireEvent.submit(form); fireEvent.submit(form)

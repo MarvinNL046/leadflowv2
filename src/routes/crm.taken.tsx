@@ -24,6 +24,7 @@ function TasksPage() {
     workspaceId ? { workspaceId } : 'skip',
   )
   const setDone = useMutation(api.tasks.setDone)
+  const members = useQuery(api.tasks.assignees, workspaceId ? { workspaceId } : 'skip')
 
   if (tenants === undefined || (workspaceId && tasks === undefined)) {
     return <Skeleton className="h-64 w-full" />
@@ -83,6 +84,7 @@ function TasksPage() {
                     />
                     <div className="min-w-0 flex-1">
                       <p className="font-medium">{task.title}</p>
+                      <p className="text-xs text-muted-foreground">Verantwoordelijke: {task.assignedToId ? members?.find(m => m.userId === task.assignedToId)?.name ?? (members ? 'Voormalig teamlid' : 'Laden…') : 'Niet toegewezen'}</p>
                       {task.description && (
                         <p className="mt-0.5 whitespace-pre-line text-sm text-muted-foreground">
                           {task.description}

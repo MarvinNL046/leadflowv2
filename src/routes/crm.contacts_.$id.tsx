@@ -295,7 +295,7 @@ function ContactDetailPage() {
       </div>
 
       <DetailsSection contact={contact} />
-      <ContactTasks key={id} contactId={id as Id<'contacts'>} />
+      <ContactTasks key={id} contactId={id as Id<'contacts'>} workspaceId={contact.workspaceId} />
       <SuiteSummarySection
         existingSuite={apps?.existingSuite === true}
         contactId={id as Id<'contacts'>}
