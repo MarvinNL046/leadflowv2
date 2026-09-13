@@ -6,6 +6,7 @@ import { internal } from "../_generated/api";
 import { action } from "../_generated/server";
 import { getSiteUrl, requireEnv } from "../lib/env";
 import { TOPUP_MAX_CENTS, TOPUP_MIN_CENTS } from "./wallet";
+import { marketplaceStripeLiveMode } from "./stripeMode";
 
 /**
  * Stripe wallet top-up (ported from v1 src/lib/marketplace/
@@ -39,7 +40,9 @@ export const createTopup = action({
 			});
 		}
 
-		const stripe = new Stripe(requireEnv("STRIPE_SECRET_KEY"));
+		const key = requireEnv("STRIPE_SECRET_KEY");
+		marketplaceStripeLiveMode(key);
+		const stripe = new Stripe(key);
 		const siteUrl = getSiteUrl();
 
 		// 3. Create the Checkout Session (inline price_data, no product).

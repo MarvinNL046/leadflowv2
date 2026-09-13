@@ -63,3 +63,7 @@ Chrome http://localhost:5186/login toont Sign in to wetry en Development mode. D
 ## Stripe-isolatie — LG-085
 
 Bestaande Stripe-testmodus van StaycoolAirco.nl bevat een actieve webhook naar de productie-LeadFlow-backend (vibrant-wildebeest-329). Deze gedeelde testmodus dus nog niet gebruiken voor de browserproef. Richt een afzonderlijke Stripe-sandbox in met uitsluitend de steady-orca-351-webhook en eigen testsleutel. De bestaande webhook is niet gewijzigd. Geen testbetaling uitgevoerd; event.livemode wordt in de huidige marketplace-handler niet expliciet tegen de omgeving gecontroleerd. Onderzoek dit afzonderlijk voordat productiebetalingen als volledig gescheiden zijn aangemerkt.
+
+## Aparte sandbox aangemaakt — LG-086
+
+Sandbox LeadFlow Marketplace E2E: acct_1UFIDcEGHXq0MPJu. Webhook we_1UFIEoEGHXq0MPJubwCjxaMa wijst uitsluitend naar steady-orca-351, luistert naar completed en async_payment_succeeded. Staging mode=test en modusbeveiliging gedeployd. Nog in te stellen: STRIPE_SECRET_KEY uit deze nieuwe sandbox (niet gedeelde Testmodus) en STRIPE_MARKETPLACE_WEBHOOK_SECRET van deze nieuwe webhook. Geen betaling uitgevoerd. Productie bevat momenteel een testsleutel; de nieuwe live-default is daar nog niet gepubliceerd.

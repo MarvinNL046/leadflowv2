@@ -84,6 +84,7 @@ import type * as marketplace_provincesData from "../marketplace/provincesData.js
 import type * as marketplace_purchase from "../marketplace/purchase.js";
 import type * as marketplace_regions from "../marketplace/regions.js";
 import type * as marketplace_stripe from "../marketplace/stripe.js";
+import type * as marketplace_stripeMode from "../marketplace/stripeMode.js";
 import type * as marketplace_types from "../marketplace/types.js";
 import type * as marketplace_wallet from "../marketplace/wallet.js";
 import type * as marketplace_wizard from "../marketplace/wizard.js";
@@ -200,6 +201,7 @@ declare const fullApi: ApiFromModules<{
   "marketplace/purchase": typeof marketplace_purchase;
   "marketplace/regions": typeof marketplace_regions;
   "marketplace/stripe": typeof marketplace_stripe;
+  "marketplace/stripeMode": typeof marketplace_stripeMode;
   "marketplace/types": typeof marketplace_types;
   "marketplace/wallet": typeof marketplace_wallet;
   "marketplace/wizard": typeof marketplace_wizard;

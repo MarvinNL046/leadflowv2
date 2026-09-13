@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import {bridge as suiteBridge} from './suiteHttp';
 import Stripe from "stripe";
+import { marketplaceStripeLiveMode } from "./marketplace/stripeMode";
 import { httpAction } from "./_generated/server";
 import { mcpEndpoint } from "./mcpWhatsapp";
 import { mcpEndpoint as mcpLeadflowEndpoint } from "./mcpLeadflow";
@@ -2021,6 +2022,12 @@ http.route({
     if (!secret || !key) {
       return jsonResponse({ error: "not_configured" }, 500);
     }
+    let expectedLiveMode: boolean;
+    try {
+      expectedLiveMode = marketplaceStripeLiveMode(key);
+    } catch {
+      return jsonResponse({ error: "stripe_mode_not_configured" }, 500);
+    }
 
     const sig = request.headers.get("stripe-signature");
     if (!sig) return jsonResponse({ error: "no_signature" }, 400);
@@ -2046,6 +2053,9 @@ http.route({
       return jsonResponse({ received: true }, 200);
     }
     const session = event.data.object as Stripe.Checkout.Session;
+    if (event.livemode !== expectedLiveMode || session.livemode !== expectedLiveMode) {
+      return jsonResponse({ error: "stripe_mode_mismatch" }, 400);
+    }
     if (session.metadata?.kind !== "marketplace_topup") {
       return jsonResponse({ received: true }, 200);
     }
