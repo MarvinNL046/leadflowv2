@@ -63,3 +63,17 @@ Met echte, opeenvolgende eigenaarsessies van testbedrijven A en B is in Cashflow
 - Alle tijdelijke productrechten zijn na de proef uitgezet. Vier herkenbare fictieve klanten zijn bewaard, één per bedrijf per app.
 
 Dit voltooit de eerder openstaande browsercontrole van directe klantdetails. Geautomatiseerde tests dekken daarnaast wijzigen/archiveren van vreemde klanten en schrijven na intrekken. Niet alle productfuncties en mutatie-endpoints zijn live getest. Nog te verbeteren: Frostwork foutpresentatie en de offerte-/factuurklantkiezer voor bedrijven met lokale Cashflow-contacten.
+
+## Klanten kiezen bij offertes en facturen — 13 september 2026
+
+1. Open in Cashflow **Offertes → Nieuwe offerte** of **Facturen → Nieuwe factuur**.
+2. Klik bij **Aan** op **Klant kiezen**. Typ minimaal twee tekens om klanten binnen je eigen administratie te zoeken.
+3. Kies een klant en bevestig met **Opslaan** in het klantpaneel. Hiermee kies je alleen de klant; het document is nog niet opgeslagen.
+4. Bestaat de klant nog niet? Kies **Nieuwe klant aanmaken**, vul naam, e-mail en adres in en klik **Aanmaken & kiezen**. Voor nieuwe bedrijven wordt deze klant binnen hun eigen Cashflow-administratie bewaard.
+5. Controleer de klantgegevens onder **Aan** voordat je het document verder invult. **Opslaan als concept** is een aparte documentactie.
+
+De bestaande organisatie met een expliciete legacy LeadFlow-koppeling behoudt haar eigen contactbron. Andere bedrijven hebben die koppeling niet nodig om klanten te kiezen of aan te maken.
+
+Frostwork toont bij onbeschikbare klantgegevens nu een begrijpelijke melding met **Naar mijn klanten** en **Opnieuw proberen**. Een ontbrekende klant kan ook een tijdelijke laadfout betekenen; het scherm onthult geen technische fouttekst of gegevens van een ander bedrijf.
+
+Live gecontroleerd met testbedrijf A: eigen klant zoeken/selecteren in beide documentformulieren en een nieuwe lokale klant aanmaken vanuit de factuurklantkiezer. De factuur bleef onopgeslagen en de factuurlijst leeg. Alle tijdelijke testrechten zijn uitgezet. Deze controle betreft de klantkeuze; opslaan, heropenen, bedragen en volledige documentisolatie zijn de volgende proef.
