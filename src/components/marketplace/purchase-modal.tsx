@@ -24,6 +24,7 @@ import type { Id } from '../../../convex/_generated/dataModel'
  */
 
 export interface FullContact {
+  contactId?: Id<'contacts'> | null
   firstName: string | null
   lastName: string | null
   email: string | null
@@ -71,7 +72,7 @@ export function PurchaseModal({
       const res = await purchaseLead({ leadId, mode })
       if (res.success && res.fullLead) {
         toast.success('Lead ontgrendeld! De gegevens staan nu in je CRM.')
-        onPurchased(res.fullLead)
+        onPurchased({...res.fullLead, contactId: res.contactId ?? null})
         onOpenChange(false)
         return
       }

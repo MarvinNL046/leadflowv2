@@ -187,11 +187,13 @@ test('four-company rehearsal: three shared copies are isolated, fourth buyer is 
   const c = await additionalBuyer(t, 'synthetic-c');
   const d = await additionalBuyer(t, 'synthetic-d');
   const lead = await t.run(ctx => ctx.db.get(leadId));
+  expect(await a.buyer.query(api.marketplace.purchase.getMyPurchasedContact,{leadId})).toBeNull();
   expect(lead!.maxSharedBuyers).toBe(3);
   const results = [];
   for (const company of [a,b,c]) {
     const result = await company.buyer.mutation(api.marketplace.purchase.purchaseLead, { leadId, mode: 'shared' });
-    expect(result.success).toBe(true);
+  expect(result.success).toBe(true);
+  expect(await company.buyer.query(api.marketplace.purchase.getMyPurchasedContact,{leadId})).toMatchObject({contactId:result.contactId,email:'audit@example.invalid'});
     expect(result.contactId).toBeDefined();
     const detail = await company.buyer.query(api.contacts.getDetail, { contactId: result.contactId! });
     expect(detail!.contact.workspaceId).toBe(company.workspaceId);
@@ -206,6 +208,16 @@ test('four-company rehearsal: three shared copies are isolated, fourth buyer is 
   expect(await d.buyer.query(api.marketplace.purchase.listMyPurchases, {})).toHaveLength(0);
   expect(await t.run(ctx => ctx.db.query('marketplaceWalletTransactions').take(10))).toHaveLength(3);
   expect(await t.run(ctx => ctx.db.query('opportunities').take(10))).toHaveLength(3);
+});
+
+test('purchased detail denies non-buyers and removes a missing CRM link',async()=>{
+  const {t,buyer,leadId}=await setup();
+  const purchase=await buyer.mutation(api.marketplace.purchase.purchaseLead,{leadId,mode:'shared'});
+  const other=await additionalBuyer(t,'other-buyer');
+  expect(await other.buyer.query(api.marketplace.purchase.getMyPurchasedContact,{leadId})).toBeNull();
+  await expect(t.query(api.marketplace.purchase.getMyPurchasedContact,{leadId})).rejects.toThrow();
+  await t.run(ctx=>ctx.db.delete(purchase.contactId!));
+  expect(await buyer.query(api.marketplace.purchase.getMyPurchasedContact,{leadId})).toMatchObject({contactId:null,email:'audit@example.invalid'});
 });
 
 test('exclusive purchase prevents another company buying either mode without debiting it', async () => {
