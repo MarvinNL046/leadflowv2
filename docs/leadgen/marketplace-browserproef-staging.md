@@ -59,3 +59,7 @@ Chrome http://localhost:5186/login toont Sign in to wetry en Development mode. D
 ## Browserbewijs — LG-084
 
 13 september 2026: gebruiker aangemeld op localhost:5186 in in-app browser. Reguliere bedrijfsregistratie voltooid voor LeadFlow Marketplace Test A (synthetisch, dummytelefoon). CRM en marketplace-activering werken. Na herladen voorkeuren Airco/Installeren/Limburg, beide segmenten/verkoopvormen en e-mail uit bevestigd. Wallet EUR 0, geen transacties. Nog geen aankoop of opvolgtaak getest; daarvoor volgen synthetische aanvraag en Stripe-testconfiguratie. Productie ongewijzigd.
+
+## Stripe-isolatie — LG-085
+
+Bestaande Stripe-testmodus van StaycoolAirco.nl bevat een actieve webhook naar de productie-LeadFlow-backend (vibrant-wildebeest-329). Deze gedeelde testmodus dus nog niet gebruiken voor de browserproef. Richt een afzonderlijke Stripe-sandbox in met uitsluitend de steady-orca-351-webhook en eigen testsleutel. De bestaande webhook is niet gewijzigd. Geen testbetaling uitgevoerd; event.livemode wordt in de huidige marketplace-handler niet expliciet tegen de omgeving gecontroleerd. Onderzoek dit afzonderlijk voordat productiebetalingen als volledig gescheiden zijn aangemerkt.
