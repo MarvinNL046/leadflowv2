@@ -751,3 +751,10 @@ Open: verplichte statuschecks via branchbeveiliging zijn afzonderlijk en niet in
 Bestaande bescherming gecontroleerd: geen klassieke branchregels en rulesets-lijst leeg. In GitHub voor exact main voorbereid: PR verplicht, typecheck en test verplicht (bron GitHub Actions), actuele main verplicht, regels ook voor beheerders. Geen verplichte reviewgoedkeuring; force push en verwijdering niet toegestaan. Create aangeklikt, maar GitHub onderbreekt opslaan met Confirm access/sudo-herauthenticatie. GitHub Mobile-verificatie gestart. De regel is nog niet als opgeslagen of actief bevestigd.
 
 Open: Marvin bevestigt GitHub Mobile-aanvraag; daarna opgeslagen regel controleren en docs/quality-checks.md actualiseren. Geen codewijziging of deployment. Aanbevolen eerstvolgende stap: GitHub-bevestiging afronden in de open Chrome-tab.
+
+
+## LG-108 — 13 september 2026: verplichte checks op main bevestigd
+
+Na GitHub Mobile-herauthenticatie meldt GitHub Branch protection rule created. Regel 83137603 opnieuw geopend en opgeslagen waarden gecontroleerd: exact main (1 branch), PR verplicht, test en typecheck vereist met GitHub Actions als bron, up-to-date verplicht, enforce admins aan, reviewapprovals niet verplicht, force pushes en deletions uit. Hiermee is het open punt uit LG-107 afgerond. Geen negatieve mergeproef of productiecodewijziging uitgevoerd; bewijs is de opgeslagen GitHub-configuratie.
+
+Bereik: repositoryinstelling plus docs/quality-checks.md en werklog. Instelling actief sinds 13 september 2026. Eerstvolgende technische wijziging loopt via deze verplichte controles. Praktijkpilot blijft open: vanaf 14 september drie Staycool-dossiers met klantenservice uitvoeren en resultaten, eigenaar, deadline en behandeltijd vastleggen.

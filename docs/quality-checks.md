@@ -6,6 +6,8 @@ Beide jobs draaien op Ubuntu met Node.js 24, installeren exact package-lock.json
 
 Bij een rode controle: open de PR > Checks > betreffende job > mislukte stap. Herstel de fout en push een nieuwe commit; de controles starten opnieuw. Lokaal reproduceren: npm ci, npm run typecheck, npm test. De tests gebruiken de bestaande Vitest-configuratie en gesimuleerde backends.
 
-Deze workflow maakt checkresultaten zichtbaar. Verplicht slagen vóór samenvoegen is een afzonderlijke GitHub-branchregel; de workflow alleen verandert die regel niet. Vercel blijft de deployment uitvoeren zoals eerder ingericht.
+Sinds 13 september 2026 beschermt GitHub-regel 83137603 exact main: een pull request is verplicht, test en typecheck moeten slagen met GitHub Actions als bron, en de branch moet bijgewerkt zijn met main. De regel geldt ook voor beheerders; force pushes en verwijderen van main zijn niet toegestaan. Een tweede reviewer is niet verplicht. Bij een verouderde PR: werk de branch bij met main en wacht de nieuwe controles af. Vercel blijft de deployment uitvoeren zoals eerder ingericht.
+
+Beheer: https://github.com/MarvinNL046/leadflowv2/settings/branch_protection_rules/83137603. Deze repositoryinstelling staat los van het workflowbestand; wijzigen van YAML past de beschermingsregel niet automatisch aan.
 
 Bronnen: https://github.com/actions/checkout en https://github.com/actions/setup-node.
