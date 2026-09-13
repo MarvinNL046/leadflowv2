@@ -29,6 +29,7 @@ import { Route as CrmWorkflowsRouteImport } from './routes/crm.workflows'
 import { Route as FeedIndexRouteImport } from './routes/feed.index'
 import { Route as FeedPurchasedRouteImport } from './routes/feed.purchased'
 import { Route as FeedSettingsRouteImport } from './routes/feed.settings'
+import { Route as FeedSoldRouteImport } from './routes/feed.sold'
 import { Route as FeedWalletRouteImport } from './routes/feed.wallet'
 import { Route as FeedOnboardingRouteImport } from './routes/feed_.onboarding'
 import { Route as CrmCampaignsIdRouteImport } from './routes/crm.campaigns_.$id'
@@ -149,6 +150,11 @@ const FeedSettingsRoute = FeedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => FeedRoute,
 } as any)
+const FeedSoldRoute = FeedSoldRouteImport.update({
+  id: '/sold',
+  path: '/sold',
+  getParentRoute: () => FeedRoute,
+} as any)
 const FeedWalletRoute = FeedWalletRouteImport.update({
   id: '/wallet',
   path: '/wallet',
@@ -265,6 +271,7 @@ export interface FileRoutesByFullPath {
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/feed/purchased': typeof FeedPurchasedRoute
   '/feed/settings': typeof FeedSettingsRoute
+  '/feed/sold': typeof FeedSoldRoute
   '/feed/wallet': typeof FeedWalletRoute
   '/feed/onboarding': typeof FeedOnboardingRoute
   '/crm/': typeof CrmIndexRoute
@@ -304,6 +311,7 @@ export interface FileRoutesByTo {
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/feed/purchased': typeof FeedPurchasedRoute
   '/feed/settings': typeof FeedSettingsRoute
+  '/feed/sold': typeof FeedSoldRoute
   '/feed/wallet': typeof FeedWalletRoute
   '/feed/onboarding': typeof FeedOnboardingRoute
   '/crm': typeof CrmIndexRoute
@@ -346,6 +354,7 @@ export interface FileRoutesById {
   '/crm/workflows': typeof CrmWorkflowsRoute
   '/feed/purchased': typeof FeedPurchasedRoute
   '/feed/settings': typeof FeedSettingsRoute
+  '/feed/sold': typeof FeedSoldRoute
   '/feed/wallet': typeof FeedWalletRoute
   '/feed_/onboarding': typeof FeedOnboardingRoute
   '/crm/': typeof CrmIndexRoute
@@ -389,6 +398,7 @@ export interface FileRouteTypes {
     | '/crm/workflows'
     | '/feed/purchased'
     | '/feed/settings'
+    | '/feed/sold'
     | '/feed/wallet'
     | '/feed/onboarding'
     | '/crm/'
@@ -428,6 +438,7 @@ export interface FileRouteTypes {
     | '/crm/workflows'
     | '/feed/purchased'
     | '/feed/settings'
+    | '/feed/sold'
     | '/feed/wallet'
     | '/feed/onboarding'
     | '/crm'
@@ -469,6 +480,7 @@ export interface FileRouteTypes {
     | '/crm/workflows'
     | '/feed/purchased'
     | '/feed/settings'
+    | '/feed/sold'
     | '/feed/wallet'
     | '/feed_/onboarding'
     | '/crm/'
@@ -642,6 +654,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/feed/settings'
       preLoaderRoute: typeof FeedSettingsRouteImport
+      parentRoute: typeof FeedRoute
+    }
+    '/feed/sold': {
+      id: '/feed/sold'
+      path: '/sold'
+      fullPath: '/feed/sold'
+      preLoaderRoute: typeof FeedSoldRouteImport
       parentRoute: typeof FeedRoute
     }
     '/feed/wallet': {
@@ -845,6 +864,7 @@ const CrmRouteWithChildren = CrmRoute._addFileChildren(CrmRouteChildren)
 interface FeedRouteChildren {
   FeedPurchasedRoute: typeof FeedPurchasedRoute
   FeedSettingsRoute: typeof FeedSettingsRoute
+  FeedSoldRoute: typeof FeedSoldRoute
   FeedWalletRoute: typeof FeedWalletRoute
   FeedIndexRoute: typeof FeedIndexRoute
   FeedLeadIdRoute: typeof FeedLeadIdRoute
@@ -853,6 +873,7 @@ interface FeedRouteChildren {
 const FeedRouteChildren: FeedRouteChildren = {
   FeedPurchasedRoute: FeedPurchasedRoute,
   FeedSettingsRoute: FeedSettingsRoute,
+  FeedSoldRoute: FeedSoldRoute,
   FeedWalletRoute: FeedWalletRoute,
   FeedIndexRoute: FeedIndexRoute,
   FeedLeadIdRoute: FeedLeadIdRoute,

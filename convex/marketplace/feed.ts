@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { type QueryCtx, query } from "../_generated/server";
 import { requireMarketplaceAccess } from "./access";
@@ -404,5 +405,51 @@ export const getMaskedLeadDetail = query({
 			lead.allowExclusive && sharedCount === 0,
 			lead.allowShared && slotsLeft > 0,
 		);
+	},
+});
+
+/** Company names only: no buyer IDs, CRM links or applicant details. */
+export const getLeadBuyers = query({
+	args: { leadId: v.id("marketplaceLeads") },
+	returns: v.array(v.object({ companyName: v.string(), mode: v.union(v.literal("exclusive"), v.literal("shared")) })),
+	handler: async (ctx, { leadId }) => {
+		const { orgId } = await requireMarketplaceAccess(ctx);
+		const lead = await ctx.db.get(leadId);
+		if (!lead || !["published", "sold_shared", "sold_exclusive", "expired"].includes(lead.status)) return [];
+		const prefs = await ctx.db.query("marketplaceBuyerPreferences").withIndex("by_org", q => q.eq("orgId", orgId)).unique();
+		const ownPurchase = await ctx.db.query("marketplacePurchases").withIndex("by_lead_org", q => q.eq("leadId", leadId).eq("buyerOrgId", orgId)).first();
+		if (!ownPurchase && !matchesBuyer(lead, prefs)) return [];
+		// Historic leads allowed four buyers; bound this read independently of stored limits.
+		const purchases = await ctx.db.query("marketplacePurchases").withIndex("by_lead", q => q.eq("leadId", leadId)).take(10);
+		return await Promise.all(purchases.map(async purchase => ({
+			companyName: (await ctx.db.get(purchase.buyerOrgId))?.name || "Onbekend bedrijf",
+			mode: purchase.mode,
+		})));
+	},
+});
+
+/** Paginate before filtering so history reads remain bounded, even for narrow preferences. */
+export const getSoldLeads = query({
+	args: { paginationOpts: paginationOptsValidator },
+	returns: v.object({
+		page: v.array(v.object({
+			id: v.id("marketplaceLeads"), nicheLabel: v.string(), city: v.union(v.string(), v.null()),
+			buyers: v.array(v.object({companyName: v.string(), mode: v.union(v.literal("exclusive"), v.literal("shared"))})),
+		})),
+		isDone: v.boolean(), continueCursor: v.string(),
+	}),
+	handler: async (ctx, { paginationOpts }) => {
+		const { orgId } = await requireMarketplaceAccess(ctx);
+		const prefs = await ctx.db.query("marketplaceBuyerPreferences").withIndex("by_org", q => q.eq("orgId", orgId)).unique();
+		const batch = await ctx.db.query("marketplaceLeads").order("desc").paginate({...paginationOpts, numItems: Math.min(30, Math.max(1, paginationOpts.numItems))});
+		const page = [];
+		for (const lead of batch.page) {
+			if (!["sold_exclusive", "sold_shared", "expired"].includes(lead.status) || !matchesBuyer(lead, prefs)) continue;
+			const purchases = await ctx.db.query("marketplacePurchases").withIndex("by_lead", q => q.eq("leadId", lead._id)).take(10);
+			if (!purchases.length) continue;
+			const buyers = await Promise.all(purchases.map(async purchase => ({companyName: (await ctx.db.get(purchase.buyerOrgId))?.name || "Onbekend bedrijf", mode: purchase.mode})));
+			page.push({id: lead._id, nicheLabel: NICHE_LABELS[lead.niche as Niche], city: lead.city ?? null, buyers});
+		}
+		return {page, isDone: batch.isDone, continueCursor: batch.continueCursor};
 	},
 });

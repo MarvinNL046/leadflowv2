@@ -42,6 +42,7 @@ const EXTERNAL_NAV = [
 const MARKETPLACE_NAV: NavItem[] = [
   { to: '/feed', label: 'Offerteaanvragen', icon: Store },
   { to: '/feed/purchased', label: 'Ontgrendelde leads', icon: Users },
+  { to: '/feed/sold', label: 'Verkochte aanvragen', icon: Users },
   { to: '/feed/wallet', label: 'Tegoed', icon: Receipt },
   { to: '/feed/settings', label: 'Werkgebied en meldingen', icon: Settings },
 ]
