@@ -16,6 +16,7 @@ import { Route as FeedRouteImport } from './routes/feed'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegistrerenRouteImport } from './routes/registreren'
 import { Route as CrmIndexRouteImport } from './routes/crm.index'
+import { Route as CrmAppsRouteImport } from './routes/crm.apps'
 import { Route as CrmCampaignsRouteImport } from './routes/crm.campaigns'
 import { Route as CrmContactsRouteImport } from './routes/crm.contacts'
 import { Route as CrmLeadgenRouteImport } from './routes/crm.leadgen'
@@ -81,6 +82,11 @@ const RegistrerenRoute = RegistrerenRouteImport.update({
 const CrmIndexRoute = CrmIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => CrmRoute,
+} as any)
+const CrmAppsRoute = CrmAppsRouteImport.update({
+  id: '/apps',
+  path: '/apps',
   getParentRoute: () => CrmRoute,
 } as any)
 const CrmCampaignsRoute = CrmCampaignsRouteImport.update({
@@ -247,6 +253,7 @@ export interface FileRoutesByFullPath {
   '/feed': typeof FeedRouteWithChildren
   '/login': typeof LoginRoute
   '/registreren': typeof RegistrerenRoute
+  '/crm/apps': typeof CrmAppsRoute
   '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
   '/crm/leadgen': typeof CrmLeadgenRoute
@@ -285,6 +292,7 @@ export interface FileRoutesByTo {
   '/aan-de-slag': typeof AanDeSlagRoute
   '/login': typeof LoginRoute
   '/registreren': typeof RegistrerenRoute
+  '/crm/apps': typeof CrmAppsRoute
   '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
   '/crm/leadgen': typeof CrmLeadgenRoute
@@ -326,6 +334,7 @@ export interface FileRoutesById {
   '/feed': typeof FeedRouteWithChildren
   '/login': typeof LoginRoute
   '/registreren': typeof RegistrerenRoute
+  '/crm/apps': typeof CrmAppsRoute
   '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
   '/crm/leadgen': typeof CrmLeadgenRoute
@@ -368,6 +377,7 @@ export interface FileRouteTypes {
     | '/feed'
     | '/login'
     | '/registreren'
+    | '/crm/apps'
     | '/crm/campaigns'
     | '/crm/contacts'
     | '/crm/leadgen'
@@ -406,6 +416,7 @@ export interface FileRouteTypes {
     | '/aan-de-slag'
     | '/login'
     | '/registreren'
+    | '/crm/apps'
     | '/crm/campaigns'
     | '/crm/contacts'
     | '/crm/leadgen'
@@ -446,6 +457,7 @@ export interface FileRouteTypes {
     | '/feed'
     | '/login'
     | '/registreren'
+    | '/crm/apps'
     | '/crm/campaigns'
     | '/crm/contacts'
     | '/crm/leadgen'
@@ -539,6 +551,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/crm/'
       preLoaderRoute: typeof CrmIndexRouteImport
+      parentRoute: typeof CrmRoute
+    }
+    '/crm/apps': {
+      id: '/crm/apps'
+      path: '/apps'
+      fullPath: '/crm/apps'
+      preLoaderRoute: typeof CrmAppsRouteImport
       parentRoute: typeof CrmRoute
     }
     '/crm/campaigns': {
@@ -762,6 +781,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface CrmRouteChildren {
+  CrmAppsRoute: typeof CrmAppsRoute
   CrmCampaignsRoute: typeof CrmCampaignsRoute
   CrmContactsRoute: typeof CrmContactsRoute
   CrmLeadgenRoute: typeof CrmLeadgenRoute
@@ -791,6 +811,7 @@ interface CrmRouteChildren {
 }
 
 const CrmRouteChildren: CrmRouteChildren = {
+  CrmAppsRoute: CrmAppsRoute,
   CrmCampaignsRoute: CrmCampaignsRoute,
   CrmContactsRoute: CrmContactsRoute,
   CrmLeadgenRoute: CrmLeadgenRoute,
