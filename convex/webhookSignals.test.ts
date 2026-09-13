@@ -54,3 +54,26 @@ test('unmatched receipt is observable without creating customer data',async()=>{
   expect((await admin.query(api.webhookSignals.list,opts)).page[0]).toMatchObject({channel:'email',reason:'unmatched_receipt'});
   expect(await t.run(ctx=>ctx.db.query('messages').first())).toBeNull();
 });
+
+test('recent references are bounded and retain only safe email IDs',async()=>{
+  const {t,admin}=await setup();
+  const id='47c816f4-8ca5-4eb4-8017-d39e608e7f90';
+  for(let n=0;n<7;n++)await t.mutation(internal.messaging.updateStatusByExternalId,{externalMessageId:id,channel:'email',newStatus:'delivered'});
+  const signal=(await admin.query(api.webhookSignals.list,opts)).page[0];
+  expect(signal.count).toBe(7);expect(signal.recent).toHaveLength(5);
+  expect(new Set(signal.recent.map(r=>r.reference)).size).toBe(5);
+  for(const r of signal.recent){expect(r.providerMessageId).toBe(id);expect(r.reference).toMatch(/^[a-f0-9-]{36}$/);}
+  expect(await t.run(ctx=>ctx.db.query('messages').first())).toBeNull();
+});
+test.each([['email','person@example.invalid'],['email','https://example.invalid/?key=secret'],['sms','31612345678'],['whatsapp','true_31612345678@c.us_SECRET'],['whatsapp','47c816f4-8ca5-4eb4-8017-d39e608e7f90']] as const)('drops unsafe or unsupported %s provider ID %s',async(channel,externalMessageId)=>{
+  const {t,admin}=await setup();await t.mutation(internal.messaging.updateStatusByExternalId,{externalMessageId,channel,newStatus:'delivered'});
+  const recent=(await admin.query(api.webhookSignals.list,opts)).page[0].recent;
+  expect(recent).toHaveLength(1);expect(recent[0].providerMessageId).toBeUndefined();
+  expect(JSON.stringify(await t.run(ctx=>ctx.db.query('webhookSignals').take(30)))).not.toContain(externalMessageId);
+});
+test('legacy groups remain readable and get references only on new occurrences',async()=>{
+  const {t,admin}=await setup();await t.run(ctx=>ctx.db.insert('webhookSignals',{channel:'sms',reason:'invalid_payload',count:4,firstSeenAt:1,lastSeenAt:2,open:true}));
+  expect((await admin.query(api.webhookSignals.list,opts)).page[0].recent).toEqual([]);
+  await t.mutation(internal.webhookSignals.record,{channel:'sms',reason:'invalid_payload'});
+  const row=(await admin.query(api.webhookSignals.list,opts)).page[0];expect(row.count).toBe(5);expect(row.recent).toHaveLength(1);expect(row.firstSeenAt).toBe(1);
+});

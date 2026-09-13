@@ -477,7 +477,7 @@ export const updateStatusByExternalId = internalMutation({
   },
   handler: async (ctx, args) => {
     const msg = args.smsConnectionId ? (args.channel==='sms'?await findCompanySmsReceipt(ctx,args.externalMessageId,args.smsConnectionId):null) : args.whatsappConnectionId ? (args.channel==='whatsapp'?await findCompanyWhatsappReceipt(ctx,args.externalMessageId,args.whatsappConnectionId):null) : args.emailConnectionId ? (args.channel==='email' ? await findCompanyEmailReceipt(ctx,args.externalMessageId,args.emailConnectionId):null) : await findLegacyReceipt(ctx,args.externalMessageId,args.channel,args.workspaceId);
-    if (!msg) {await recordSignal(ctx,args.channel,'unmatched_receipt');return { matched: false, firstRead: false };}
+    if (!msg) {await recordSignal(ctx,args.channel,'unmatched_receipt',args.externalMessageId);return { matched: false, firstRead: false };}
 
     const patch: Record<string, unknown> = { status: args.newStatus };
     // Webhook-events kunnen door elkaar binnenkomen: een (herhaald)
