@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { UserButton } from "@clerk/clerk-react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
 	Authenticated,
@@ -19,6 +20,13 @@ function Page() {
 			<Link to="/">← LeadFlow</Link>
 			<h1 className="text-3xl font-bold">Aan de slag met LeadFlow</h1>
 			<Authenticated>
+				<div className="flex items-center gap-3 rounded-lg border p-4">
+					<UserButton />
+					<p className="text-sm text-muted-foreground">
+						Open je accountmenu om je e-mailadres te controleren en zo nodig te
+						verifiëren. Vernieuw daarna deze pagina voordat je verdergaat.
+					</p>
+				</div>
 				<Setup />
 			</Authenticated>
 			<Unauthenticated>
