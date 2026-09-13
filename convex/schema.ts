@@ -316,6 +316,7 @@ export default defineSchema({
     createdById: v.optional(v.id("users")),
   })
     .index("by_workspace_status", ["workspaceId", "status"])
+    .index("by_workspace_status_assignee", ["workspaceId", "status", "assignedToId"])
     .index("by_contact", ["contactId"])
     .index("by_workspace_source", ["workspaceId", "source"]),
 

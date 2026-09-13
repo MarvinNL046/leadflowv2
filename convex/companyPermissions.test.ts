@@ -142,3 +142,21 @@ test('task assignment accepts own team, rejects outsiders and supports unassigni
   await caller.mutation(api.tasks.assign,{taskId,userId:null});
   expect((await caller.query(api.tasks.listByContact,{contactId:a.contactId}))[0].assignedToId).toBeUndefined();
 });
+
+test('my tasks uses authenticated identity and filters before the result limit',async()=>{
+  const {t,a,b}=await setup();
+  const caller=t.withIdentity({subject:'a-member'});
+  const member=await t.run(ctx=>ctx.db.query('users').filter(q=>q.eq(q.field('clerkUserId'),'a-member')).first());
+  await t.run(async ctx=>{
+    for(let i=0;i<301;i++) await ctx.db.insert('tasks',{workspaceId:a.workspaceId,title:'Unassigned '+i,status:'open'});
+    await ctx.db.insert('tasks',{workspaceId:a.workspaceId,title:'Mine',status:'open',assignedToId:member!._id});
+    await ctx.db.insert('tasks',{workspaceId:a.workspaceId,title:'Done',status:'done',assignedToId:member!._id});
+  });
+  const mine=await caller.query(api.tasks.listOpen,{workspaceId:a.workspaceId,view:'mine'});
+  expect(mine.map(task=>task.title)).toEqual(['Mine']);
+  const unassigned=await caller.query(api.tasks.listOpen,{workspaceId:a.workspaceId,view:'unassigned'});
+  expect(unassigned).toHaveLength(300);
+  expect(unassigned.every(task=>task.assignedToId===undefined)).toBe(true);
+  expect(await t.withIdentity({subject:'a-owner'}).query(api.tasks.listOpen,{workspaceId:a.workspaceId,view:'mine'})).toHaveLength(0);
+  await expect(caller.query(api.tasks.listOpen,{workspaceId:b.workspaceId,view:'mine'})).rejects.toThrow();
+});

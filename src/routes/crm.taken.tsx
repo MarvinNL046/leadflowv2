@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { CheckCircle2 } from '@/components/icons'
 import { Card, CardContent } from '#/components/ui/card.tsx'
@@ -16,17 +17,18 @@ export const Route = createFileRoute('/crm/taken')({ component: TasksPage })
  * vervaldatum bovenaan; afvinken = klaar.
  */
 function TasksPage() {
+  const [view, setView] = useState<'all' | 'mine' | 'unassigned'>('mine')
   const tenants = useQuery(api.userProfiles.myTenants)
   const tenant = tenants?.find((t) => t.workspace !== null) ?? null
   const workspaceId = tenant?.workspace?.id as Id<'workspaces'> | undefined
   const tasks = useQuery(
     api.tasks.listOpen,
-    workspaceId ? { workspaceId } : 'skip',
+    workspaceId ? { workspaceId, view } : 'skip',
   )
   const setDone = useMutation(api.tasks.setDone)
   const members = useQuery(api.tasks.assignees, workspaceId ? { workspaceId } : 'skip')
 
-  if (tenants === undefined || (workspaceId && tasks === undefined)) {
+  if (tenants === undefined) {
     return <Skeleton className="h-64 w-full" />
   }
   if (!workspaceId) {
@@ -51,13 +53,18 @@ function TasksPage() {
         </p>
       </div>
 
-      {tasks !== undefined && tasks.length === 0 ? (
+      <div role="group" aria-label="Takenfilter" className="flex flex-wrap gap-2">
+        {([{key:'mine',label:'Mijn taken'},{key:'all',label:'Alle open taken'},{key:'unassigned',label:'Niet toegewezen'}] as const).map(item => <Button key={item.key} variant={view === item.key ? 'default' : 'outline'} aria-pressed={view === item.key} onClick={() => setView(item.key)}>{item.label}</Button>)}
+      </div>
+      {tasks !== undefined && <p className="text-sm text-muted-foreground">{tasks.length === 300 ? '300 taken getoond; mogelijk zijn er meer.' : `${tasks.length} open ${tasks.length === 1 ? 'taak' : 'taken'} in deze weergave`}</p>}
+
+      {tasks === undefined ? <Skeleton className="h-64 w-full" /> : tasks.length === 0 ? (
         <Card>
           <CardContent className="p-10 text-center">
             <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500" />
-            <p className="mt-2 font-medium">Geen open taken</p>
+            <p className="mt-2 font-medium">{view === 'mine' ? 'Geen open taken aan jou toegewezen' : view === 'unassigned' ? 'Geen open taken zonder verantwoordelijke' : 'Geen open taken'}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Alles is opgevolgd.
+              {view === 'mine' ? 'Bekijk Alle open taken of Niet toegewezen voor de overige opvolging.' : 'Er zijn geen geregistreerde open taken in deze weergave.'}
             </p>
           </CardContent>
         </Card>

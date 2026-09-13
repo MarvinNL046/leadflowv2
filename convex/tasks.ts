@@ -65,14 +65,15 @@ async function requireMembershipForTask(
 
 /** Open taken van de workspace, vroegste vervaldatum eerst (zonder = achteraan). */
 export const listOpen = query({
-  args: { workspaceId: v.id("workspaces") },
+  args: { workspaceId: v.id("workspaces"), view: v.optional(v.union(v.literal('all'), v.literal('mine'), v.literal('unassigned'))) },
   handler: async (ctx, args) => {
-    await requireMembershipForWorkspace(ctx, args.workspaceId);
-    const tasks = await ctx.db
+    const userId = await requireMembershipForWorkspace(ctx, args.workspaceId);
+    const tasks = await (args.view === 'mine' || args.view === 'unassigned' ? ctx.db.query('tasks')
+      .withIndex('by_workspace_status_assignee', q => q.eq('workspaceId', args.workspaceId).eq('status', 'open').eq('assignedToId', args.view === 'mine' ? userId : undefined)) : ctx.db
       .query("tasks")
       .withIndex("by_workspace_status", (q) =>
         q.eq("workspaceId", args.workspaceId).eq("status", "open"),
-      )
+      ))
       .take(300);
     const enriched = await Promise.all(
       tasks.map(async (task) => {

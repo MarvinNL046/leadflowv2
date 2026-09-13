@@ -79,3 +79,7 @@ Dit verandert niets aan het live testaccount: saldo en aankopen blijven zoals ze
 Bij een nieuwe opvolgtaak kies je Toewijzen aan. Bij een bestaande taak kies je de medewerker onder Verantwoordelijke. Niet toegewezen maakt de toewijzing leeg. De lijst bevat uitsluitend huidige teamleden van je bedrijf. De takenpagina toont wie verantwoordelijk is; er wordt nog geen automatische notificatie verzonden. De eerdere vrije tekst blijft bewaard, maar de keuzelijst is de formele toewijzing.
 
 Bij een contact opent Klant & offertes de bijbehorende Cashflow-klant in je ingelogde Cashflow-bedrijf. Kies daar de juiste offerte. Een ontbrekende koppeling toont de bestaande niet-gevondenmelding. Deze route maakt geen klant of offerte aan en verleent geen Cashflow-toegang.
+
+## Mijn taken — LG-071
+
+Open Taken: standaard zie je de open taken die aan jouw account zijn toegewezen. Alle open taken toont de werklijst van je workspace; Niet toegewezen toont taken die nog geen verantwoordelijke hebben. De telling hoort bij de geselecteerde weergave, terwijl de sidebar alle open taken blijft tellen. Via het contact kun je een verantwoordelijke kiezen. Een lege lijst bij Mijn taken betekent niet dat alle bedrijfsopvolging afgerond is. Bij 300 resultaten wordt de begrenzing vermeld.
