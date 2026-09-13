@@ -91,4 +91,3 @@ Read-only backend bevestigt aankoop en taak in workspace vd77743j3p5zb2nta93q9vc
 
 ## LG-099: exclusieve browserproef afgerond
 Test A koopt exclusief voor EUR 72,60: EUR 81,85 naar EUR 9,25, één aankoop. Contact, opportunity en handmatige opvolgtaak behouden na herladen. Test B ziet geen klantgegevens of taak. Na gebruikersverzoek toont de detailpagina nu wel de bedrijfsnaam van de koper en Exclusief; backend beperkt deze informatie tot passende marketplacebedrijven. Zie werklog LG-099 voor referenties en beperkingen. Alleen testomgeving, nog niet live.
-
