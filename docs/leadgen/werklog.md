@@ -305,3 +305,11 @@ Publicatiebevestiging LG-043: Vercel dpl_78P78XHAozjB1oTXpyvhUGU2LnVB READY, pro
 Geen backend- of rolwijzigingen. Twee interactietests controleren dat openen/annuleren geen toegang intrekt en dat een mislukte verwijdering met foutmelding openblijft; herhalen richt zich op hetzelfde testlid. Geen echte uitnodigingen verzonden of productieleden aangepast. Bestaande lichte huisstijl en shadcn-configuratie behouden. Geen SEO-werk.
 
 Publicatiebevestiging LG-044 — 13 september 2026: Vercel dpl_EHTFJ44wV12awRvzb8UKWRxteriv READY, productiecommit 61c876b6bc8bcee0c1ca2a80bd07705506e50072. Live teambeheer visueel gecontroleerd in smalle browserweergave: velden, badges, lege uitnodigingen en rolselectie zichtbaar. Rolselectie geopend en met Escape gesloten, zonder opslaan. Bevestigingsvenster voor verwijderen uitsluitend met fictieve componenttests gecontroleerd: productie bevat alleen eigenaren en biedt daarvoor terecht geen verwijderknop. Geen productietoegang gewijzigd.
+
+## Consistente communicatie-instellingen — 13 september 2026
+
+| ID | Datum | Repo/site | Pagina of bereik | Wat gedaan | Status | Controle | Commit/PR | Live sinds | Vervolg |
+|---|---|---|---|---|---|---|---|---|---|
+| LG-045 | 2026-09-13 | leadflowv2 | /crm/settings/email, /crm/settings/sms, /crm/settings/eigen-whatsapp | shadcn Input/Label/Card/Badge/Skeleton, consistente themakleuren en handleidinglinks, teruglink e-mail, laadmeldingen en geblokkeerde invoer tijdens acties | Klaar voor publicatie | Vite-build geslaagd; 473 tests/51 bestanden geslaagd met maxWorkers=2; TypeScript bestaande diagnostiek | Deze wijziging | Nog niet bevestigd | Veilige gebeurtenisreferentie voor toekomstige webhooksignalen en afzonderlijke bedrijfsproef |
+
+Bestaande backend-, activatie-, pauzeer- en autorisatielogica behouden. Geen providerkoppelingen geactiveerd of gepauzeerd, sleutels ingevuld of berichten verstuurd. Eerste testuitvoering had één timer-pumpfout in bestaande leadgenFlow-test; volledige herhaling met twee workers slaagt. Geen nieuwe tests voor uitsluitend omkeerbare vormgeving. Geen SEO-werk.
