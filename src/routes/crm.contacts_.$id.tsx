@@ -52,6 +52,7 @@ import { cn } from '#/lib/utils.ts'
 import { humanizeConvexError } from '#/lib/errors.ts'
 import { frostworkCustomerUrl } from '#/lib/external-apps.ts'
 import { SuiteSummarySection } from '../components/crm/suite-summary'
+import { ContactTasks } from '../components/crm/contact-tasks'
 import { getMetaFormLabel } from '#/lib/meta-forms.ts'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
@@ -294,6 +295,7 @@ function ContactDetailPage() {
       </div>
 
       <DetailsSection contact={contact} />
+      <ContactTasks key={id} contactId={id as Id<'contacts'>} />
       <SuiteSummarySection
         existingSuite={apps?.existingSuite === true}
         contactId={id as Id<'contacts'>}
