@@ -22,7 +22,9 @@ type CashflowSummary = {
 		latestDate: number | null;
 		latestNumber: string | null;
 	};
-	quotes: { count: number; openCount: number };
+	quotes: { count: number; openCount: number; latest?: {
+		number: string | null; date: number; status: string;
+	} | null };
 };
 
 type FrostworkSummary = {
@@ -185,6 +187,15 @@ function CashflowBody({ summary }: { summary: CashflowSummary | null }) {
 					</span>
 				)}
 			</li>
+			{summary.quotes.latest && (
+				<li className="pt-2">
+					<p>Meest recente offerte: {summary.quotes.latest.number ?? "Zonder nummer"}</p>
+					<p>{({draft: "Concept", sent: "Verstuurd", accepted: "Geaccepteerd", rejected: "Afgewezen", expired: "Verlopen"} as Record<string, string>)[summary.quotes.latest.status] ?? "Status onbekend"} · {dateShort(summary.quotes.latest.date)}</p>
+				</li>
+			)}
+			{summary.quotes.count > 0 && (
+				<li className="pt-2 text-xs text-zinc-500">Klanthistorie; controleer of de offerte bij deze aanvraag hoort.</li>
+			)}
 		</ul>
 	);
 }
