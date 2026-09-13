@@ -32,3 +32,11 @@ Productiebranches: LeadFlow main; Frostwork frostwork-summary-endpoint; Cashflow
 LeadFlow gebruikt SUITE_FROSTWORK_SECRET en SUITE_CASHFLOW_SECRET. De corresponderende doelapp gebruikt SUITE_BRIDGE_SECRET. Per product moeten de waarden overeenkomen; geen waarden opnemen in Git, documentatie of logs. Polling gebruikt de vaste LeadFlow-server-URL en valideert doelorganisatie en responsevelden. Bij rotatie eerst rekening houden met de maximale 15 minuten lease en controleren dat polling weer slaagt.
 
 Aanbevolen vervolg: echte klantpilot met twee lege bedrijven, vervolgens overeengekomen prijzen/Stripe-afhandeling aansluiten. Betaalwebhooks moeten dezelfde productrechten en auditroute gebruiken en idempotent zijn. Zelfstandige abonnementen mogen nooit dubbel worden gefactureerd. Test ook de overgang van zelfstandig abonnement naar suite-abonnement vóór verkoop.
+
+## Wat gebeurt er als toegang verloopt?
+
+Een reeds geopende app schakelt bij het verlopen van de toegangsbevestiging automatisch naar 'Je toegang via LeadFlow is niet actief'. Je hoeft daarvoor niet uit te loggen of de pagina te herladen. Cashflow houdt de administratie-export beschikbaar. Via 'Toegang via LeadFlow bekijken' kun je de status vernieuwen wanneer de beheerder opnieuw toegang heeft toegekend.
+
+De schermcontrole loopt elke seconde en bij terugkeer naar het venster. Een achtergrondtab of slapend apparaat kan schermupdates uitstellen; de server blijft de toegang zelfstandig controleren. Bestaande zelfstandige abonnementen, vrijstellingen en bestaande Frostwork-toelating houden hun eigen regels. Deze wijziging maakt intrekken niet onmiddellijk: de hierboven genoemde maximale geldigheid van 15 minuten blijft gelden.
+
+Live gecontroleerd op 13 september 2026 met het lege Testbedrijf B in beide productiedomeinen. De tijdelijke rechten zijn na de proef uitgezet. De live servercontrole van LeadFlow koppelingen weigert ook A naar B en B naar A; een volledige proef met twee onafhankelijke eigenaarsessies in beide doelapps en directe schrijfacties is nog niet afgerond.
