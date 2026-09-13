@@ -67,3 +67,9 @@ Voor bedrijven zonder marketplace is een startscherm toegevoegd (live sinds 13 s
 Op 13 september 2026 is het afzonderlijke testbedrijf A geactiveerd en ingericht op Airco / Installeren / Limburg, particulier en zakelijk, beide verkoopvormen. De voorkeuren zijn na opslaan opnieuw gelezen. E-mailmeldingen staan uit. De feed toont nul passende aanvragen; wallet EUR 0, geen transacties. Dit is technisch bewijs voor onboarding, niet een afgeronde Staycool-aankoop of betaalproef.
 
 Bedrijven doorlopen: Leads kopen → Marketplace voor mijn bedrijf activeren → niche, type werk, segment en provincie kiezen → voorkeuren opslaan → Werkgebied en meldingen controleren. Bij geen aanbod hoeven filters niet willekeurig verruimd te worden: controleer of er werkelijk geschikte gepubliceerde aanvragen zijn. Opwaarderen en lead kopen zijn afzonderlijke vervolgstappen met financiële gevolgen.
+
+## Aankoopproef met synthetische gegevens — LG-068
+
+Op 13 september 2026 slaagden 30 aankooptests in een geïsoleerde Convex-testdatabase. Drie gedeelde kopers krijgen elk een eigen CRM-contact/verkoopkans; een vierde wordt geweigerd zonder afschrijving. Een exclusieve koop sluit verdere verkoop uit. Na een gedeelde koop is exclusief niet meer mogelijk. De CRM-contacten zijn tussen de testbedrijven afgeschermd. De bestaande bron- en aanvraagtekstoverdracht is eveneens getest.
+
+Dit verandert niets aan het live testaccount: saldo en aankopen blijven zoals ze waren. Echte Stripe Checkout en de volledige aankoop via een browser zijn nog niet getest. Volgende stap is een afzonderlijke stagingproef met synthetisch aanbod en testbetaling.

@@ -163,3 +163,68 @@ test.each(['pending_review','rejected','expired','duplicate'] as const)('%s lead
   expect(await buyer.query(api.marketplace.feed.getMaskedLeadDetail,{leadId})).toBeNull();
   expect((await buyer.mutation(api.marketplace.purchase.purchaseLead,{leadId,mode:'shared'})).success).toBe(false);
 });
+
+// LG-068: isolated four-company rehearsal; all balances and identities are synthetic.
+async function additionalBuyer(t: Awaited<ReturnType<typeof setup>>['t'], name: string) {
+  const ids = await t.run(async ctx => {
+    const userId = await ctx.db.insert('users', { clerkUserId: name });
+    const orgId = await ctx.db.insert('orgs', { name, slug: name, ownerId: userId, marketplaceEnabled: true });
+    const workspaceId = await ctx.db.insert('workspaces', { orgId, name, isDefault: true });
+    await ctx.db.insert('memberships', { userId, orgId, workspaceId, role: 'owner' });
+    await ctx.db.insert('marketplaceWallets', { orgId, balanceCents: 10000, updatedAt: Date.now() });
+    await ctx.db.insert('marketplaceBuyerPreferences', { orgId, niches: ['airco'], preferredMode: 'both', notifyOnNewLead: false, notifyChannel: 'email', updatedAt: Date.now() });
+    const pipelineId = await ctx.db.insert('pipelines', { workspaceId, name, isDefault: true });
+    await ctx.db.insert('pipelineStages', { pipelineId, name: 'Nieuw', order: 0, isWonStage: false, isLostStage: false });
+    return { orgId, workspaceId };
+  });
+  return { ...ids, buyer: t.withIdentity({ subject: name }) };
+}
+
+test('four-company rehearsal: three shared copies are isolated, fourth buyer is not charged', async () => {
+  const a = await setup();
+  const { t, leadId } = a;
+  const b = await additionalBuyer(t, 'synthetic-b');
+  const c = await additionalBuyer(t, 'synthetic-c');
+  const d = await additionalBuyer(t, 'synthetic-d');
+  const lead = await t.run(ctx => ctx.db.get(leadId));
+  expect(lead!.maxSharedBuyers).toBe(3);
+  const results = [];
+  for (const company of [a,b,c]) {
+    const result = await company.buyer.mutation(api.marketplace.purchase.purchaseLead, { leadId, mode: 'shared' });
+    expect(result.success).toBe(true);
+    expect(result.contactId).toBeDefined();
+    const detail = await company.buyer.query(api.contacts.getDetail, { contactId: result.contactId! });
+    expect(detail!.contact.workspaceId).toBe(company.workspaceId);
+    expect((await company.buyer.query(api.marketplace.wallet.getWallet, {})).wallet.balanceCents).toBe(10000-lead!.priceSharedCents);
+    results.push(result);
+  }
+  expect(new Set(results.map(result => result.contactId)).size).toBe(3);
+  await expect(b.buyer.query(api.contacts.getDetail, { contactId: results[0].contactId! })).rejects.toThrow();
+  const denied = await d.buyer.mutation(api.marketplace.purchase.purchaseLead, { leadId, mode: 'shared' });
+  expect(denied.success).toBe(false);
+  expect((await d.buyer.query(api.marketplace.wallet.getWallet, {})).wallet.balanceCents).toBe(10000);
+  expect(await d.buyer.query(api.marketplace.purchase.listMyPurchases, {})).toHaveLength(0);
+  expect(await t.run(ctx => ctx.db.query('marketplaceWalletTransactions').take(10))).toHaveLength(3);
+  expect(await t.run(ctx => ctx.db.query('opportunities').take(10))).toHaveLength(3);
+});
+
+test('exclusive purchase prevents another company buying either mode without debiting it', async () => {
+  const { t,buyer,leadId } = await setup();
+  const b = await additionalBuyer(t, 'synthetic-b');
+  expect((await buyer.mutation(api.marketplace.purchase.purchaseLead, { leadId,mode:'exclusive' })).success).toBe(true);
+  for (const mode of ['shared','exclusive'] as const) {
+    expect((await b.buyer.mutation(api.marketplace.purchase.purchaseLead, { leadId,mode })).success).toBe(false);
+  }
+  expect((await b.buyer.query(api.marketplace.wallet.getWallet, {})).wallet.balanceCents).toBe(10000);
+  expect(await t.run(ctx => ctx.db.query('contacts').take(10))).toHaveLength(1);
+  expect(await t.run(ctx => ctx.db.query('marketplaceWalletTransactions').take(10))).toHaveLength(1);
+});
+
+test('first shared purchase removes exclusive option for subsequent companies', async () => {
+  const { t,buyer,leadId } = await setup();
+  const b = await additionalBuyer(t, 'synthetic-b');
+  await buyer.mutation(api.marketplace.purchase.purchaseLead, { leadId,mode:'shared' });
+  expect(await b.buyer.mutation(api.marketplace.purchase.purchaseLead, { leadId,mode:'exclusive' })).toMatchObject({success:false,error:'mode_not_allowed'});
+  expect((await b.buyer.query(api.marketplace.wallet.getWallet, {})).wallet.balanceCents).toBe(10000);
+  expect((await b.buyer.mutation(api.marketplace.purchase.purchaseLead, { leadId,mode:'shared' })).success).toBe(true);
+});
