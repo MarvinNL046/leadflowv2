@@ -107,3 +107,7 @@ Agendaonderzoek op klantnaam leverde historische afspraken op, geen aangetroffen
 ## Frostwork-match herkennen — LG-077
 
 LeadFlow zoekt eerst met contact-ID. Bij geen match probeert de bestaande koppeling het exacte e-mailadres binnen de ingestelde Frostwork-organisatie. Gevonden via e-mailadres betekent dat onderhoud/installatiegegevens gevonden zijn, maar de contact-ID nog niet gekoppeld is. Maak daarom niet automatisch een nieuwe klant aan. Geen klantmatch gevonden is een zoekresultaat, geen bewijs dat de klant nergens bestaat. Niet beschikbaar betekent dat de gegevens niet betrouwbaar konden worden opgehaald.
+
+## Dagelijkse werklijst — LG-079
+
+Kies in Taken eerst Mijn taken, Alle open taken of Niet toegewezen. Kies daarna Vandaag voor deadlines op de huidige dag, of Te laat voor eerdere dagen. Datums volgen je lokale browsertijdzone; taken voor vandaag zijn nog niet te laat. Taken zonder deadline vind je onder Alle datums. De telling hoort bij beide gekozen filters. Laat een taak open zolang de uitkomst nog bevestigd moet worden, zoals bij P-001. De datumfilters worden vóór de limiet van 300 resultaten toegepast.

@@ -317,6 +317,8 @@ export default defineSchema({
   })
     .index("by_workspace_status", ["workspaceId", "status"])
     .index("by_workspace_status_assignee", ["workspaceId", "status", "assignedToId"])
+    .index("by_workspace_status_due", ["workspaceId", "status", "dueDate"])
+    .index("by_workspace_status_assignee_due", ["workspaceId", "status", "assignedToId", "dueDate"])
     .index("by_contact", ["contactId"])
     .index("by_workspace_source", ["workspaceId", "source"]),
 

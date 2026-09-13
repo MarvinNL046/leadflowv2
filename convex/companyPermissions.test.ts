@@ -34,6 +34,24 @@ async function setup(){
   });return {t,...data};
 }
 
+test('deadline range is applied before cap, excludes undated tasks and combines with assignee', async()=>{
+  const {t,a,b}=await setup();
+  const caller=t.withIdentity({subject:'a-owner'});
+  await t.run(async ctx=>{
+    const owner=(await ctx.db.query('users').filter(q=>q.eq(q.field('clerkUserId'),'a-owner')).first())!;
+    for(let i=0;i<301;i++)await ctx.db.insert('tasks',{workspaceId:a.workspaceId,title:'No deadline',status:'open'});
+    for(const [title,dueDate] of [['before',999],['start',1000],['inside',1500],['end',2000]] as const)await ctx.db.insert('tasks',{workspaceId:a.workspaceId,title,status:'open',dueDate,assignedToId:owner._id});
+    await ctx.db.insert('tasks',{workspaceId:a.workspaceId,title:'done',status:'done',dueDate:1200,assignedToId:owner._id});
+  });
+  const args={workspaceId:a.workspaceId,view:'mine' as const,dueRange:{from:1000,to:2000}};
+  expect((await caller.query(api.tasks.listOpen,args)).map(t=>t.title)).toEqual(['start','inside']);
+  expect(await caller.query(api.tasks.listOpen,{...args,view:'unassigned'})).toHaveLength(0);
+  expect((await caller.query(api.tasks.listOpen,{...args,view:'all'})).map(t=>t.title)).toEqual(['start','inside']);
+  expect((await caller.query(api.tasks.listOpen,{...args,dueRange:{from:0,to:1000}})).map(t=>t.title)).toEqual(['before']);
+  await expect(caller.query(api.tasks.listOpen,{...args,workspaceId:b.workspaceId})).rejects.toThrow();
+  await expect(caller.query(api.tasks.listOpen,{...args,dueRange:{from:2000,to:1000}})).rejects.toThrow();
+});
+
 test.each(['a-member','b-owner','platform','anonymous'])('%s cannot manage company A',async subject=>{
   const {t,a}=await setup();const caller=subject==='anonymous'?t:t.withIdentity({subject});
   const denied=[

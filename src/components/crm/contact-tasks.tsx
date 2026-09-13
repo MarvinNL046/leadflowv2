@@ -74,7 +74,7 @@ export function ContactTasks({ contactId, workspaceId }: { contactId: Id<'contac
         </li>)}</ul>
         {tasks.length === 50 && <p className="text-sm text-muted-foreground">De 50 recentste taken worden getoond. Bekijk ook de open takenlijst.</p>}
       </>}
-      <a href="/crm/taken" className="inline-block text-sm text-primary underline">Alle open taken van je bedrijf</a>
+      <a href="/crm/taken" className="inline-block text-sm text-primary underline">Naar het takenoverzicht</a>
       <form className="space-y-3 border-t pt-4" onSubmit={event => { event.preventDefault(); void save() }}>
         <Label htmlFor={`${prefix}-title`}>Nieuwe opvolgtaak</Label>
         <Input id={`${prefix}-title`} required maxLength={200} value={title} disabled={pending} onChange={event => setTitle(event.target.value)} placeholder="Bijvoorbeeld: afspraakstatus controleren" />
