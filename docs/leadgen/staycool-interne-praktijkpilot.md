@@ -32,3 +32,21 @@ De eerdere marketplace-pilot voor airco-installatie in heel Limburg staat apart 
 Het spreadsheet is geëxporteerd en alle drie tabbladen visueel gecontroleerd. Formules getest met tijdelijke invoer: EUR 20 x 50% kostentoerekening en 30 minuten x EUR 30/uur geven EUR 25 totaal. Bij ontbrekend aandeel verdwijnt het berekende bedrag; onvolledige registraties blijven gemarkeerd. Alle testinvoer is verwijderd. Niet in Microsoft Excel zelf doorgerekend; controle vond plaats in de spreadsheet-engine.
 
 Eerstvolgende stap: samen één bestaand Staycool-traject kiezen en de eerste praktijkstap met werkelijk gemeten tijd vastleggen. Werkelijke facturen en verbruik toevoegen zodra beschikbaar. Externe prijsvalidatie volgt pas met een extern bedrijf.
+
+## Eerste praktijkcontrole — 13 september 2026 (LG-064)
+
+Interne casus P-001 is geselecteerd vanuit het Staycool-dashboard. De klantreferentie blijft uitsluitend in de lokale pilotnotitie; geen contactgegevens in dit document of het meetbestand.
+
+| Onderdeel | Waargenomen resultaat | Open actie |
+| --- | --- | --- |
+| Bedrijfscontext | LeadFlow toont Staycool Airconditioning, Default, super-admin | Cashflow/Frostwork-context afzonderlijk controleren |
+| Aanvraag | Bestaande websiteaanvraag voor verplaatsing van een eerder geplaatste airco | Service-/verplaatsingsvraag kwalificeren; geen generieke nieuwe installatieofferte aannemen |
+| Pipeline en activiteit | Eén opportunity, fase Nieuw; Nog niet gebeld | Werkelijke contactuitkomst en volgende afspraak vastleggen |
+| Automatische opvolging | E-mail en sms als records aanwezig; workflow Snelle Response Completed | Dit bewijst geen ontvangst of geboekte afspraak |
+| Open taken | Geen taak voor P-001 zichtbaar in de open takenlijst | Eerst eventuele bestaande afspraak controleren, daarna passende opvolgtaak met eigenaar en datum |
+| Suiteverwijzing | Contact toont 1 offerte en 0 facturen; Cashflow-link opent de algemene app | Eerst vaststellen of die offerte bij deze aanvraag hoort en concept is |
+| Frostwork | Contact toont nog niet als klant | Bestaande klant zoeken voordat een duplicaat of werkbon wordt gemaakt |
+
+De browsercontrole liep van 15:22:23 tot 15:24:49 UTC (17:22:23–17:24:49 CEST): 2 minuten 26 seconden verstreken agenttijd, inclusief navigatie en verwerking. Dit is geen gemeten menselijke supporttijd en is niet als personeelskosten in Tijd geboekt. Er zijn geen berichten verstuurd, telefoongesprekken gestart, taken afgevinkt of verkoopfasen gewijzigd.
+
+Het meetbestand markeert bedrijfscontext en CRM-opvolging als Bezig; overige praktijkstappen blijven open. Kosten en menselijke supportminuten blijven onbekend. Eerste concrete vervolg: afspraakstatus controleren en de verplaatsingsvraag opvolgen, met eigenaar, datum en werkelijke uitkomst. Daarna de passende Cashflow-offerte en Frostwork-route controleren. Productverbeterpunt voor een volgende taak: vanuit een CRM-contact rechtstreeks de relevante offerte en open opvolgtaak kunnen openen.
