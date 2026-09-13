@@ -71,3 +71,16 @@ Sandbox LeadFlow Marketplace E2E: acct_1UFIDcEGHXq0MPJu. Webhook we_1UFIEoEGHXq0
 ## Betalingsbewijs — LG-087
 
 Beide sandboxsecrets ingesteld na expliciet akkoord. EUR 50 Checkout betaald met synthetische kaart/contactgegevens. Event evt_1UFIJvEGHXq0MPJuW7FoJEP2, paid/complete, event en session livemode=false. Eerste webhook 200 OK om 18:40:07 UTC, handmatige herlevering 200 OK om 18:40:52 UTC. Lokale wallet na herladen EUR 50 en precies één opwaardering. Geen echte betaling. Aankoop/CRM-taak/bedrijf B nog uit te voeren; productie-instellingen ongewijzigd.
+
+## Aankoop en opvolging — LG-088, 13 september 2026
+
+Geslaagd in localhost:5186 met steady-orca-351 en Test A:
+
+- Synthetische aanvraag p17fsspz4f6v4ve991qpmdj14n8eb291 vóór aankoop afgeschermd.
+- Gedeelde aankoop EUR 18,15 via bevestigingsdialoog. Eén aankoop p974wx7p4jv1ye91xkjddsymhn8eabm5.
+- Na herladen nog ontgrendeld; CRM-link naar ks7c9qd9k4zf8ehfnz3yq5cy118eaesr werkt. Bron en opdracht in CRM-notitie, één opportunity.
+- Taak sd7dv78prbhrc6gtfx73jsbhy18ea2av via UI gemaakt: TEST LG088 - controleer fictieve marketplaceaanvraag, Marvin S, 14 september 2026. Zichtbaar onder Mijn taken.
+- Ontgrendelde leads bevat precies één gedeelde aankoop met CRM-link.
+- Wallet EUR 31,85: EUR 50 opwaardering minus één aankoop EUR 18,15.
+
+Read-only backend bevestigt aankoop en taak in workspace vd77743j3p5zb2nta93q9vc4sx8ea0dy van Test A. Alleen synthetische data, geen klantcommunicatie. Tweede-bedrijfcontrole in browser nog open; bestaande integratietests vervangen die stap niet. Productie-Stripewijziging nog niet gepubliceerd. Eerstvolgende stap: testbedrijf B aanmelden in dezelfde geïsoleerde Development-omgeving en toegang tot dit contact/deze taak controleren.
