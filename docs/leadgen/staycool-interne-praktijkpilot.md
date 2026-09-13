@@ -61,3 +61,9 @@ Het opvolgblok is op 13 september 2026 gepubliceerd en in Chrome getest met een 
 
 Voor bedrijven zonder marketplace is een startscherm toegevoegd (live sinds 13 september 2026, PR #66): open Leads kopen in de sidebar. De eigenaar of beheerder kan de marketplace voor het eigen bedrijf activeren. Dit koopt geen lead. De bestaande standaardinstelling schakelt nieuwe-leadmeldingen per e-mail in; controleer daarna Werkgebied en meldingen, diensten en voorkeuren. Medewerkers vragen de eigenaar/beheerder om activering. Leadgenbeheer blijft alleen voor de platform-superadmin.
 
+
+## Uitgevoerde marketplace-onboarding — LG-067
+
+Op 13 september 2026 is het afzonderlijke testbedrijf A geactiveerd en ingericht op Airco / Installeren / Limburg, particulier en zakelijk, beide verkoopvormen. De voorkeuren zijn na opslaan opnieuw gelezen. E-mailmeldingen staan uit. De feed toont nul passende aanvragen; wallet EUR 0, geen transacties. Dit is technisch bewijs voor onboarding, niet een afgeronde Staycool-aankoop of betaalproef.
+
+Bedrijven doorlopen: Leads kopen → Marketplace voor mijn bedrijf activeren → niche, type werk, segment en provincie kiezen → voorkeuren opslaan → Werkgebied en meldingen controleren. Bij geen aanbod hoeven filters niet willekeurig verruimd te worden: controleer of er werkelijk geschikte gepubliceerde aanvragen zijn. Opwaarderen en lead kopen zijn afzonderlijke vervolgstappen met financiële gevolgen.
