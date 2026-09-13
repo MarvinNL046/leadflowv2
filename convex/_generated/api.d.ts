@@ -104,6 +104,8 @@ import type * as pipelinesLogic from "../pipelinesLogic.js";
 import type * as providerRouting from "../providerRouting.js";
 import type * as segments from "../segments.js";
 import type * as segmentsLogic from "../segmentsLogic.js";
+import type * as suiteAccess from "../suiteAccess.js";
+import type * as suiteHttp from "../suiteHttp.js";
 import type * as tasks from "../tasks.js";
 import type * as templateRender from "../templateRender.js";
 import type * as unsubscribeToken from "../unsubscribeToken.js";
@@ -218,6 +220,8 @@ declare const fullApi: ApiFromModules<{
   providerRouting: typeof providerRouting;
   segments: typeof segments;
   segmentsLogic: typeof segmentsLogic;
+  suiteAccess: typeof suiteAccess;
+  suiteHttp: typeof suiteHttp;
   tasks: typeof tasks;
   templateRender: typeof templateRender;
   unsubscribeToken: typeof unsubscribeToken;

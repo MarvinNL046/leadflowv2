@@ -10,11 +10,12 @@ export const product=v.union(v.literal('frostwork'),v.literal('cashflow'));
 // to a global admin flag. A request is NOT an entitlement or a subscription.
 export const status=query({
   args:{workspaceId:v.id('workspaces')},
-  returns:v.object({canRequest:v.boolean(),existingSuite:v.boolean(),requested:v.array(product)}),
+  returns:v.object({canRequest:v.boolean(),existingSuite:v.boolean(),requested:v.array(product),active:v.array(product)}),
   handler:async(ctx,{workspaceId})=>{
     const {orgId,membership}=await requireWorkspacePermission(ctx,workspaceId);
     const rows=await ctx.db.query('appRequests').withIndex('by_orgId_and_product',q=>q.eq('orgId',orgId)).take(3);
-    return {canRequest:canManageCompany(membership.role),existingSuite:await hasWorkspaceProviders(ctx,workspaceId),requested:rows.map(r=>r.product)};
+    const bindings=await ctx.db.query('suiteBindings').withIndex('by_orgId_and_product',q=>q.eq('orgId',orgId)).take(3);
+    return {canRequest:canManageCompany(membership.role),existingSuite:await hasWorkspaceProviders(ctx,workspaceId),requested:rows.map(r=>r.product),active:bindings.filter(b=>b.enabled&&b.validUntil>Date.now()).map(b=>b.product)};
   },
 });
 export const request=mutation({

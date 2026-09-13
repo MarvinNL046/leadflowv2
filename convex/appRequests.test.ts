@@ -22,7 +22,7 @@ test('owner request is idempotent, visible to members and never grants suite acc
  await owner.mutation(api.appRequests.request,{workspaceId,product:'frostwork'});
  await owner.mutation(api.appRequests.request,{workspaceId,product:'frostwork'});
  expect(await t.run(ctx=>ctx.db.query('appRequests').take(10))).toHaveLength(1);
- expect(await t.withIdentity({subject:'member'}).query(api.appRequests.status,{workspaceId})).toEqual({existingSuite:false,canRequest:false,requested:['frostwork']});
+ expect(await t.withIdentity({subject:'member'}).query(api.appRequests.status,{workspaceId})).toEqual({existingSuite:false,canRequest:false,requested:['frostwork'],active:[]});
  expect((await t.withIdentity({subject:'admin'}).query(api.appRequests.list,{paginationOpts:{cursor:null,numItems:20}})).page).toHaveLength(1);
 });
 test('anonymous, member and unrelated superadmin cannot request; outsiders cannot read company status',async()=>{

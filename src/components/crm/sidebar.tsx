@@ -131,7 +131,7 @@ export function SidebarContent({
         <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
           Apps
         </p>
-        {apps?.existingSuite && EXTERNAL_NAV.map((app) => {
+        {EXTERNAL_NAV.filter(app=>apps?.existingSuite||apps?.active?.includes(app.label==='Frostwork'?'frostwork':'cashflow')).map((app) => {
           const Icon = app.icon
           return (
             <a

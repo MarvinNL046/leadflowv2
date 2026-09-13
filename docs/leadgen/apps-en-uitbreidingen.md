@@ -1,5 +1,7 @@
 # Apps en uitbreidingen — 13 september 2026
 
+> Deze notitie beschrijft de eerste aanvraagfase (LG-049). De actuele koppeling en handmatige producttoegang staan in [Suite-toegang](suite-toegang.md). De technische beginsituatie hieronder is historisch; LG-050 voegt toegangshandhaving in beide doelapps toe.
+
 ## Voor bedrijven
 
 Open **Apps & uitbreidingen** in de sidebar (`/crm/apps`). LeadFlow blijft je CRM; Frostwork en Cashflow worden afzonderlijk per bedrijf afgesproken.
@@ -37,3 +39,4 @@ Frostwork controleert Clerk-organisatie, betaAllowed en de app-rol via orgMember
 6. Test twee volledig onafhankelijke bedrijven, directe API-aanroepen, verval/intrekken en een dubbele betaalwebhook. Activeer commerciële verkoop pas nadat provisioning en handhaving samen bewezen zijn.
 
 Deze fase levert de aanvraagroute en correcte LeadFlow-navigatie op. Er is nog geen centraal abonnement of automatische toegang over de drie apps.
+
