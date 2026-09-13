@@ -10,4 +10,5 @@ Je bedrijfsnaam en verkoopvorm zijn na aankoop zichtbaar voor passende marketpla
 
 Eigen aankopen en CRM-opvolging vind je onder **Ontgrendelde leads**. Je diensten en werkgebied pas je aan onder **Werkgebied en meldingen**.
 
-Status 13 september 2026: gecontroleerd in de testomgeving; productiepublicatie volgt apart.
+Status 13 september 2026: gepubliceerd via PR #74; live op https://leadflow.wetry.app/feed/sold. Backend en frontend succesvol gedeployd.
+
