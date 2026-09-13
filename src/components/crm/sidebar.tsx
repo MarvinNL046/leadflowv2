@@ -75,6 +75,7 @@ export function SidebarContent({
   // Globale "concepten wachten"-teller — zichtbaar vanaf elke CRM-pagina.
   const tenants = useQuery(api.userProfiles.myTenants)
   const workspaceId = tenants?.find((t) => t.workspace !== null)?.workspace?.id
+  const apps = useQuery(api.appRequests.status, workspaceId ? {workspaceId} : 'skip')
   const selectedOrgId = tenants?.find(t => t.workspace !== null)?.org?.id
   const canManage = tenants?.some(t => t.org?.id === selectedOrgId && (t.role === 'owner' || t.role === 'admin')) ?? false
   const pendingIds = useQuery(
@@ -130,7 +131,7 @@ export function SidebarContent({
         <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
           Apps
         </p>
-        {EXTERNAL_NAV.map((app) => {
+        {apps?.existingSuite && EXTERNAL_NAV.map((app) => {
           const Icon = app.icon
           return (
             <a
@@ -146,6 +147,7 @@ export function SidebarContent({
             </a>
           )
         })}
+        <Link to="/crm/apps" onClick={onNavigate} className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100">Apps & uitbreidingen</Link>
       </div>
 
       {/* Nav */}

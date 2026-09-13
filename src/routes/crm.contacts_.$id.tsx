@@ -75,6 +75,7 @@ function ContactDetailPage() {
   const notes = useQuery(api.notes.listByContact, {
     contactId: id as Id<'contacts'>,
   })
+  const apps = useQuery(api.appRequests.status, detail?.contact.workspaceId ? {workspaceId:detail.contact.workspaceId} : 'skip')
 
   async function handleDelete() {
     if (deleting) return
@@ -270,8 +271,8 @@ function ContactDetailPage() {
             asChild
           >
             <a
-              href={frostworkCustomerUrl(fullName)}
-              target="_blank"
+              href={apps?.existingSuite ? frostworkCustomerUrl(fullName) : '/crm/apps'}
+              target={apps?.existingSuite ? '_blank' : undefined}
               rel="noreferrer"
             >
               <Snowflake className="h-4 w-4" />
@@ -294,6 +295,7 @@ function ContactDetailPage() {
 
       <DetailsSection contact={contact} />
       <SuiteSummarySection
+        existingSuite={apps?.existingSuite === true}
         contactId={id as Id<'contacts'>}
         contactName={fullName}
       />

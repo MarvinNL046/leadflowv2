@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   profile: undefined as undefined | { isSuperAdmin: boolean },
   access: undefined as undefined | { ok: boolean },
   pathname: '/crm',
+  apps: undefined as undefined | {existingSuite:boolean},
 }))
 
 vi.mock('@tanstack/react-router', () => ({
@@ -23,6 +24,7 @@ vi.mock('convex/react', () => ({
     if (name === 'userProfiles:me') return state.profile
     if (name === 'marketplace/access:marketplaceAccess') return state.access
     if (name === 'userProfiles:myTenants') return []
+    if (name === 'appRequests:status') return state.apps
     return undefined
   },
 }))
@@ -32,9 +34,20 @@ beforeEach(() => {
   state.profile = undefined
   state.access = undefined
   state.pathname = '/crm'
+  state.apps = undefined
 })
 
 describe('Leadgen navigation', () => {
+  it('shows upsell while loading or without company suite access, even for superadmin',()=>{
+    state.profile={isSuperAdmin:true};
+    render(createElement(SidebarContent));
+    expect(screen.queryByRole('link',{name:'Frostwork'})).toBeNull();
+    expect(screen.getByRole('link',{name:'Apps & uitbreidingen'}).getAttribute('href')).toBe('/crm/apps');
+  });
+  it('preserves existing company suite navigation',()=>{
+    state.apps={existingSuite:true};render(createElement(SidebarContent));
+    expect(screen.getByRole('link',{name:'Frostwork'}).getAttribute('href')).toBe('https://frostwork.wetry.app/customers');
+  });
   it('keeps restricted links hidden while access is loading', () => {
     render(createElement(SidebarContent))
     expect(screen.queryByRole('region', { name: 'Leadgenbeheer' })).toBeNull()

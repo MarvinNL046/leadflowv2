@@ -54,9 +54,11 @@ const dateShort = (ms: number) =>
  * los onbereikbaar zijn → per kaart een nette lege staat.
  */
 export function SuiteSummarySection({
+  existingSuite,
 	contactId,
 	contactName,
 }: {
+  existingSuite: boolean;
 	contactId: Id<"contacts">;
 	contactName: string;
 }) {
@@ -70,6 +72,7 @@ export function SuiteSummarySection({
 	useEffect(() => {
 		let cancelled = false;
 		setData(undefined);
+		if (!existingSuite) return;
 		fetchSummary({ contactId })
 			.then((res) => {
 				if (!cancelled) setData(res);
@@ -80,7 +83,8 @@ export function SuiteSummarySection({
 		return () => {
 			cancelled = true;
 		};
-	}, [contactId, fetchSummary]);
+	}, [contactId, fetchSummary, existingSuite]);
+	if (!existingSuite) return <Card><CardContent className="space-y-2 p-5 text-sm"><p>Frostwork en Cashflow zijn uitbreidingen voor je bedrijf.</p><a href="/crm/apps" className="text-primary underline">Bekijk apps & uitbreidingen</a></CardContent></Card>;
 
 	return (
 		<Card>
