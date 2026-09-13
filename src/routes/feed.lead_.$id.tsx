@@ -74,7 +74,8 @@ function LeadDetailPage() {
   const [modalMode, setModalMode] = useState<'exclusive' | 'shared' | null>(
     null,
   )
-  const [revealed, setRevealed] = useState<FullContact | null>(null)
+  const [purchaseResult, setPurchaseResult] = useState<{leadId: string; contact: FullContact} | null>(null)
+  const revealed = purchaseResult?.leadId === leadId ? purchaseResult.contact : null
 
   // View tracking: a write, so it runs in an effect (loaders can't write).
   // 5-min dedup lives server-side. Fire-and-forget; failures are silent.
@@ -277,7 +278,7 @@ function LeadDetailPage() {
         onOpenChange={(open) => {
           if (!open) setModalMode(null)
         }}
-        onPurchased={(full) => setRevealed(full)}
+        onPurchased={(full) => setPurchaseResult({leadId, contact: full})}
       />
     </div>
   )
