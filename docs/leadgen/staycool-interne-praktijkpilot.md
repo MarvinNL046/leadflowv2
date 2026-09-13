@@ -89,3 +89,5 @@ Open Taken: standaard zie je de open taken die aan jouw account zijn toegewezen.
 Gebruik in Cashflow het bestaande account van het bedrijf waarin de klant en offertes staan. Een LeadFlow-superadminrol bewijst geen gekoppeld Cashflow-bedrijf. Verschijnt Welkom bij Cashflow met bedrijfsregistratie, maak dan niet voor deze controle opnieuw een bedrijf aan: meld aan met het bestaande Cashflow-account. Open daarna opnieuw Klant & offertes vanuit het LeadFlow-contact, zodat de klantverwijzing weer wordt meegegeven. Controleer de klantnaam en kies vervolgens de juiste offerte; de teller in LeadFlow bewijst op zichzelf niet dat een offerte bij de huidige aanvraag hoort.
 
 Browserproef op 13 september 2026: de link bereikt Cashflow, maar de huidige sessie landt op onboarding. Klantdetail en offerte zijn daardoor nog niet live geverifieerd. Er is geen bedrijf, klant of offerte aangemaakt of gewijzigd.
+
+LG-073: op Welkom bij Cashflow staat bovenaan Uitloggen. Gebruik deze knop om naar het inlogscherm te gaan en met het bestaande bedrijfsaccount aan te melden. Open daarna opnieuw Klant & offertes in LeadFlow.
