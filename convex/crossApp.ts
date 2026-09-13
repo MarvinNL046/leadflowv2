@@ -27,7 +27,9 @@ type CashflowSummary = {
     latestDate: number | null
     latestNumber: string | null
   }
-  quotes: { count: number; openCount: number }
+  quotes: { count: number; openCount: number; latest?: {
+    number: string | null; date: number; status: string
+  } | null }
 }
 
 type FrostworkSummary = {

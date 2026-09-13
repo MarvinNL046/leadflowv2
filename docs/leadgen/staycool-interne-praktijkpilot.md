@@ -95,3 +95,7 @@ LG-073: op Welkom bij Cashflow staat bovenaan Uitloggen. Gebruik deze knop om na
 ## Klant/offertecontrole afgerond — LG-074
 
 Op 13 september 2026 is de eerder vastgestelde LeadFlow-klantdeeplink geopend binnen het bestaande Staycool-Cashflow-bedrijf. De juiste klant en diens offertedetail openen succesvol. De offerte is verlopen en dateert van februari, vóór de aanvraag van september. Gebruik de suite-teller daarom alleen als klanthistorie: controleer altijd status, datum en werkzaamheden voordat je aanneemt dat de huidige aanvraag al een offerte heeft. Er is niets verstuurd of gewijzigd. Open blijft: afspraakstatus controleren en vaststellen of een nieuwe of aangepaste offerte nodig is. Productvervolg: offertestatus en datum zichtbaar maken bij de LeadFlow-suiteverwijzing.
+
+## Offertehistorie in LeadFlow — LG-075
+
+Bij het contact toont de Cashflow-kaart naast de aantallen de meest recente offerte met nummer, status en datum. De datum volgt Cashflow: verzenddatum, of bij een concept het aanmaakmoment. Verlopen wordt op dezelfde manier berekend als in Cashflow. Controleer via Klant & offertes de werkzaamheden: de meest recente offerte van de klant hoort niet automatisch bij de huidige aanvraag. De kaart wordt opnieuw opgehaald bij openen van het contact; het is geen continu bijgewerkte offerteweergave.
