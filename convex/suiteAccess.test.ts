@@ -160,3 +160,43 @@ test("bridge rejects requests without the per-product secret", async () => {
     (await t.fetch("/suite/access", { method: "POST", body: "{}" })).status,
   ).toBe(401);
 });
+
+test("two companies stay isolated through HTTP pairing, activation and revocation", async () => {
+  const { t, code, owner, workspaceId } = await setup();
+  const secondWorkspace = await t.run(async ctx => {
+    const userId = await ctx.db.insert("users", { clerkUserId: "owner-b" });
+    const orgId = await ctx.db.insert("orgs", { name: "B", slug: "b", ownerId: userId });
+    const workspaceId = await ctx.db.insert("workspaces", { orgId, name: "B", isDefault: true });
+    await ctx.db.insert("memberships", { orgId, workspaceId, userId, role: "owner" });
+    return workspaceId;
+  });
+  const second = t.withIdentity({ subject: "owner-b", issuer: "https://issuer.test" });
+  const secondCode = await second.mutation(api.suiteAccess.createCode, { workspaceId: secondWorkspace, product: "cashflow" });
+  vi.stubEnv("SUITE_CASHFLOW_SECRET", "test-only-secret-never-used-in-production");
+  const request = (body: Record<string, string>) => t.fetch("/suite/access", {
+    method: "POST", headers: { "x-suite-product": "cashflow", authorization: "Bearer test-only-secret-never-used-in-production" }, body: JSON.stringify(body),
+  });
+  const aResponse = await request({ code, subject: "owner", issuer: "https://issuer.test", targetOrgId: "target-a" });
+  expect(aResponse.status).toBe(200);
+  const a = await aResponse.json();
+  expect((await request({ code: secondCode, subject: "owner-b", issuer: "https://issuer.test", targetOrgId: "target-a" })).status).toBe(400);
+  const bResponse = await request({ code: secondCode, subject: "owner-b", issuer: "https://issuer.test", targetOrgId: "target-b" });
+  expect(bResponse.status).toBe(200);
+  const b = await bResponse.json();
+  const admin = t.withIdentity({ subject: "admin" });
+  const grant = { enabled: true, validUntil: Date.now() + 3600000, note: "Geisoleerde technische proef" };
+  await admin.mutation(api.suiteAccess.setAccess, { ...grant, bindingId: a.bindingId });
+  expect((await owner.query(api.appRequests.status, { workspaceId })).active).toEqual(["cashflow"]);
+  expect((await second.query(api.appRequests.status, { workspaceId: secondWorkspace })).active).toEqual([]);
+  await expect(second.query(api.appRequests.status, { workspaceId })).rejects.toThrow();
+  expect((await request({ bindingId: a.bindingId, targetOrgId: "target-b" })).status).toBe(400);
+  await admin.mutation(api.suiteAccess.setAccess, { ...grant, bindingId: b.bindingId });
+  await admin.mutation(api.suiteAccess.setAccess, { ...grant, bindingId: a.bindingId, enabled: false, validUntil: 0 });
+  const revoked = await (await request({ bindingId: a.bindingId, targetOrgId: "target-a" })).json();
+  const untouched = await (await request({ bindingId: b.bindingId, targetOrgId: "target-b" })).json();
+  expect(revoked.allowedUntil).toBe(0);
+  expect(revoked.revision).toBe(2);
+  expect(untouched.allowedUntil).toBeGreaterThan(Date.now());
+  expect(untouched.revision).toBe(1);
+  expect((await second.query(api.appRequests.status, { workspaceId: secondWorkspace })).active).toEqual(["cashflow"]);
+});
