@@ -729,3 +729,11 @@ Bereik: package.json/lock (directe @tiptap/core-afhankelijkheid en typecheck-scr
 De 14 oude migrate-scripts, beide seed-scripts en sync-all zijn ongewijzigd bewaard onder docs/v1-migration/legacy-scripts/*.ts.txt; de ETL-skeleton is eveneens .ts.txt. Het cutover-runbook bevestigde dat de browserclients de inmiddels interne migratiefuncties niet meer kunnen aanroepen. Geen TypeScript-excludes, any-casts of publieke migratie-API toegevoegd.
 
 Controle: tsc --noEmit geslaagd; alle 55 testbestanden / 516 tests geslaagd; Vite-productiebuild geslaagd; git diff --check geslaagd. Tests lokaal, geen echte webhooktest verstuurd. Publicatie: nog niet live; wijzigingen voorbereid voor review. Open: review/publicatie en praktijkpilot vanaf morgen. Aanbevolen vervolg: deze technische correcties publiceren na review, daarna de drie voorbereide pilotdossiers met klantenservice doorlopen.
+
+## LG-105 — 13 september 2026: TypeScriptcorrecties gepubliceerd
+
+PR #75 gereviewd en samengevoegd: 6d5b169e219c07ba877002def71b5ae08f25e3de. De merge bevat exact dezelfde bestandsinhoud als de lokaal gecontroleerde PR-head 1de2485 (typecheck groen, 516 tests groen, productiebuild groen). Previewdeployment was READY. Productiedeployment dpl_CheVPVFjueWaSEyaXER9kJyBjRkv is READY en gekoppeld aan leadflow.wetry.app. Productielogs bevestigen geslaagde Convex-typecheck, schemavalidatie, functiepublicatie en frontendbuild; geen indexes verwijderd.
+
+Live browsercontrole na reload van /feed/sold: marketplace-navigatie en Verkochte aanvragen laden, met de verwachte lege selectie voor het huidige werkgebied en uitleg over afgeschermde contactgegevens. Geen aankoop, betaling, klantbericht of CRM-mutatie uitgevoerd. Dit is een beperkte releasecontrole; de volledige schrijf-isolatieproef staat in LG-102. Bereik: publicatie van LG-104 plus eerder klaargezette documentatie LG-101–103. Publicatiedatum: 13 september 2026.
+
+Open: eerste echte klantenservicesessie vanaf 14 september. Aanbevolen volgende stap: de drie voorbereide Staycool-pilotdossiers doorlopen en uitkomst, opvolgeigenaar, deadline en werkelijke behandeltijd vastleggen. Technisch vervolg: typecheck en tests automatisch als PR-controle laten draaien.
