@@ -89,3 +89,9 @@ Live gecontroleerd met testbedrijf A: eigen klant zoeken/selecteren in beide doc
 Versturen en inplannen zijn afzonderlijke vervolgstappen. Een documentlink geeft geen toegang tot de administratie van een ander bedrijf.
 
 Controle 13 september 2026: productie-aanmaak, wijzigen en heropvragen van fictieve concepten en documentisolatie in beide richtingen gecontroleerd via publieke functies met de bestaande A/B-eigenaarsidentiteiten. Browser A bevestigt eigen heropende offerte/factuur, opgeslagen factuurwijziging en geweigerde B-links. Daarnaast 42 gerichte tests geslaagd. Geen volledige browserronde als B of live verzend-/betaalproef uitgevoerd. Tijdelijke rechten weer uitgezet; vier herkenbare fictieve concepten bewaard. De eerdere openstaande conceptcontrole is hiermee voor dit beschreven bereik afgerond.
+
+## Ontoegankelijke offerte of factuur
+
+Cashflow toont nu **Offerte niet beschikbaar** of **Factuur niet beschikbaar**, met **Naar mijn offertes/facturen** en **Opnieuw proberen**. De melding maakt geen onderscheid dat het bestaan van andermans document bevestigt. De teruglink brengt je naar je eigen overzicht. Live gecontroleerd op 13 september 2026.
+
+Het interne [pilotvoorstel voor pakketten](pakketten-pilotvoorstel.md) beschrijft mogelijke prijzen en uitbreidingen. Dit is nog geen gepubliceerd of automatisch gefactureerd aanbod.
