@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { CheckCircle2 } from '@/components/icons'
 import { Card, CardContent } from '#/components/ui/card.tsx'
@@ -18,12 +18,22 @@ export const Route = createFileRoute('/crm/taken')({ component: TasksPage })
  */
 function TasksPage() {
   const [view, setView] = useState<'all' | 'mine' | 'unassigned'>('mine')
+  const [period, setPeriod] = useState<'all' | 'today' | 'overdue'>('all')
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(timer)
+  }, [])
+  const currentDay = new Date(now)
+  const dayStart = new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate()).getTime()
+  const dayEnd = new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate() + 1).getTime()
+  const dueRange = period === 'all' ? undefined : {from: period === 'today' ? dayStart : 0, to: period === 'today' ? dayEnd : dayStart}
   const tenants = useQuery(api.userProfiles.myTenants)
   const tenant = tenants?.find((t) => t.workspace !== null) ?? null
   const workspaceId = tenant?.workspace?.id as Id<'workspaces'> | undefined
   const tasks = useQuery(
     api.tasks.listOpen,
-    workspaceId ? { workspaceId, view } : 'skip',
+    workspaceId ? { workspaceId, view, dueRange } : 'skip',
   )
   const setDone = useMutation(api.tasks.setDone)
   const members = useQuery(api.tasks.assignees, workspaceId ? { workspaceId } : 'skip')
@@ -41,7 +51,6 @@ function TasksPage() {
     )
   }
 
-  const now = Date.now()
 
   return (
     <div className="flex flex-col gap-4">
@@ -57,12 +66,16 @@ function TasksPage() {
         {([{key:'mine',label:'Mijn taken'},{key:'all',label:'Alle open taken'},{key:'unassigned',label:'Niet toegewezen'}] as const).map(item => <Button key={item.key} variant={view === item.key ? 'default' : 'outline'} aria-pressed={view === item.key} onClick={() => setView(item.key)}>{item.label}</Button>)}
       </div>
       {tasks !== undefined && <p className="text-sm text-muted-foreground">{tasks.length === 300 ? '300 taken getoond; mogelijk zijn er meer.' : `${tasks.length} open ${tasks.length === 1 ? 'taak' : 'taken'} in deze weergave`}</p>}
+      <div role="group" aria-label="Deadlinefilter" className="flex flex-wrap gap-2">
+        {([{key:'all',label:'Alle datums'},{key:'today',label:'Vandaag'},{key:'overdue',label:'Te laat'}] as const).map(item => <Button key={item.key} variant={period === item.key ? 'default' : 'outline'} aria-pressed={period === item.key} onClick={() => { setNow(Date.now()); setPeriod(item.key) }}>{item.label}</Button>)}
+      </div>
+      <p className="text-xs text-muted-foreground">Te laat = deadline vóór vandaag. Datums volgen je lokale tijdzone. Taken zonder deadline staan bij Alle datums.</p>
 
       {tasks === undefined ? <Skeleton className="h-64 w-full" /> : tasks.length === 0 ? (
         <Card>
           <CardContent className="p-10 text-center">
             <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500" />
-            <p className="mt-2 font-medium">{view === 'mine' ? 'Geen open taken aan jou toegewezen' : view === 'unassigned' ? 'Geen open taken zonder verantwoordelijke' : 'Geen open taken'}</p>
+            <p className="mt-2 font-medium">{period !== 'all' ? 'Geen open taken in deze periode' : view === 'mine' ? 'Geen open taken aan jou toegewezen' : view === 'unassigned' ? 'Geen open taken zonder verantwoordelijke' : 'Geen open taken'}</p>
             <p className="mt-1 text-sm text-muted-foreground">
               {view === 'mine' ? 'Bekijk Alle open taken of Niet toegewezen voor de overige opvolging.' : 'Er zijn geen geregistreerde open taken in deze weergave.'}
             </p>
@@ -74,7 +87,7 @@ function TasksPage() {
             <ul className="divide-y">
               {(tasks ?? []).map((task) => {
                 const overdue =
-                  task.dueDate !== undefined && task.dueDate < now
+                  task.dueDate !== undefined && task.dueDate < dayStart
                 return (
                   <li
                     key={task._id}

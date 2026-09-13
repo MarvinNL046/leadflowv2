@@ -65,10 +65,15 @@ async function requireMembershipForTask(
 
 /** Open taken van de workspace, vroegste vervaldatum eerst (zonder = achteraan). */
 export const listOpen = query({
-  args: { workspaceId: v.id("workspaces"), view: v.optional(v.union(v.literal('all'), v.literal('mine'), v.literal('unassigned'))) },
+  args: { workspaceId: v.id("workspaces"), view: v.optional(v.union(v.literal('all'), v.literal('mine'), v.literal('unassigned'))), dueRange: v.optional(v.object({from:v.number(),to:v.number()})) },
   handler: async (ctx, args) => {
     const userId = await requireMembershipForWorkspace(ctx, args.workspaceId);
-    const tasks = await (args.view === 'mine' || args.view === 'unassigned' ? ctx.db.query('tasks')
+    const range = args.dueRange;
+    if (range && (!Number.isFinite(range.from) || !Number.isFinite(range.to) || range.from < 0 || range.to <= range.from)) throw new Error('Ongeldige datumperiode');
+    const tasks = range ? await (args.view === 'mine' || args.view === 'unassigned'
+      ? ctx.db.query('tasks').withIndex('by_workspace_status_assignee_due', q => q.eq('workspaceId',args.workspaceId).eq('status','open').eq('assignedToId',args.view === 'mine' ? userId : undefined).gte('dueDate',range.from).lt('dueDate',range.to))
+      : ctx.db.query('tasks').withIndex('by_workspace_status_due', q => q.eq('workspaceId',args.workspaceId).eq('status','open').gte('dueDate',range.from).lt('dueDate',range.to))).take(300)
+    : await (args.view === 'mine' || args.view === 'unassigned' ? ctx.db.query('tasks')
       .withIndex('by_workspace_status_assignee', q => q.eq('workspaceId', args.workspaceId).eq('status', 'open').eq('assignedToId', args.view === 'mine' ? userId : undefined)) : ctx.db
       .query("tasks")
       .withIndex("by_workspace_status", (q) =>
