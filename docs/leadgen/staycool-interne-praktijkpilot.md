@@ -111,3 +111,7 @@ LeadFlow zoekt eerst met contact-ID. Bij geen match probeert de bestaande koppel
 ## Dagelijkse werklijst — LG-079
 
 Kies in Taken eerst Mijn taken, Alle open taken of Niet toegewezen. Kies daarna Vandaag voor deadlines op de huidige dag, of Te laat voor eerdere dagen. Datums volgen je lokale browsertijdzone; taken voor vandaag zijn nog niet te laat. Taken zonder deadline vind je onder Alle datums. De telling hoort bij beide gekozen filters. Laat een taak open zolang de uitkomst nog bevestigd moet worden, zoals bij P-001. De datumfilters worden vóór de limiet van 300 resultaten toegepast.
+
+## Van aanvraag naar opvolging — LG-081
+
+Lees vóór aankoop de opdracht, regio, aanvraagdatum en verkoopvorm. Gedeeld vermeldt totaal aantal mogelijke kopers en vrije koopplaatsen; exclusief geldt voor verkoop via LeadFlow. De prijs wordt na bevestiging van tegoed afgeschreven; aankoop garandeert geen opdracht. Na ontgrendelen kies je Open contact en plan opvolging. Controleer eerdere afspraken en registreer contactuitkomst en taak met verantwoordelijke/datum. Via Ontgrendelde leads vind je het CRM-contact later terug. Herladen van een gekocht aanvraagdetail behoudt de ontgrendelde route. Bij ontbrekende CRM-koppeling vraag je de beheerder om hulp.

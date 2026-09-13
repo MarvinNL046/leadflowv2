@@ -65,6 +65,7 @@ function LeadDetailPage() {
   const leadId = id as Id<'marketplaceLeads'>
 
   const lead = useQuery(api.marketplace.feed.getMaskedLeadDetail, { leadId })
+  const purchased = useQuery(api.marketplace.purchase.getMyPurchasedContact, { leadId })
   const trackView = useMutation(api.marketplace.leadViews.trackLeadView)
 
   // Purchase flow state. `revealed` holds the unmasked contact after a
@@ -82,7 +83,9 @@ function LeadDetailPage() {
     void trackView({ leadId }).catch(() => {})
   }, [lead, leadId, trackView])
 
-  if (lead === undefined) {
+  if (purchased || revealed) return <div className="space-y-4"><BackLink /><UnlockedCard contact={purchased ?? revealed!} /></div>
+
+  if (lead === undefined || purchased === undefined) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-40" />
@@ -144,7 +147,7 @@ function LeadDetailPage() {
             )}
             <span className="inline-flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
-              {new Date(lead.createdAt).toLocaleDateString('nl-NL')}
+              Aangevraagd op {new Date(lead.createdAt).toLocaleDateString('nl-NL')} · {Math.max(0, Math.floor((Date.now() - lead.createdAt) / 86400000))} dagen geleden
             </span>
           </div>
         </CardHeader>
@@ -221,6 +224,12 @@ function LeadDetailPage() {
           )}
 
           <Separator />
+          <div className="space-y-1 text-sm text-zinc-600">
+            <p>Je koopt toegang tot de aanvraag en contactgegevens; een opdracht is niet gegarandeerd.</p>
+            {lead.allowExclusive && <p><strong>Exclusief:</strong> via LeadFlow alleen verkocht aan jouw bedrijf.</p>}
+            {lead.allowShared && <p><strong>Gedeeld:</strong> maximaal {lead.maxSharedBuyers} kopers totaal. Nog {lead.sharedSlotsAvailable} koopplaatsen beschikbaar. De prijs geldt per koper.</p>}
+            <p>De gekozen prijs wordt eenmalig van je tegoed afgeschreven na bevestiging.</p>
+          </div>
           {lead.expiresAt && <p className="text-sm text-zinc-500">Te koop tot {new Intl.DateTimeFormat('nl-NL',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Amsterdam'}).format(lead.expiresAt)}. Een eerdere aankoop kan de beschikbaarheid beperken.</p>}
           {revealed ? (
             <p className="text-sm font-medium text-emerald-600">
@@ -323,9 +332,10 @@ function UnlockedCard({ contact }: { contact: FullContact }) {
       <CardContent className="space-y-3">
         <RevealedContact contact={contact} />
         <p className="text-sm text-zinc-500">
-          De volledige gegevens staan nu ook als contact in je CRM, klaar voor
-          opvolging.
+          Controleer de aanvraag en eventuele eerdere afspraken. Leg daarna je contactuitkomst en een opvolgtaak met verantwoordelijke en datum vast.
         </p>
+        {contact.contactId ? <Button asChild><Link to="/crm/contacts/$id" params={{id:contact.contactId}}>Open contact en plan opvolging</Link></Button> : <p className="text-sm">De CRM-koppeling is niet beschikbaar. Bekijk je ontgrendelde leads of vraag je beheerder om hulp.</p>}
+        <Link to="/feed/purchased" className="block text-sm font-medium text-violet-700 hover:underline">Alle ontgrendelde leads</Link>
         <Link
           to="/feed"
           className="text-sm font-medium text-violet-700 hover:underline"

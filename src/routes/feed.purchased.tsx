@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { MapPin, Phone, Mail, User, Clock } from "@/components/icons"
 import { Badge } from '#/components/ui/badge.tsx'
@@ -42,6 +42,7 @@ const TRANSITIONS: Record<string, string[]> = {
 }
 
 type Purchase = {
+  contactId: Id<'contacts'> | null
   purchaseId: Id<'marketplacePurchases'>
   leadId: Id<'marketplaceLeads'>
   mode: 'exclusive' | 'shared'
@@ -166,6 +167,8 @@ function PurchaseCard({ purchase: p }: { purchase: Purchase }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {p.contactId && <Link to="/crm/contacts/$id" params={{id:p.contactId}} className="inline-block font-medium text-violet-700 hover:underline">Open contact en plan opvolging</Link>}
+        <p className="text-sm text-zinc-500">Controleer eerdere afspraken en leg de volgende actie vast bij het contact.</p>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-600">
           {(p.city || p.postalCode) && (
             <span className="inline-flex items-center gap-1">

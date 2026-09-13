@@ -47,6 +47,28 @@ export interface FullLead {
 	postalCode: string | null;
 }
 
+/** A purchased detail survives reload; ownership is resolved on the server. */
+export const getMyPurchasedContact = query({
+  args: {leadId: v.id('marketplaceLeads')},
+  returns: v.union(v.null(), v.object({
+    contactId:v.union(v.id('contacts'),v.null()),
+    firstName:v.union(v.string(),v.null()), lastName:v.union(v.string(),v.null()),
+    email:v.union(v.string(),v.null()), phone:v.union(v.string(),v.null()),
+    city:v.union(v.string(),v.null()), postalCode:v.union(v.string(),v.null()),
+  })),
+  handler: async(ctx,{leadId})=>{
+    const {orgId}=await requireMarketplaceAccess(ctx);
+    const purchase=await ctx.db.query('marketplacePurchases').withIndex('by_lead_org',q=>q.eq('leadId',leadId).eq('buyerOrgId',orgId)).first();
+    if(!purchase)return null;
+    const lead=await ctx.db.get(leadId);
+    if(!lead)return null;
+    const contact=purchase.contactId ? await ctx.db.get(purchase.contactId) : null;
+    const workspace=contact ? await ctx.db.get(contact.workspaceId) : null;
+    return {contactId:workspace?.orgId===orgId && contact?.workspaceId===purchase.buyerWorkspaceId ? contact._id : null,
+      firstName:lead.firstName??null,lastName:lead.lastName??null,email:lead.email??null,phone:lead.phone??null,city:lead.city??null,postalCode:lead.postalCode??null};
+  },
+});
+
 export interface PurchaseResult {
 	success: boolean;
 	purchaseId?: Id<"marketplacePurchases">;
