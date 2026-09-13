@@ -47,3 +47,11 @@ De expliciet geselecteerde deployment marvinsmit1988:wetryleadflow:dev/marketpla
 Na beschikbaar stellen van de Clerk Development-instance moeten publishable key en bijbehorende issuer veilig worden ingesteld. Voor Checkout zijn daarnaast de Stripe-testsleutel en het webhooksecret van deze testdeployment nodig. Deel geheimen via de betreffende dashboards of een genegeerd lokaal configuratiebestand, niet via chat. Eerst de login en de juiste testbackend bevestigen, dan pas testdata en Checkout uitvoeren.
 
 Voeg aan stap 5 toe: open het eigen CRM-contact, maak een interne opvolgtaak met testverantwoordelijke en deadline, controleer deze in het takenoverzicht en na herladen. Bedrijf B mag ook die taak niet kunnen lezen of wijzigen. Geen klantberichten versturen.
+
+## Testlogin voorbereid — LG-083, 13 september 2026
+
+Clerk wetry Development gevonden: ins_3Czp4DOBv8evoVqJVAzy9X4iFJP, publiek domein darling-magpie-58.clerk.accounts.dev. Bestaande JWT-template convex aanwezig. Geen Clerk-instellingen of geheime sleutels gewijzigd. Alleen testdeployment steady-orca-351 geconfigureerd: CLERK_JWT_ISSUER_DOMAIN naar dit domein, SITE_URL http://localhost:5186, SUPER_ADMIN_EMAILS nobody@marketplace-test.invalid (geen bestaande gebruiker automatisch beheerder).
+
+Appcode succesvol gepubliceerd naar de expliciet geselecteerde developmentdeployment. Lokale frontend start met: node node_modules/vite/bin/vite.js --mode marketplace --port 5186 --strictPort. Genegeerde .env.marketplace.local bevat expliciete testkey, testbackend en lege PostHog-key. Door Convex gegenereerde .env.local verwijderd, zodat standaardselectie niet blijvend naar de proefomgeving wijzigt.
+
+Chrome http://localhost:5186/login toont Sign in to wetry en Development mode. Daarmee is het loginscherm bevestigd; aanmelden/tokenacceptatie nog niet getest. Gebruiker kan het bestaande Development-account gebruiken. Stripe-testsecret/webhooksecret ontbreken nog. Geen testbedrijven, aankopen, tegoed of berichten aangemaakt.
