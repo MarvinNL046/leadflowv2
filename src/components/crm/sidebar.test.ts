@@ -61,7 +61,7 @@ describe('Leadgen navigation', () => {
     const leads = screen.getByRole('link', { name: /Binnengekomen leads/ })
     expect(leads.getAttribute('href')).toBe('/crm/leadgen')
     expect(leads.getAttribute('target')).toBeNull()
-    expect(screen.queryByRole('region', { name: 'Marketplace' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Leads kopen' }).getAttribute('href')).toBe('/feed')
   })
 
   it('shows buyers the feed without exposing the admin shortcuts', () => {

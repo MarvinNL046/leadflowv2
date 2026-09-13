@@ -13,6 +13,7 @@ import { Sheet, SheetContent, SheetTitle } from '#/components/ui/sheet.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { cn } from '#/lib/utils.ts'
 import { api } from '../../convex/_generated/api'
+import { MarketplaceStart } from '#/components/marketplace/marketplace-start'
 
 export const Route = createFileRoute('/feed')({ component: FeedLayout })
 
@@ -45,7 +46,7 @@ function FeedGate() {
     )
   }
   if (!access.ok) {
-    return <RedirectTo to="/crm" label="Geen marketplace-toegang…" />
+    return <MarketplaceStart />
   }
   return <FeedShell />
 }
