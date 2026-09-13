@@ -349,7 +349,7 @@ export const upsertContactFromMetaLead = internalMutation({
     }
 
     let contactId: Id<"contacts">;
-    let isNewContact = false;
+
     if (contact) {
       // Merge: alleen lege velden invullen, niet overschrijven.
       const merged: Record<string, string | undefined> = {};
@@ -386,7 +386,7 @@ export const upsertContactFromMetaLead = internalMutation({
         country: f.country,
         callCount: 0,
       });
-      isNewContact = true;
+
     }
 
     // Attribution-row altijd insert (1-op-1 met deze meta-lead).

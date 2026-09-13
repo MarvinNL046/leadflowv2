@@ -15,10 +15,10 @@ afterEach(cleanup)
 
 test('saves the chosen province and sends explicit null when clearing service selection',async()=>{
   render(createElement(PreferencesForm,{mode:'settings',initial:{niches:['airco'],preferredMode:'both',notifyOnNewLead:true,serviceTypes:['install'],provinces:['Limburg']}}))
-  expect(screen.getByRole('button',{name:'Limburg',exact:true}).getAttribute('aria-pressed')).toBe('true')
-  fireEvent.click(screen.getByRole('button',{name:'Repareren',exact:true}))
-  fireEvent.click(screen.getByRole('button',{name:'Onderhouden',exact:true}))
-  fireEvent.click(screen.getByRole('button',{name:'Opslaan',exact:true}))
+  expect(screen.getByRole('button',{name:'Limburg'}).getAttribute('aria-pressed')).toBe('true')
+  fireEvent.click(screen.getByRole('button',{name:'Repareren'}))
+  fireEvent.click(screen.getByRole('button',{name:'Onderhouden'}))
+  fireEvent.click(screen.getByRole('button',{name:'Opslaan'}))
   await waitFor(()=>expect(save).toHaveBeenCalledWith(expect.objectContaining({serviceTypes:null,provinces:['Limburg'],notifyChannel:'email'})))
 })
 

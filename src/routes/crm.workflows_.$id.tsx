@@ -19,7 +19,6 @@ import {
 } from '#/components/ui/card.tsx'
 import { Badge } from '#/components/ui/badge.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
-import { Separator } from '#/components/ui/separator.tsx'
 import { cn } from '#/lib/utils.ts'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'

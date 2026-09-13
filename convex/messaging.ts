@@ -74,7 +74,7 @@ export const send = action({
     if ("error" in ctxData) {
       throw new Error(ctxData.error);
     }
-    const { contact, workspaceId, userId, recipient } = ctxData;
+    const { workspaceId, userId, recipient } = ctxData;
 
     const emailTransport = args.channel==='email' ? await ctx.runQuery(internal.companyEmail.transport,{workspaceId}) : null;
     const ownWa=args.channel==='whatsapp'?await ctx.runQuery(internal.companyWhatsapp.transport,{workspaceId}):null;

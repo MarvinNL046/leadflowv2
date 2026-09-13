@@ -21,14 +21,14 @@ import { createHmac } from "node:crypto";
 config({ path: ".env.meta-test" });
 config({ path: ".env.local" });
 
-const SITE_URL = process.env.VITE_CONVEX_SITE_URL;
-const APP_SECRET = process.env.META_APP_SECRET;
-const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN;
-
-if (!SITE_URL || !APP_SECRET || !VERIFY_TOKEN) {
-  console.error("❌ Missing env: VITE_CONVEX_SITE_URL / META_APP_SECRET / META_WEBHOOK_VERIFY_TOKEN");
-  process.exit(1);
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error('Missing env: ' + name);
+  return value;
 }
+const SITE_URL = requiredEnv('VITE_CONVEX_SITE_URL');
+const APP_SECRET = requiredEnv('META_APP_SECRET');
+const VERIFY_TOKEN = requiredEnv('META_WEBHOOK_VERIFY_TOKEN');
 
 const WEBHOOK_URL = `${SITE_URL}/webhooks/meta`;
 
@@ -44,7 +44,7 @@ async function main() {
   getUrl.searchParams.set("hub.verify_token", VERIFY_TOKEN);
   getUrl.searchParams.set("hub.challenge", challenge);
 
-  console.log("→ GET", getUrl.pathname + getUrl.search);
+  console.log("→ GET", getUrl.pathname);
   const getRes = await fetch(getUrl);
   const getBody = await getRes.text();
   console.log(`  status=${getRes.status} body=${JSON.stringify(getBody)}`);

@@ -721,3 +721,11 @@ Bestaande pilotwerkinstructie, P-001-notitie en klantenservicecontrolelijst gele
 Lokale outputs/staycool-pilot/startlijst-praktijkpilot.md bevat casuslinks, waargenomen status, eerst te bevestigen informatie, gereedcriteria, invulblok voor CRM-notitie, tijdregistratie en terugkoppeling. P-001-lokale-notitie.md aangevuld zodat oude startstatus niet als actueel wordt gelezen. Geen klantcommunicatie, verzending aan collega, offerte, afspraak of CRM-mutatie uitgevoerd. Meetbestand blijft zonder verzonnen personeelsminuten of resultaten.
 
 Open: daadwerkelijke eerste klantenservicesessie, toewijzing P-002/P-003, afspraakstatus en echte uitkomsten. Volgende stap voor Marvin/klantenservice: startlijst doorlopen en per casus uitkomst, eigenaar/datum en werkelijke minuten vastleggen. De technische schrijf-isolatie is afgerond in LG-102; algemene TypeScriptopruiming blijft apart open. Bereik van deze taak: pilotvoorbereiding en documentatie, geen softwarepublicatie.
+
+## LG-104 — 13 september 2026: volledige TypeScriptcontrole hersteld
+
+Bereik: package.json/lock (directe @tiptap/core-afhankelijkheid en typecheck-script), campagneblok-iconentype, router/workflow ongebruikte imports, messaging/metaProcessor ongebruikte variabelen, marketplace PreferencesForm-tests en env-validatie van scripts/test-meta-webhook.ts. Het webhooktestscript logt de verify-token niet meer. Geen autorisatie- of databasegedrag gewijzigd.
+
+De 14 oude migrate-scripts, beide seed-scripts en sync-all zijn ongewijzigd bewaard onder docs/v1-migration/legacy-scripts/*.ts.txt; de ETL-skeleton is eveneens .ts.txt. Het cutover-runbook bevestigde dat de browserclients de inmiddels interne migratiefuncties niet meer kunnen aanroepen. Geen TypeScript-excludes, any-casts of publieke migratie-API toegevoegd.
+
+Controle: tsc --noEmit geslaagd; alle 55 testbestanden / 516 tests geslaagd; Vite-productiebuild geslaagd; git diff --check geslaagd. Tests lokaal, geen echte webhooktest verstuurd. Publicatie: nog niet live; wijzigingen voorbereid voor review. Open: review/publicatie en praktijkpilot vanaf morgen. Aanbevolen vervolg: deze technische correcties publiceren na review, daarna de drie voorbereide pilotdossiers met klantenservice doorlopen.
