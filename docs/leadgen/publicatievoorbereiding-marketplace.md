@@ -43,3 +43,7 @@ Live Stripe-bestemming we_1UFInFEPjKUovbQKqLWOS0De aangesloten op productie. Eig
 Configuratieproef: live Checkout aangemaakt met metadata.kind=configuration_check, zonder klant/bedrijfkoppeling, en direct onbetaald verlopen gemaakt. Geen walletbijschrijving of echte betaling. Productie-CRM en /feed/wallet laden met bestaande super-adminsessie; tegoedpagina toont saldo en opwaardeerbediening. Accountmenu en contactfoutpagina eerder in staging gecontroleerd, niet opnieuw met productie-testaccounts.
 
 Open: volledige echte betaling inclusief live-webhook en eenmalige walletbijschrijving nog niet bewezen. Ook exclusieve sandbox-browseraankoop en gerichte schrijfpoging vanuit B-browser blijven apart open. Aanbevolen vervolg: gebruiker doet één kleine live-opwaardering via Tegoed; daarna betaling, webhook en wallet gezamenlijk controleren.
+
+## Eerste livebetaling bevestigd — LG-098
+
+13 september 2026 21:24:51 CEST: gebruiker betaalde EUR 10. Stripe-event evt_1UFJ1DEPjKUovbQKteJAx2Kr (checkout.session.completed) is live, paid/complete, EUR 10 en marketplace_topup; levering aan de productiebackend is HTTP 200 received=true. Sessie komt overeen met de terugkeer-URL van de gebruiker. Wallet toont saldo EUR 10 en één opwaardering EUR 10. Hiermee is de eerder genoemde open livebetaalproef afgerond. Geen liveherlevering uitgevoerd; bescherming tegen dubbele levering is eerder in sandbox bewezen. Volgende stap: exclusieve sandboxaankoop en daarna interne praktijkpilot. Geen extra betaling nodig.
