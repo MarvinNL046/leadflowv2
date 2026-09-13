@@ -5,7 +5,7 @@ interface BlockSidebarProps {
   onAdd: (type: BlockType) => void
 }
 
-const BLOCKS: { type: BlockType; label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
+const BLOCKS: { type: BlockType; label: string; Icon: typeof Heading }[] = [
   { type: 'heading', label: 'Kop', Icon: Heading },
   { type: 'text', label: 'Tekst', Icon: Type },
   { type: 'button', label: 'Knop', Icon: MousePointerClick },

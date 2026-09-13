@@ -1,3 +1,5 @@
+> Archiefnotitie 13 september 2026: de oude scripts/migrate-*.ts, seed-pipeline.ts, seed-workflows.ts en sync-all.ts zijn als niet-uitvoerbare bronreferentie verplaatst naar [legacy-scripts](v1-migration/legacy-scripts/README.md). De onderstaande commando's beschrijven de historische cutover en zijn geen actuele uitvoerinstructies.
+
 # LeadFlow v1 → v2 Cutover Runbook
 
 **Status:** draft per 2026-05-19. Aanvul tijdens dry-run.

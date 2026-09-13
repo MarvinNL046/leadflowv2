@@ -91,3 +91,6 @@ Read-only backend bevestigt aankoop en taak in workspace vd77743j3p5zb2nta93q9vc
 
 ## LG-099: exclusieve browserproef afgerond
 Test A koopt exclusief voor EUR 72,60: EUR 81,85 naar EUR 9,25, één aankoop. Contact, opportunity en handmatige opvolgtaak behouden na herladen. Test B ziet geen klantgegevens of taak. Na gebruikersverzoek toont de detailpagina nu wel de bedrijfsnaam van de koper en Exclusief; backend beperkt deze informatie tot passende marketplacebedrijven. Zie werklog LG-099 voor referenties en beperkingen. Alleen testomgeving, nog niet live.
+
+## LG-102: B-schrijfproef afgerond
+Echte B-browsersessie op localhost/steady-orca: contacts.update, tasks.setDone, tasks.assign en tasks.create op fictieve A-records rechtstreeks geprobeerd. Alle vier door backend geweigerd op lidmaatschap. JSON vóór/na exact gelijk. Tijdelijke lokale route verwijderd; geen productiecode aangepast. Deze vier schrijfcontroles zijn geslaagd; dit is geen volledige audit van alle API's. Zie werklog voor record- en requestreferenties.

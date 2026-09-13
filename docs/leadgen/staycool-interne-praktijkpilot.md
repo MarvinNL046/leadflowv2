@@ -115,3 +115,6 @@ Kies in Taken eerst Mijn taken, Alle open taken of Niet toegewezen. Kies daarna 
 ## Van aanvraag naar opvolging — LG-081
 
 Lees vóór aankoop de opdracht, regio, aanvraagdatum en verkoopvorm. Gedeeld vermeldt totaal aantal mogelijke kopers en vrije koopplaatsen; exclusief geldt voor verkoop via LeadFlow. De prijs wordt na bevestiging van tegoed afgeschreven; aankoop garandeert geen opdracht. Na ontgrendelen kies je Open contact en plan opvolging. Controleer eerdere afspraken en registreer contactuitkomst en taak met verantwoordelijke/datum. Via Ontgrendelde leads vind je het CRM-contact later terug. Herladen van een gekocht aanvraagdetail behoudt de ontgrendelde route. Bij ontbrekende CRM-koppeling vraag je de beheerder om hulp.
+
+## Eerste ronde P-001 t/m P-003 — LG-103
+De lokale startlijst outputs/staycool-pilot/startlijst-praktijkpilot.md bevat drie concrete bestaande dossiers met directe links en gereedcriteria. P-001 hergebruikt de bestaande open taak; P-002/P-003 vragen eerst controle van historie en interne toewijzing. Klantenservice registreert bevestigde uitkomst, volgende actie met verantwoordelijke/datum en werkelijke minuten. Nog geen menselijke pilotsessie of klantcontact als uitgevoerd geboekt. De technische A/B-proeven zijn afgerond voor de geteste lees-/schrijfpaden; dit vervangt het praktijkgebruik niet.

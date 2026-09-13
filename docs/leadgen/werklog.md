@@ -697,3 +697,35 @@ Nieuwe route /feed/sold via sidebar en marketplace-tabbladen. Toont uitsluitend 
 Bestanden: convex/marketplace/feed.ts, convex/marketplacePurchaseFlow.test.ts, src/routes/feed.sold.tsx, src/routes/feed.tsx, src/components/crm/sidebar.tsx en gegenereerde routeTree.gen.ts. 39 marketplace-integratietests geslaagd, nu ook exacte minimale lijstresponse bij exclusief/gedeeld, anonieme weigering en regio/nichemismatch. Convex-deploy naar steady-orca-351 geslaagd; frontend client/SSR-build geslaagd; diff-check geslaagd. Eerder vastgestelde algemene TypeScriptfouten blijven open; geen repositorybrede groene typecheck geclaimd.
 
 Browserbewijs: A en B zien in /feed/sold beide fictieve aanvragen, met Test A als exclusieve respectievelijk gedeelde koper. Sidebar en bovenste tab zichtbaar. Geen productiepublicatie, echte transactie of klantbericht. Aanbevolen vervolg: wijzigingen als release beoordelen/publiceren; bredere TypeScriptopruiming en gerichte B-schrijfpoging blijven apart open. Werkbranch feat/marketplace-buyer-names.
+
+## LG-101 — 13 september 2026: koperinformatie en verkochte aanvragen live
+
+PR #74 gecontroleerd: mergeable, ongewijzigde head 9f77e513f37b91128f78edb46a169c2b2803627a en Vercel-preview success. Diff-check schoon; bestaand bewijs LG-099/LG-100 (39 tests, testbackend en frontendbuild, browser A/B) beoordeeld. Na gebruikersakkoord ready gemaakt en squash gemerged naar 55ec9036d8cf8cae36d145a207c1126fbee60448. Productiedeployment dpl_Efra3bf2uVBFgQ8yvH1q3aNW2TjF READY. Buildlogs bevestigen schema-validatie, Convex-functiedeploy en frontendpublicatie op 13 september 2026 19:48 UTC.
+
+Productie /feed/sold geopend met bestaande sessie. Sidebar en marketplace-tab Verkochte aanvragen aanwezig; pagina toont geldige lege toestand: geen verkochte aanvragen binnen huidige diensten/werkgebied. Geen fictieve leads op productie ingevoerd om dit te vullen. Gevulde weergave en beperkte koperinformatie zijn op staging gecontroleerd. Handleiding bijgewerkt naar live-status. Geen betaling, walletwijziging of klantbericht uitgevoerd.
+
+Bereik: release #74 (koperquery/detail, verkochte-overzichtquery/route, navigatie, aankoopuitleg en documentatie). Open: algemene TypeScriptfouten buiten deze release en gerichte B-schrijfpoging. Aanbevolen vervolg: die schrijfcontrole afronden in sandbox, daarna Staycool-praktijkpilot met bestaande echte aanvragen. Publicatiestatus: live.
+
+## LG-102 — 13 september 2026: echte B-browsersessie weigert wijzigingen aan A
+
+Tijdelijke lokale route /crm/isolation-probe gebruikte bestaande useMutation-hooks en echte Clerk/Convex-sessie van Test B. Uitvoering alleen toegestaan bij Vite DEV, steady-orca-351 en exact org rd72z1h2a5xrscff4n5rabvcd98ea3vh. Geen impersonatie of interne mutaties voor de schrijfproef. Doel: fictief A-contact ks78rq0hxweq4t29a42p8hgky18eak34 en taak sd73zc9sn60xykwespftgsp3cs8ea04x.
+
+Vier publiek aanroepbare mutaties rechtstreeks vanuit B-browser geprobeerd: contacts.update (voornaam), tasks.setDone, tasks.assign (B als verantwoordelijke), tasks.create (nieuwe taak bij A-contact). Alle vier geweigerd wegens ontbrekend workspace/bedrijfslidmaatschap. Requestreferenties respectievelijk 97dcd386bc8cda79, 8f0000acce3f09f1, 9a3de10bcd1272ae, a18cedcacf2711a6. Read-only JSON-vergelijking vóór/na van doelcontact en testtaken exact gelijk (unchanged=true). Geen herstel nodig en geen nieuw taakrecord. Testharnas verwijderd uit routes; gegenereerde router hersteld. Alleen lokale fixture als bewijs buiten repository bewaard. Geen productiewijziging, echte betaling of berichten.
+
+Deze gerichte browser-schrijfproef is afgerond; zij bewijst deze vier mutaties, niet iedere API van de suite. Eerdere leesproef en marketplace-aankoopproef blijven apart bewijs. Algemene TypeScriptfouten blijven open. Aanbevolen volgende stap: Staycool-interne praktijkpilot met een kleine set echte aanvragen en opvolging door klantenservice, inclusief terugkoppeling op ontbrekende procesinformatie. Documentatie-only bereik: werklog en marketplace-browserproef-staging.md.
+
+## LG-103 — 13 september 2026: eerste praktijkronde concreet voorbereid
+
+Bestaande pilotwerkinstructie, P-001-notitie en klantenservicecontrolelijst gelezen. Live Staycool-dashboard opnieuw gecontroleerd; drie bestaande dossiers geselecteerd voor verschillende opvolgsituaties: P-001 verplaatsing, P-002 eerdere niet-bereikte klant, P-003 kwalificatie verwarmen/koelen. Identiteiten en deeplinks uitsluitend in lokale startlijst, niet in deze publieke repository. P-001-contactdetail bevestigt bestaande open taak voor Marvin Smit met deadline 14 september, oude verlopen offerte en bestaande installatie in suite. Geen nieuwe taak gemaakt of resultaat afgevinkt. P-002/P-003 alleen dashboardselectie; hun volledige historie moet klantenservice controleren.
+
+Lokale outputs/staycool-pilot/startlijst-praktijkpilot.md bevat casuslinks, waargenomen status, eerst te bevestigen informatie, gereedcriteria, invulblok voor CRM-notitie, tijdregistratie en terugkoppeling. P-001-lokale-notitie.md aangevuld zodat oude startstatus niet als actueel wordt gelezen. Geen klantcommunicatie, verzending aan collega, offerte, afspraak of CRM-mutatie uitgevoerd. Meetbestand blijft zonder verzonnen personeelsminuten of resultaten.
+
+Open: daadwerkelijke eerste klantenservicesessie, toewijzing P-002/P-003, afspraakstatus en echte uitkomsten. Volgende stap voor Marvin/klantenservice: startlijst doorlopen en per casus uitkomst, eigenaar/datum en werkelijke minuten vastleggen. De technische schrijf-isolatie is afgerond in LG-102; algemene TypeScriptopruiming blijft apart open. Bereik van deze taak: pilotvoorbereiding en documentatie, geen softwarepublicatie.
+
+## LG-104 — 13 september 2026: volledige TypeScriptcontrole hersteld
+
+Bereik: package.json/lock (directe @tiptap/core-afhankelijkheid en typecheck-script), campagneblok-iconentype, router/workflow ongebruikte imports, messaging/metaProcessor ongebruikte variabelen, marketplace PreferencesForm-tests en env-validatie van scripts/test-meta-webhook.ts. Het webhooktestscript logt de verify-token niet meer. Geen autorisatie- of databasegedrag gewijzigd.
+
+De 14 oude migrate-scripts, beide seed-scripts en sync-all zijn ongewijzigd bewaard onder docs/v1-migration/legacy-scripts/*.ts.txt; de ETL-skeleton is eveneens .ts.txt. Het cutover-runbook bevestigde dat de browserclients de inmiddels interne migratiefuncties niet meer kunnen aanroepen. Geen TypeScript-excludes, any-casts of publieke migratie-API toegevoegd.
+
+Controle: tsc --noEmit geslaagd; alle 55 testbestanden / 516 tests geslaagd; Vite-productiebuild geslaagd; git diff --check geslaagd. Tests lokaal, geen echte webhooktest verstuurd. Publicatie: nog niet live; wijzigingen voorbereid voor review. Open: review/publicatie en praktijkpilot vanaf morgen. Aanbevolen vervolg: deze technische correcties publiceren na review, daarna de drie voorbereide pilotdossiers met klantenservice doorlopen.
