@@ -2,7 +2,7 @@
 
 PR: https://github.com/MarvinNL046/leadflowv2/pull/73
 Branch: fix/marketplace-stripe-mode
-Status: concept; nog niet publiceren naar productie.
+Status: gepubliceerd op 13 september 2026 via PR #73, commit b892c6c8369fccfa9a62a6ddeb9274057af2db3d. Zie actuele afronding hieronder; eerdere controles zijn historische voorbereiding.
 
 ## Wijzigingen
 
@@ -28,8 +28,18 @@ Bij LG-086 is in productie een Stripe-testsleutel vastgesteld; STRIPE_MARKETPLAC
 
 Bij fouten: herstel de vorige goedgekeurde code/configuratie als samenhangende release. Draai wallettransacties niet terug via databaseherstel.
 
-Nog open: exclusieve sandbox-browseraankoop en gerichte schrijfpoging vanuit B-browser (integratietests bestaan wel). Deze voorbereiding is geen productiepublicatie.
+Nog open: exclusieve sandbox-browseraankoop en gerichte schrijfpoging vanuit B-browser (integratietests bestaan wel). De onderstaande historische voorbereiding is ingehaald door LG-097.
 
 ## Actuele configuratiecontrole LG-094
 
 13 september 2026: productie nog testkey, webhooksecret aanwezig, geen expliciete geldige mode. Testwebhook naar huidige marketplace-productie actief. Live-dashboard bevat geen webhook naar de huidige marketplacebackend; andere actieve bestemmingen horen bij abonnementen en Cashflow. Dus eerst live-key/live-webhooksecret en endpoint voorbereiden, daarna samen met code en expliciete live-modus publiceren. Accountstatus in read-only API meldt betalingen/uitbetalingen ingeschakeld, maar bewijst niet dat deze marketplace live kan afrekenen. Geen configuratie gewijzigd.
+
+## Afronding LG-097 — 13 september 2026
+
+Productie gepubliceerd via PR #73 (b892c6c8369fccfa9a62a6ddeb9274057af2db3d). Vercel dpl_CJSkaxxm2usLDtiTayqCYGVdJrA3 is READY, target production; buildlogs bevestigen geslaagde schema-validatie en Convex-deploy gevolgd door frontendpublicatie.
+
+Live Stripe-bestemming we_1UFInFEPjKUovbQKqLWOS0De aangesloten op productie. Eigen restricted key LeadFlow Marketplace Production heeft Checkout Sessions schrijven. Productievariabelen STRIPE_SECRET_KEY, STRIPE_MARKETPLACE_WEBHOOK_SECRET en STRIPE_MARKETPLACE_MODE=live ingesteld; SITE_URL is https://leadflow.wetry.app. Geen geheimen in documentatie. Oude testbestemming we_1ToRfjEPjKUovbQKGToVtHqp naar productie uitgeschakeld; overige appbestemmingen ongemoeid.
+
+Configuratieproef: live Checkout aangemaakt met metadata.kind=configuration_check, zonder klant/bedrijfkoppeling, en direct onbetaald verlopen gemaakt. Geen walletbijschrijving of echte betaling. Productie-CRM en /feed/wallet laden met bestaande super-adminsessie; tegoedpagina toont saldo en opwaardeerbediening. Accountmenu en contactfoutpagina eerder in staging gecontroleerd, niet opnieuw met productie-testaccounts.
+
+Open: volledige echte betaling inclusief live-webhook en eenmalige walletbijschrijving nog niet bewezen. Ook exclusieve sandbox-browseraankoop en gerichte schrijfpoging vanuit B-browser blijven apart open. Aanbevolen vervolg: gebruiker doet één kleine live-opwaardering via Tegoed; daarna betaling, webhook en wallet gezamenlijk controleren.
