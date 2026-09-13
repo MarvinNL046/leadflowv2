@@ -305,6 +305,7 @@ export default defineSchema({
   // met dezelfde source geeft de bestaande taak terug.
   tasks: defineTable({
     workspaceId: v.id("workspaces"),
+    assignedToId: v.optional(v.id("users")),
     contactId: v.optional(v.id("contacts")),
     title: v.string(),
     description: v.optional(v.string()),

@@ -9,6 +9,40 @@ import {
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
+async function checkAssignee(ctx: QueryCtx, workspaceId: Id<'workspaces'>, userId: Id<'users'>) {
+  const workspace = await ctx.db.get(workspaceId);
+  if (!workspace) throw new Error('Workspace not found');
+  const member = await ctx.db.query('memberships').withIndex('by_user_org', q => q.eq('userId', userId).eq('orgId', workspace.orgId)).first();
+  if (!member || !await ctx.db.get(userId)) throw new Error('Kies een huidig teamlid van dit bedrijf');
+}
+
+export const assignees = query({
+  args: { workspaceId: v.id('workspaces') },
+  returns: v.array(v.object({ userId: v.id('users'), name: v.string() })),
+  handler: async (ctx, { workspaceId }) => {
+    const { orgId } = await requireWorkspacePermission(ctx, workspaceId);
+    const members = await ctx.db.query('memberships').withIndex('by_org', q => q.eq('orgId', orgId)).take(501);
+    if (members.length > 500) throw new Error('Te veel teamleden om te laden');
+    const result = [];
+    for (const userId of new Set(members.map(m => m.userId))) {
+      const user = await ctx.db.get(userId);
+      if (user) result.push({ userId, name: user.name || user.email || 'Teamlid' });
+    }
+    return result;
+  },
+});
+
+export const assign = mutation({
+  args: { taskId: v.id('tasks'), userId: v.union(v.id('users'), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { taskId, userId }) => {
+    const task = await requireMembershipForTask(ctx, taskId);
+    if (userId) await checkAssignee(ctx, task.workspaceId, userId);
+    await ctx.db.patch(taskId, { assignedToId: userId ?? undefined });
+    return null;
+  },
+});
+
 /**
  * Taken (follow-ups). Handmatig aan te maken op een contact, én via de
  * suite-API gevoed door cashflow's heractiveren-flow ("verlopen offerte
@@ -104,6 +138,7 @@ export const listByContact = query({
 export const create = mutation({
   args: {
     contactId: v.id("contacts"),
+    assignedToId: v.optional(v.id('users')),
     title: v.string(),
     description: v.optional(v.string()),
     dueDate: v.optional(v.number()),
@@ -116,6 +151,7 @@ export const create = mutation({
       contact.workspaceId,
     );
     const title = args.title.trim();
+    if (args.assignedToId) await checkAssignee(ctx, contact.workspaceId, args.assignedToId);
     if (title.length === 0) throw new Error("Titel mag niet leeg zijn");
     return await ctx.db.insert("tasks", {
       workspaceId: contact.workspaceId,
@@ -125,6 +161,7 @@ export const create = mutation({
       dueDate: args.dueDate,
       status: "open",
       createdById: userId,
+      assignedToId: args.assignedToId,
     });
   },
 });

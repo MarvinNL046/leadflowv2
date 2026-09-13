@@ -104,7 +104,8 @@ export function SuiteSummarySection({
 						<AppCard
 							icon={<Receipt className="h-4 w-4 text-blue-600" />}
 							title="Cashflow"
-							href={CASHFLOW_URL}
+							href={`${CASHFLOW_URL}/klanten/open?lf=${encodeURIComponent(contactId)}`}
+							linkLabel="Klant & offertes"
 						>
 							<CashflowBody summary={data?.cashflow ?? null} />
 						</AppCard>
@@ -126,11 +127,13 @@ function AppCard({
 	icon,
 	title,
 	href,
+	linkLabel = 'Open',
 	children,
 }: {
 	icon: ReactNode;
 	title: string;
 	href: string;
+	linkLabel?: string;
 	children: ReactNode;
 }) {
 	return (
@@ -146,7 +149,7 @@ function AppCard({
 					rel="noreferrer"
 					className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
 				>
-					Open <ExternalLink className="h-3 w-3" />
+					{linkLabel} <ExternalLink className="h-3 w-3" />
 				</a>
 			</div>
 			<div className="text-sm text-zinc-600">{children}</div>

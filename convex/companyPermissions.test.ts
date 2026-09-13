@@ -126,3 +126,19 @@ test('removing management rights takes effect on the next write and provider che
   await expect(caller.query(internal.files.assertUploadAccess,{workspaceId:a.workspaceId})).rejects.toThrow();
   expect(await caller.query(api.crmSettings.get,{workspaceId:a.workspaceId})).toMatchObject({companyName:'Before'});
 });
+
+test('task assignment accepts own team, rejects outsiders and supports unassigning',async()=>{
+  const {t,a,b}=await setup();
+  const caller=t.withIdentity({subject:'a-member'});
+  const own=await caller.query(api.tasks.assignees,{workspaceId:a.workspaceId});
+  const outsiders=await t.withIdentity({subject:'b-owner'}).query(api.tasks.assignees,{workspaceId:b.workspaceId});
+  expect(own).toHaveLength(3);
+  const taskId=await caller.mutation(api.tasks.create,{contactId:a.contactId,title:'Assign test',assignedToId:own[0].userId});
+  expect((await caller.query(api.tasks.listByContact,{contactId:a.contactId}))[0].assignedToId).toBe(own[0].userId);
+  await expect(caller.mutation(api.tasks.assign,{taskId,userId:outsiders[0].userId})).rejects.toThrow();
+  await expect(caller.mutation(api.tasks.create,{contactId:a.contactId,title:'Wrong',assignedToId:outsiders[0].userId})).rejects.toThrow();
+  await expect(t.withIdentity({subject:'b-owner'}).mutation(api.tasks.assign,{taskId,userId:outsiders[0].userId})).rejects.toThrow();
+  await expect(t.withIdentity({subject:'b-owner'}).query(api.tasks.assignees,{workspaceId:a.workspaceId})).rejects.toThrow();
+  await caller.mutation(api.tasks.assign,{taskId,userId:null});
+  expect((await caller.query(api.tasks.listByContact,{contactId:a.contactId}))[0].assignedToId).toBeUndefined();
+});

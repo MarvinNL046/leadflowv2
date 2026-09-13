@@ -73,3 +73,9 @@ Bedrijven doorlopen: Leads kopen → Marketplace voor mijn bedrijf activeren →
 Op 13 september 2026 slaagden 30 aankooptests in een geïsoleerde Convex-testdatabase. Drie gedeelde kopers krijgen elk een eigen CRM-contact/verkoopkans; een vierde wordt geweigerd zonder afschrijving. Een exclusieve koop sluit verdere verkoop uit. Na een gedeelde koop is exclusief niet meer mogelijk. De CRM-contacten zijn tussen de testbedrijven afgeschermd. De bestaande bron- en aanvraagtekstoverdracht is eveneens getest.
 
 Dit verandert niets aan het live testaccount: saldo en aankopen blijven zoals ze waren. Echte Stripe Checkout en de volledige aankoop via een browser zijn nog niet getest. Volgende stap is een afzonderlijke stagingproef met synthetisch aanbod en testbetaling.
+
+## Taken aan teamleden toewijzen — LG-070
+
+Bij een nieuwe opvolgtaak kies je Toewijzen aan. Bij een bestaande taak kies je de medewerker onder Verantwoordelijke. Niet toegewezen maakt de toewijzing leeg. De lijst bevat uitsluitend huidige teamleden van je bedrijf. De takenpagina toont wie verantwoordelijk is; er wordt nog geen automatische notificatie verzonden. De eerdere vrije tekst blijft bewaard, maar de keuzelijst is de formele toewijzing.
+
+Bij een contact opent Klant & offertes de bijbehorende Cashflow-klant in je ingelogde Cashflow-bedrijf. Kies daar de juiste offerte. Een ontbrekende koppeling toont de bestaande niet-gevondenmelding. Deze route maakt geen klant of offerte aan en verleent geen Cashflow-toegang.
