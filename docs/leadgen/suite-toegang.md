@@ -52,3 +52,14 @@ Live gecontroleerd op 13 september 2026 met het lege Testbedrijf B in beide prod
 | Twee onafhankelijke eigenaarsessies met eigen klantrecords | Nog open | Browserproef |
 
 Voor de resterende browserproef: houd A en B in gescheiden sessies, bevestig per app de testbedrijfsnaam en eigenaar, maak alleen herkenbare fictieve klanten aan, wijzig de eigen klant en controleer dat de directe klantlink in de andere sessie geen klantgegevens toont. Leg per stap het resultaat vast; alleen een ontbrekende lijstregel is onvoldoende bewijs. Laat productrechten na de proef weer uitzetten. De geautomatiseerde tests vullen directe mutatiepogingen aan; presenteer die niet als browserbewijs.
+
+## Afgeronde browserproef — 13 september 2026
+
+Met echte, opeenvolgende eigenaarsessies van testbedrijven A en B is in Cashflow en Frostwork bevestigd:
+
+- Ieder bedrijf kan zijn eigen fictieve klant aanmaken en wijzigen.
+- B kan de directe klantlink van A niet openen, en A die van B niet.
+- Cashflow toont 'Klant niet gevonden'. Frostwork weigert met NOT_FOUND, bevestigd in serverlogs, maar toont nog een technische fouttekst.
+- Alle tijdelijke productrechten zijn na de proef uitgezet. Vier herkenbare fictieve klanten zijn bewaard, één per bedrijf per app.
+
+Dit voltooit de eerder openstaande browsercontrole van directe klantdetails. Geautomatiseerde tests dekken daarnaast wijzigen/archiveren van vreemde klanten en schrijven na intrekken. Niet alle productfuncties en mutatie-endpoints zijn live getest. Nog te verbeteren: Frostwork foutpresentatie en de offerte-/factuurklantkiezer voor bedrijven met lokale Cashflow-contacten.
