@@ -77,3 +77,15 @@ De bestaande organisatie met een expliciete legacy LeadFlow-koppeling behoudt ha
 Frostwork toont bij onbeschikbare klantgegevens nu een begrijpelijke melding met **Naar mijn klanten** en **Opnieuw proberen**. Een ontbrekende klant kan ook een tijdelijke laadfout betekenen; het scherm onthult geen technische fouttekst of gegevens van een ander bedrijf.
 
 Live gecontroleerd met testbedrijf A: eigen klant zoeken/selecteren in beide documentformulieren en een nieuwe lokale klant aanmaken vanuit de factuurklantkiezer. De factuur bleef onopgeslagen en de factuurlijst leeg. Alle tijdelijke testrechten zijn uitgezet. Deze controle betreft de klantkeuze; opslaan, heropenen, bedragen en volledige documentisolatie zijn de volgende proef.
+
+## Conceptofferte of conceptfactuur bewaren en heropenen
+
+1. Kies de klant en voeg omschrijving, aantal, prijs en btw toe. Controleer of je prijzen inclusief of exclusief btw invoert.
+2. Controleer subtotaal, btw en eindtotaal. Bijvoorbeeld: 3 stuks van EUR 100 exclusief 21% btw geven EUR 300 + EUR 63 = EUR 363.
+3. Kies **Opslaan als concept**. Een concept heeft nog geen definitief documentnummer; de factuur krijgt haar factuurdatum pas bij definitief maken.
+4. Open **Offertes** of **Facturen**, kies **Concept** en open het document. Controleer klant, regels, referentie en totaal.
+5. Wil je iets aanpassen? Kies **Bewerken**, pas de gegevens aan en kies **Wijzigingen opslaan**. De opgeslagen versie blijft een concept.
+
+Versturen en inplannen zijn afzonderlijke vervolgstappen. Een documentlink geeft geen toegang tot de administratie van een ander bedrijf.
+
+Controle 13 september 2026: productie-aanmaak, wijzigen en heropvragen van fictieve concepten en documentisolatie in beide richtingen gecontroleerd via publieke functies met de bestaande A/B-eigenaarsidentiteiten. Browser A bevestigt eigen heropende offerte/factuur, opgeslagen factuurwijziging en geweigerde B-links. Daarnaast 42 gerichte tests geslaagd. Geen volledige browserronde als B of live verzend-/betaalproef uitgevoerd. Tijdelijke rechten weer uitgezet; vier herkenbare fictieve concepten bewaard. De eerdere openstaande conceptcontrole is hiermee voor dit beschreven bereik afgerond.
