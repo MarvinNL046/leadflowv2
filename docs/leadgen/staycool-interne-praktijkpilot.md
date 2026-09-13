@@ -1,0 +1,34 @@
+# Staycool interne praktijkpilot — 13 september 2026
+
+Marvin heeft Staycool gekozen als interne pilot. Doel: dagelijkse bruikbaarheid, inrichting en supportbelasting meten voordat externe bedrijven starten. Deze pilot bewijst geen betalingsbereidheid en telt niet als betalende klant. Bestaande Staycool-accounts en koppelingen blijven het uitgangspunt; maak geen duplicaatbedrijf en gebruik de A/B-testbedrijven niet als praktijkresultaat.
+
+## Meetperiode en registratie
+
+Voorstel: 13 t/m 27 september 2026; de datums zijn aanpasbaar in het meegeleverde Staycool-pilot.xlsx. Dit is een registratieperiode, geen automatisch gepland evaluatiemoment. Het bestand bevat Pilot, Kosten en Tijd. De gele velden zijn invoer; berekeningen staan daarbuiten. De werkversie staat bij deze Codex-taak in outputs/staycool-pilot/Staycool-pilot.xlsx.
+
+- Kosten: servicedatum, categorie, bronbedrag exclusief btw, onderbouwd aandeel Staycool en factuur-/bronreferentie. Verdeel een factuur die meerdere perioden omvat over de juiste servicedatums; boek geen volledige maandfactuur zonder toelichting op een halve pilotperiode. Vermijd dubbeltelling van dezelfde factuur.
+- Tijd: datum, soort werk, activiteit, werkelijke minuten en resultaat. Splits onboarding, support, herstel en evaluatie. Ontwikkeltijd aan algemene productfeatures hoort niet automatisch volledig bij Staycool.
+- Het interne uurtarief EUR 30 is een expliciete aanname uit het eerdere voorstel. Pas dit aan zodra een onderbouwd tarief beschikbaar is. Tijdkosten zijn daarmee een raming, ook wanneer minuten gemeten zijn.
+- Onbekende kosten blijven leeg. Is een kostensoort werkelijk nul, leg dan een nulregel met bewijs vast. Alleen regels 6–205 tellen mee; verleng bij meer regels eerst de formules.
+- Zet de twee volledigheidsvelden pas op Ja nadat providerkosten en tijdregistratie zijn gecontroleerd. Het bestand toont geen definitief periodebedrag zolang gegevens ontbreken. Er wordt geen omzet of marge voor een betalende klant afgeleid.
+
+## Praktijkroute
+
+1. Controleer in LeadFlow, Cashflow en Frostwork de Staycool-bedrijfsnaam en het eigen account. De bestaande legacy-koppeling hoeft niet opnieuw via een uitbreidingsaanvraag te lopen. De nieuwe eigenaar-aanvraagflow blijft bedoeld voor bedrijven zonder bestaande suite.
+2. Kies één bestaand eigen CRM-traject en noteer uitsluitend een interne referentie in het meetbestand. Controleer contact, pipelinefase, taak en opvolging. Start de tijdregistratie bij het begin van de handeling.
+3. Open de bijbehorende eigen conceptofferte in Cashflow, controleer klant en bedragen en heropen na een eventuele conceptwijziging. Houd verzending, definitief maken en betalingen als afzonderlijke acties met een echte bedrijfsafspraak.
+4. Voer een passende praktijkstap in Frostwork uit, bijvoorbeeld een eigen werkbon voorbereiden. Noteer wat lukt, wat handmatig moet en eventuele foutmelding. Zet de stap alleen op Gereed met een datum en resultaat.
+5. Sluit iedere gebruikte dag af met kosten en supportminuten. Vermeld blokkades en volgende actie. Voeg geen klantnamen, telefoonnummers of e-mailadressen toe aan het meetbestand als een interne referentie volstaat.
+6. Evalueer na de meetperiode: aantal afgeronde trajecten, terugkerende blokkades, minuten per activiteit, totale kosten en benodigde begeleiding. Kies daarna herstel, een verlengde interne proef of één externe pilot.
+
+## Startstatus
+
+Interne pilotkeuze is bevestigd. Meetbestand en werkinstructie zijn gereed. Er zijn nog geen werkelijke kosten, supportminuten of afgeronde Staycool-praktijktrajecten aangeleverd. De bedrijfscontext en functionele stappen staan daarom open in het meetbestand. De eerdere A/B-isolatietests blijven technisch bewijs, geen Staycool-praktijkgebruik.
+
+De eerdere marketplace-pilot voor airco-installatie in heel Limburg staat apart beschreven in staycool-pilot-20260912.md. De daarin genoemde sms-ontvangst, betaalmodus en verkoopinstellingen worden door deze CRM-praktijkpilot niet als afgerond beschouwd of gewijzigd.
+
+## Controle en vervolg
+
+Het spreadsheet is geëxporteerd en alle drie tabbladen visueel gecontroleerd. Formules getest met tijdelijke invoer: EUR 20 x 50% kostentoerekening en 30 minuten x EUR 30/uur geven EUR 25 totaal. Bij ontbrekend aandeel verdwijnt het berekende bedrag; onvolledige registraties blijven gemarkeerd. Alle testinvoer is verwijderd. Niet in Microsoft Excel zelf doorgerekend; controle vond plaats in de spreadsheet-engine.
+
+Eerstvolgende stap: samen één bestaand Staycool-traject kiezen en de eerste praktijkstap met werkelijk gemeten tijd vastleggen. Werkelijke facturen en verbruik toevoegen zodra beschikbaar. Externe prijsvalidatie volgt pas met een extern bedrijf.
