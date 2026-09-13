@@ -99,3 +99,7 @@ Op 13 september 2026 is de eerder vastgestelde LeadFlow-klantdeeplink geopend bi
 ## Offertehistorie in LeadFlow — LG-075
 
 Bij het contact toont de Cashflow-kaart naast de aantallen de meest recente offerte met nummer, status en datum. De datum volgt Cashflow: verzenddatum, of bij een concept het aanmaakmoment. Verlopen wordt op dezelfde manier berekend als in Cashflow. Controleer via Klant & offertes de werkzaamheden: de meest recente offerte van de klant hoort niet automatisch bij de huidige aanvraag. De kaart wordt opnieuw opgehaald bij openen van het contact; het is geen continu bijgewerkte offerteweergave.
+
+## Actuele opvolging P-001 — LG-076
+
+Agendaonderzoek op klantnaam leverde historische afspraken op, geen aangetroffen septemberafspraak. Status blijft te bevestigen. Op 13 september is één echte interne taak opgeslagen voor Marvin Smit, uiterlijk 14 september: Afspraakstatus bevestigen en verplaatsingsaanvraag beoordelen. Controleer afspraak/werkbon, huidig adres, werkzaamheden en relatie met de oude offerte; leg daarna uitkomst en vervolg vast. De taak is geen ingeplande klantafspraak en verstuurt geen bericht.
