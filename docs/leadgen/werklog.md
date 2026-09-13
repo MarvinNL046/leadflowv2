@@ -649,3 +649,11 @@ Bereik src/routes/crm.contacts_.$id.tsx: routegebonden errorComponent toont Cont
 ## LG-093 — 13 september 2026: publicatievoorbereiding
 
 PR #73 gecontroleerd: open concept, mergeable; beschrijving bevatte verouderde status. Release-instructie publicatievoorbereiding-marketplace.md toegevoegd met bereik, bestaand testbewijs, productie-Stripeblokkade, publicatie/controle en herstel. Lokale frontendfixes en bewijs worden naar bestaande PR gepusht; PR blijft concept totdat productie-betaalmodus is opgelost. Geen nieuwe tests herhaald zonder codewijziging; LG-092 build en 53 gerichte tests uit LG-089 blijven relevante validatie. Geen productie-instellingen gewijzigd, geen livebetaling. Eerstvolgende stap: actuele productie-betaalconfiguratie gericht controleren en keuze livebetalingen oplossen vóór publicatie.
+
+## LG-094 — 13 september 2026: actuele Stripe-productiecontrole
+
+Read-only hercontrole met expliciete productie-deploymentreferentie. STRIPE_SECRET_KEY heeft testprefix; marketplace-webhooksecret aanwezig; STRIPE_MARKETPLACE_MODE niet geldig als expliciet live/test ingesteld. Sleutels uitsluitend in procesgeheugen, alleen classificatie gelogd. Stripe API met bestaande key bevestigt account acct_1QN0N4EPjKUovbQK, charges_enabled/payouts_enabled/details_submitted true (geen bewijs van werkende live-marketplacebetalingen). Test-endpoint we_1ToRfjEPjKUovbQKGToVtHqp actief naar productie-LeadFlow, alleen checkout.session.completed.
+
+Live Stripe-dashboard van StaycoolAirco.nl gecontroleerd: actieve bestemmingen aanmelden-abonnementen en cashflow-betaallinks; uitgeschakelde legacybestemmingen cutiepaws en wetryleadflow.com. Geen bestemming naar huidige vibrant-wildebeest-329 marketplace aangetroffen in getoond live-overzicht. Live-betaalroute nog niet compleet. Geen instellingen gewijzigd, geen sleutels aangemaakt, geen betaling of productiepublicatie.
+
+Eerstvolgende stap: live marketplace-webhook met completed en async_payment_succeeded configureren op productie-URL; bijbehorende live-secret/key en expliciete live-modus veilig aansluiten als één gecoördineerde release van PR #73. Gedeelde testwebhook naar productie daarna afzonderlijk uitschakelen na controle dat deze geen andere flow bedient. Bestaande andere app-endpoints ongemoeid laten. Activering echte betalingen is nog niet uitgevoerd.

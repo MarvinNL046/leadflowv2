@@ -29,3 +29,7 @@ Bij LG-086 is in productie een Stripe-testsleutel vastgesteld; STRIPE_MARKETPLAC
 Bij fouten: herstel de vorige goedgekeurde code/configuratie als samenhangende release. Draai wallettransacties niet terug via databaseherstel.
 
 Nog open: exclusieve sandbox-browseraankoop en gerichte schrijfpoging vanuit B-browser (integratietests bestaan wel). Deze voorbereiding is geen productiepublicatie.
+
+## Actuele configuratiecontrole LG-094
+
+13 september 2026: productie nog testkey, webhooksecret aanwezig, geen expliciete geldige mode. Testwebhook naar huidige marketplace-productie actief. Live-dashboard bevat geen webhook naar de huidige marketplacebackend; andere actieve bestemmingen horen bij abonnementen en Cashflow. Dus eerst live-key/live-webhooksecret en endpoint voorbereiden, daarna samen met code en expliciete live-modus publiceren. Accountstatus in read-only API meldt betalingen/uitbetalingen ingeschakeld, maar bewijst niet dat deze marketplace live kan afrekenen. Geen configuratie gewijzigd.
