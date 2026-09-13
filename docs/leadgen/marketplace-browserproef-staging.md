@@ -55,3 +55,7 @@ Clerk wetry Development gevonden: ins_3Czp4DOBv8evoVqJVAzy9X4iFJP, publiek domei
 Appcode succesvol gepubliceerd naar de expliciet geselecteerde developmentdeployment. Lokale frontend start met: node node_modules/vite/bin/vite.js --mode marketplace --port 5186 --strictPort. Genegeerde .env.marketplace.local bevat expliciete testkey, testbackend en lege PostHog-key. Door Convex gegenereerde .env.local verwijderd, zodat standaardselectie niet blijvend naar de proefomgeving wijzigt.
 
 Chrome http://localhost:5186/login toont Sign in to wetry en Development mode. Daarmee is het loginscherm bevestigd; aanmelden/tokenacceptatie nog niet getest. Gebruiker kan het bestaande Development-account gebruiken. Stripe-testsecret/webhooksecret ontbreken nog. Geen testbedrijven, aankopen, tegoed of berichten aangemaakt.
+
+## Browserbewijs — LG-084
+
+13 september 2026: gebruiker aangemeld op localhost:5186 in in-app browser. Reguliere bedrijfsregistratie voltooid voor LeadFlow Marketplace Test A (synthetisch, dummytelefoon). CRM en marketplace-activering werken. Na herladen voorkeuren Airco/Installeren/Limburg, beide segmenten/verkoopvormen en e-mail uit bevestigd. Wallet EUR 0, geen transacties. Nog geen aankoop of opvolgtaak getest; daarvoor volgen synthetische aanvraag en Stripe-testconfiguratie. Productie ongewijzigd.
