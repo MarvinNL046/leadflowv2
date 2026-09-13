@@ -40,3 +40,15 @@ Een reeds geopende app schakelt bij het verlopen van de toegangsbevestiging auto
 De schermcontrole loopt elke seconde en bij terugkeer naar het venster. Een achtergrondtab of slapend apparaat kan schermupdates uitstellen; de server blijft de toegang zelfstandig controleren. Bestaande zelfstandige abonnementen, vrijstellingen en bestaande Frostwork-toelating houden hun eigen regels. Deze wijziging maakt intrekken niet onmiddellijk: de hierboven genoemde maximale geldigheid van 15 minuten blijft gelden.
 
 Live gecontroleerd op 13 september 2026 met het lege Testbedrijf B in beide productiedomeinen. De tijdelijke rechten zijn na de proef uitgezet. De live servercontrole van LeadFlow koppelingen weigert ook A naar B en B naar A; een volledige proef met twee onafhankelijke eigenaarsessies in beide doelapps en directe schrijfacties is nog niet afgerond.
+
+## Aanvullende isolatiecontrole — 13 september 2026
+
+| Controle | Resultaat | Bewijsniveau |
+| --- | --- | --- |
+| A en B maken en wijzigen hun eigen klant | Geslaagd in beide apps | Geautomatiseerde integratietest |
+| A kan B niet lezen/wijzigen/archiveren en omgekeerd | Geslaagd, records blijven ongewijzigd | Geautomatiseerde integratietest |
+| Intrekken A blokkeert aanmaken/wijzigen/archiveren, B blijft werken | Geslaagd in beide apps | Geautomatiseerde integratietest |
+| Testbedrijf B kan zonder productrecht geen klant aanmaken | Geslaagd, nul klanten voor en na | Productiefunctie via beheer-CLI-identiteit, foutcode bevestigd in logs |
+| Twee onafhankelijke eigenaarsessies met eigen klantrecords | Nog open | Browserproef |
+
+Voor de resterende browserproef: houd A en B in gescheiden sessies, bevestig per app de testbedrijfsnaam en eigenaar, maak alleen herkenbare fictieve klanten aan, wijzig de eigen klant en controleer dat de directe klantlink in de andere sessie geen klantgegevens toont. Leg per stap het resultaat vast; alleen een ontbrekende lijstregel is onvoldoende bewijs. Laat productrechten na de proef weer uitzetten. De geautomatiseerde tests vullen directe mutatiepogingen aan; presenteer die niet als browserbewijs.
