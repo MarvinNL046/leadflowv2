@@ -737,3 +737,11 @@ PR #75 gereviewd en samengevoegd: 6d5b169e219c07ba877002def71b5ae08f25e3de. De m
 Live browsercontrole na reload van /feed/sold: marketplace-navigatie en Verkochte aanvragen laden, met de verwachte lege selectie voor het huidige werkgebied en uitleg over afgeschermde contactgegevens. Geen aankoop, betaling, klantbericht of CRM-mutatie uitgevoerd. Dit is een beperkte releasecontrole; de volledige schrijf-isolatieproef staat in LG-102. Bereik: publicatie van LG-104 plus eerder klaargezette documentatie LG-101–103. Publicatiedatum: 13 september 2026.
 
 Open: eerste echte klantenservicesessie vanaf 14 september. Aanbevolen volgende stap: de drie voorbereide Staycool-pilotdossiers doorlopen en uitkomst, opvolgeigenaar, deadline en werkelijke behandeltijd vastleggen. Technisch vervolg: typecheck en tests automatisch als PR-controle laten draaien.
+
+## LG-106 — 13 september 2026: automatische PR-controles actief
+
+Bereik: .github/workflows/quality.yml en docs/quality-checks.md. Nieuwe GitHub Actions-workflow met twee onafhankelijke jobs (typecheck/test) bij iedere pull request, push naar main en handmatige start. Node 24, npm ci, op commit vastgezette officiële checkout/setup-node v7-actions, contents:read, geen opgeslagen gitcredentials, 15 minuten timeout en annulering van achterhaalde runs. Geen productiegeheimen of deploymentstappen.
+
+Echte GitHub-run 34779984873 op PR #76 / head b1c0ba747162932680a82b602d72ce25d999037f geslaagd: typecheck-job 103785106921 groen, test-job 103785107053 groen (55 bestanden, 516 tests). Ook installatie uit de lockfile slaagde op beide schone Ubuntu-runners. PR #76 samengevoegd als 1ed9c0d0920d7724205961b217fa45718a0fada2; workflow actief op main. De PR bevat ook de eerder openstaande LG-105-releasebeschrijving. Geen appcode aangepast.
+
+Open: verplichte statuschecks via branchbeveiliging zijn afzonderlijk en niet ingesteld door deze workflow. Aanbevolen technisch vervolg: typecheck en test verplicht maken vóór samenvoegen. Praktijkvervolg blijft de drie Staycool-dossiers vanaf 14 september met klantenservice doorlopen. Bronnen voor actionconfiguratie: officiële actions/checkout- en actions/setup-node-repositories.
