@@ -64,6 +64,35 @@ test('status returns no secrets and enforces company membership',async()=>{
   expect(JSON.stringify(await t.withIdentity({subject:'a'}).query(api.companyProviders.status,{workspaceId:a.workspaceId}))).not.toContain('fixture');
   await expect(t.withIdentity({subject:'b'}).query(api.companyProviders.status,{workspaceId:a.workspaceId})).rejects.toThrow();
 });
+
+test.each(['linked','missing','failed'] as const)('Frostwork email fallback: %s', async outcome=>{
+  const {t,a}=await setup();
+  const fetchMock=vi.fn(async(input:unknown)=>{
+    const url=new URL(String(input));
+    if(url.pathname==='/api/summary/by-email'){
+      expect(url.searchParams.get('email')).toBe('a@example.invalid');
+      if(outcome==='failed')return new Response('Unavailable',{status:503});
+      return Response.json({configured:true,linked:outcome==='linked',installations:{count:1},maintenance:{lastAt:null,nextDueAt:null},workOrders:{count:0}});
+    }
+    return Response.json({configured:true,linked:false});
+  });
+  vi.stubGlobal('fetch',fetchMock);
+  const result=await t.withIdentity({subject:'a'}).action(api.crossApp.contactSuiteSummary,{contactId:a.contactId});
+  if(outcome==='linked')expect(result.frostwork).toMatchObject({linked:true,matchedBy:'email',installations:{count:1}});
+  if(outcome==='missing')expect(result.frostwork?.linked).toBe(false);
+  if(outcome==='failed')expect(result.frostwork).toBeNull();
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+});
+
+test('Frostwork ID match avoids email lookup and foreign contacts cannot fetch',async()=>{
+  const {t,a}=await setup();
+  const fetchMock=vi.fn(async()=>Response.json({configured:true,linked:true}));vi.stubGlobal('fetch',fetchMock);
+  expect((await t.withIdentity({subject:'a'}).action(api.crossApp.contactSuiteSummary,{contactId:a.contactId})).frostwork?.matchedBy).toBe('contactId');
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  fetchMock.mockClear();
+  await expect(t.withIdentity({subject:'b'}).action(api.crossApp.contactSuiteSummary,{contactId:a.contactId})).rejects.toThrow();
+  expect(fetchMock).not.toHaveBeenCalled();
+});
 test.each(['email','sms'] as const)('assigned company retains %s delivery with mocked provider',async channel=>{
   const {t,a}=await setup();
   const fetchMock=vi.fn(async()=>new Response(JSON.stringify({id:'fake-email',success:true,data:{messages:[{ID:123}]}}),{status:200}));vi.stubGlobal('fetch',fetchMock);

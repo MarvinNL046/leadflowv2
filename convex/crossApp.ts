@@ -33,6 +33,7 @@ type CashflowSummary = {
 }
 
 type FrostworkSummary = {
+  matchedBy?: 'contactId' | 'email'
   configured: boolean
   linked: boolean
   installations: { count: number }
@@ -51,10 +52,12 @@ async function fetchSummary<T>(
   base: string,
   key: string | undefined,
   contactId: string,
+  parameter = 'id',
 ): Promise<T | null> {
   if (!key) return null
   try {
-    const url = `${base}?id=${encodeURIComponent(contactId)}`
+    const url = new URL(base)
+    url.searchParams.set(parameter, contactId)
     const res = await fetch(url, { headers: { 'x-api-key': key } })
     if (!res.ok) {
       console.error('[crossApp] summary fetch', base, res.status)
@@ -81,7 +84,7 @@ export const contactSuiteSummary = action({
     if (!detail) return { cashflow: null, frostwork: null }
     if (!await ctx.runQuery(internal.companyProviders.contactEnabled,{contactId:args.contactId})) return {cashflow:null,frostwork:null}
 
-    const [cashflow, frostwork] = await Promise.all([
+    const [cashflow, byId] = await Promise.all([
       fetchSummary<CashflowSummary>(
         CASHFLOW_SUMMARY_URL,
         process.env.CASHFLOW_READ_API_KEY,
@@ -93,6 +96,20 @@ export const contactSuiteSummary = action({
         args.contactId,
       ),
     ])
+    let frostwork = byId
+    const email = detail.contact.email?.trim()
+    // Alleen na een bevestigde ontbrekende ID-match. Identiteit en e-mail
+    // komen uit het reeds geautoriseerde contact, nooit uit clientinput.
+    if (byId?.configured && !byId.linked && email) {
+      const emailUrl = new URL('/api/summary/by-email', FROSTWORK_SUMMARY_URL)
+      const byEmail = await fetchSummary<FrostworkSummary>(
+        emailUrl.toString(), process.env.FROSTWORK_READ_API_KEY, email, 'email',
+      )
+      // Een mislukte tweede lookup bewijst niet dat de klant ontbreekt.
+      frostwork = byEmail?.linked ? { ...byEmail, matchedBy: 'email' } : byEmail
+    } else if (byId?.linked) {
+      frostwork = { ...byId, matchedBy: 'contactId' }
+    }
     return { cashflow, frostwork }
   },
 })

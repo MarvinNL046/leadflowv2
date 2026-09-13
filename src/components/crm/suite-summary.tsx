@@ -28,6 +28,7 @@ type CashflowSummary = {
 };
 
 type FrostworkSummary = {
+  matchedBy?: 'contactId' | 'email';
 	configured: boolean;
 	linked: boolean;
 	installations: { count: number };
@@ -204,11 +205,12 @@ function FrostworkBody({ summary }: { summary: FrostworkSummary | null }) {
 	if (!summary || !summary.configured)
 		return <p className="text-zinc-400">Niet beschikbaar.</p>;
 	if (!summary.linked)
-		return <p className="text-zinc-400">Nog niet als klant in Frostwork.</p>;
+		return <p className="text-zinc-400">Geen klantmatch gevonden in Frostwork.</p>;
 	const nextDue = summary.maintenance.nextDueAt;
 	const overdue = nextDue !== null && nextDue < Date.now();
 	return (
 		<ul className="space-y-0.5">
+			{summary.matchedBy === 'email' && <li className="text-xs text-zinc-500">Gevonden via e-mailadres; contact-ID nog niet gekoppeld.</li>}
 			<li>
 				{summary.installations.count}{" "}
 				{summary.installations.count === 1 ? "installatie" : "installaties"} ·{" "}
