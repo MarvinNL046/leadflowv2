@@ -1,5 +1,6 @@
 import { useState } from "react";
-import {SuiteAccess} from '#/components/crm/suite-access';
+import type { Id } from "../../convex/_generated/dataModel";
+import { SuiteAccess } from "#/components/crm/suite-access";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, usePaginatedQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -74,7 +75,11 @@ function Page() {
 								<p className="text-sm text-muted-foreground">{p.description}</p>
 								{access.existingSuite || access.active.includes(p.key) ? (
 									<>
-										<Badge>{access.existingSuite?'Bestaande bedrijfskoppeling':'Suite-toegang toegekend'}</Badge>
+										<Badge>
+											{access.existingSuite
+												? "Bestaande bedrijfskoppeling"
+												: "Suite-toegang toegekend"}
+										</Badge>
 										<p className="text-sm">
 											Je rechten in {p.name} bepalen welke gegevens je daar kunt
 											openen.
@@ -87,11 +92,43 @@ function Page() {
 									</>
 								) : access.requested.includes(p.key) ? (
 									<>
-										<Badge>Aangevraagd</Badge>
+										<Badge>
+											{
+												requestLabels[
+													access.requests.find((r) => r.product === p.key)
+														?.status ?? "pending"
+												]
+											}
+										</Badge>
 										<p role="status" className="text-sm">
-											Je bedrijfsaanvraag staat bij de platformbeheerder. Er is
-											nog geen toegang geactiveerd.
+											{access.requests.find((r) => r.product === p.key)
+												?.status === "approved"
+												? "Je aanvraag is goedgekeurd voor verdere inrichting. Producttoegang wordt apart geactiveerd."
+												: access.requests.find((r) => r.product === p.key)
+															?.status === "rejected"
+													? "Je aanvraag is afgewezen. Bekijk de toelichting; neem bij vragen contact op met de platformbeheerder."
+													: "Je aanvraag is in behandeling bij de platformbeheerder."}
 										</p>
+										{access.requests.find((r) => r.product === p.key)
+											?.reviewNote && (
+											<p className="whitespace-pre-wrap text-sm">
+												Toelichting:{" "}
+												{
+													access.requests.find((r) => r.product === p.key)
+														?.reviewNote
+												}
+											</p>
+										)}
+										{access.requests.find((r) => r.product === p.key)
+											?.reviewedAt && (
+											<p className="text-xs text-muted-foreground">
+												Beoordeeld op{" "}
+												{new Date(
+													access.requests.find((r) => r.product === p.key)!
+														.reviewedAt!,
+												).toLocaleString("nl-NL")}
+											</p>
+										)}
 									</>
 								) : access.canRequest ? (
 									<Button
@@ -109,12 +146,11 @@ function Page() {
 											}
 										}}
 									>
-										Interesse in {p.name}
+										Uitbreiding aanvragen
 									</Button>
 								) : (
 									<p className="text-sm">
-										Vraag je bedrijfseigenaar of beheerder om deze uitbreiding
-										aan te vragen.
+										Vraag je bedrijfseigenaar om deze uitbreiding aan te vragen.
 									</p>
 								)}
 							</CardContent>
@@ -122,7 +158,12 @@ function Page() {
 					))}
 				</div>
 			)}
-			{workspaceId && <SuiteAccess workspaceId={workspaceId} admin={profile?.isSuperAdmin===true}/>}
+			{workspaceId && (
+				<SuiteAccess
+					workspaceId={workspaceId}
+					admin={profile?.isSuperAdmin === true}
+				/>
+			)}
 			{profile?.isSuperAdmin && <Requests />}
 		</div>
 	);
@@ -147,20 +188,7 @@ function Requests() {
 			) : !results.length ? (
 				<p className="text-sm">Nog geen aanvragen.</p>
 			) : (
-				results.map((r) => (
-					<Card key={r.id}>
-						<CardContent className="p-4 text-sm">
-							<p className="font-medium">
-								{r.company} ·{" "}
-								{r.product === "frostwork" ? "Frostwork" : "Cashflow"}
-							</p>
-							<p>
-								Aangevraagd op {new Date(r.requestedAt).toLocaleString("nl-NL")}
-							</p>
-							<Badge>Wacht op bespreking</Badge>
-						</CardContent>
-					</Card>
-				))
+				results.map((r) => <RequestReview key={r.id} request={r} />)
 			)}
 			{status === "CanLoadMore" && (
 				<Button variant="outline" onClick={() => loadMore(20)}>
@@ -168,5 +196,103 @@ function Requests() {
 				</Button>
 			)}
 		</section>
+	);
+}
+
+const requestLabels = {
+	pending: "In behandeling",
+	approved: "Goedgekeurd",
+	rejected: "Afgewezen",
+};
+function RequestReview({
+	request: r,
+}: {
+	request: {
+		id: Id<"appRequests">;
+		company: string;
+		product: "cashflow" | "frostwork";
+		requestedAt: number;
+		status: "pending" | "approved" | "rejected";
+		reviewNote: string | null;
+		reviewedAt: number | null;
+		revision: number;
+	};
+}) {
+	const review = useMutation(api.appRequests.review);
+	const [note, setNote] = useState("");
+	const [busy, setBusy] = useState(false);
+	const [message, setMessage] = useState("");
+	async function decide(status: "approved" | "rejected") {
+		setBusy(true);
+		setMessage("");
+		try {
+			await review({
+				requestId: r.id,
+				status,
+				note,
+				expectedRevision: r.revision,
+			});
+			setNote("");
+			setMessage(
+				"Beoordeling opgeslagen. Producttoegang blijft afzonderlijk geregeld.",
+			);
+		} catch {
+			setMessage(
+				"Opslaan niet gelukt. Controleer de actuele beoordeling en probeer opnieuw.",
+			);
+		} finally {
+			setBusy(false);
+		}
+	}
+	return (
+		<Card>
+			<CardContent className="space-y-3 p-4 text-sm">
+				<p className="font-medium">
+					{r.company} · {r.product === "cashflow" ? "Cashflow" : "Frostwork"}
+				</p>
+				<p>Aangevraagd op {new Date(r.requestedAt).toLocaleString("nl-NL")}</p>
+				<Badge>{requestLabels[r.status]}</Badge>
+				{r.reviewNote && (
+					<p className="whitespace-pre-wrap">
+						Laatste toelichting: {r.reviewNote}
+					</p>
+				)}
+				{r.reviewedAt && (
+					<p>Beoordeeld op {new Date(r.reviewedAt).toLocaleString("nl-NL")}</p>
+				)}
+				<label className="block" htmlFor={`review-${r.id}`}>
+					Toelichting voor het bedrijf (5–500 tekens)
+				</label>
+				<textarea
+					id={`review-${r.id}`}
+					className="min-h-20 w-full rounded-md border p-2"
+					maxLength={500}
+					value={note}
+					onChange={(e) => setNote(e.target.value)}
+					disabled={busy}
+				/>
+				<p className="text-muted-foreground">
+					Deze toelichting is zichtbaar voor het bedrijf. Goedkeuren geeft nog
+					geen abonnement of producttoegang; regel koppeling en toegang
+					afzonderlijk.
+				</p>
+				<div className="flex flex-wrap gap-2">
+					<Button
+						disabled={busy || note.trim().length < 5}
+						onClick={() => decide("approved")}
+					>
+						Goedkeuren
+					</Button>
+					<Button
+						variant="outline"
+						disabled={busy || note.trim().length < 5}
+						onClick={() => decide("rejected")}
+					>
+						Afwijzen
+					</Button>
+				</div>
+				{message && <p role="status">{message}</p>}
+			</CardContent>
+		</Card>
 	);
 }
