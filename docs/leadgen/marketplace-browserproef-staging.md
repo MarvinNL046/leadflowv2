@@ -39,3 +39,11 @@ Clerk-testinstance en Stripe-testconfiguratie nog door gebruiker te identificere
 7. Noteer bewijs per stap, deployment/commit, testreferenties en werkelijke beperkingen. Geen geslaagde Stripe/browserclaim voordat alle betreffende stappen zijn waargenomen.
 
 De eerdere 30 integratietests dekken de transactielogica, maar vervangen niet de browser-, login- en Checkout/webhookproef.
+
+## Hercontrole 13 september 2026 — LG-082
+
+De expliciet geselecteerde deployment marvinsmit1988:wetryleadflow:dev/marketplace-e2e meldt via env list: geen environmentvariabelen ingesteld. Alleen aanwezigheid gecontroleerd, geen sleutels vastgelegd. Ook lokaal is geen .env-testconfiguratie aanwezig (alleen .env.example). Testlogin en Checkout kunnen hierdoor niet worden gestart. Dit is een configuratieblokkade, geen mislukte aankooptest.
+
+Na beschikbaar stellen van de Clerk Development-instance moeten publishable key en bijbehorende issuer veilig worden ingesteld. Voor Checkout zijn daarnaast de Stripe-testsleutel en het webhooksecret van deze testdeployment nodig. Deel geheimen via de betreffende dashboards of een genegeerd lokaal configuratiebestand, niet via chat. Eerst de login en de juiste testbackend bevestigen, dan pas testdata en Checkout uitvoeren.
+
+Voeg aan stap 5 toe: open het eigen CRM-contact, maak een interne opvolgtaak met testverantwoordelijke en deadline, controleer deze in het takenoverzicht en na herladen. Bedrijf B mag ook die taak niet kunnen lezen of wijzigen. Geen klantberichten versturen.
