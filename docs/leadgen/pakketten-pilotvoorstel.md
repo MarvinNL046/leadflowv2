@@ -56,3 +56,17 @@ Meet per pilotbedrijf maandelijks abonnementomzet, hosting/communicatie/AI-koste
 Pipedrive rekent per gebruiker en pakket; zie [officiële prijsuitleg](https://support.pipedrive.com/en/article/how-does-pricing-work-in-pipedrive). HighLevel werkt met platformpakketten en aanvullende gebruikskosten; zie [officiële prijzen](https://www.gohighlevel.com/pricing) en [billing guide](https://help.gohighlevel.com/support/solutions/articles/155000001156-highlevel-pricing-guide). Geraadpleegd 13 september 2026. Deze modellen ondersteunen de keuze om basisgebruik en variabele kosten te scheiden; ze bewijzen niet dat onze voorgestelde bedragen winstgevend zijn. LeadFlow wordt hier als eigen product aangeboden, niet als wederverkoop van HighLevel.
 
 Volgende stap: het pilotaanbod en de kostenaanname toetsen, daarna de eigenaar-aanvraagflow bouwen. Publicatie van prijzen en automatische incasso zijn afzonderlijke uitvoeringsstappen.
+
+## Kostentoets — 13 september 2026
+
+In de projectdocumentatie is geen actuele, aan LeadFlow toegerekende hostingfactuur of supportregistratie aangetroffen. De werkelijke marge is daardoor nog niet vast te stellen. Onderstaande gevoeligheidsanalyse gebruikt expliciete aannames, geen gemeten kosten: EUR 30 intern per supportuur en EUR 10 overige directe kosten per bedrijf/maand. Communicatie/AI boven het budget wordt apart afgesproken.
+
+| Support per bedrijf/maand | Totale aangenomen kosten | Bijdrage CRM EUR 49 | Bijdrage bundel EUR 89 |
+| --- | ---: | ---: | ---: |
+| 10 minuten | EUR 15 | EUR 34 (69%) | EUR 74 (83%) |
+| 30 minuten | EUR 25 | EUR 24 (49%) | EUR 64 (72%) |
+| 60 minuten | EUR 40 | EUR 9 (18%) | EUR 49 (55%) |
+
+Bij een doel van 60% bijdrage en EUR 10 overige kosten past bij CRM EUR 49 ongeveer 19 minuten support per maand; bij bundel EUR 89 ongeveer 51 minuten. De losse uitbreidingen van EUR 19 en EUR 29 laten op diezelfde doelmarge maximaal EUR 7,60 en EUR 11,60 extra kosten toe. Dat maakt selfservice en heldere onboarding belangrijk. Eenmalige inrichting moet apart worden gemeten en over de verwachte klantduur worden verdeeld; die zit niet in de tabel.
+
+Besluit voor de pilot: behoud de bedragen als hypothese, bied geen onbeperkte begeleiding aan en registreer vanaf het eerste bedrijf werkelijke providerkosten en supportminuten. Voor definitieve prijsvalidatie ontbreken nog de toegerekende maandfacturen, werkelijk communicatieverbruik en gemeten supporttijd. Die ontbrekende gegevens zijn geen nulbedragen. De aanvraagflow publiceert daarom nog geen prijs of koopknop.

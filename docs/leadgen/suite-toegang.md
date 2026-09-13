@@ -95,3 +95,13 @@ Controle 13 september 2026: productie-aanmaak, wijzigen en heropvragen van ficti
 Cashflow toont nu **Offerte niet beschikbaar** of **Factuur niet beschikbaar**, met **Naar mijn offertes/facturen** en **Opnieuw proberen**. De melding maakt geen onderscheid dat het bestaan van andermans document bevestigt. De teruglink brengt je naar je eigen overzicht. Live gecontroleerd op 13 september 2026.
 
 Het interne [pilotvoorstel voor pakketten](pakketten-pilotvoorstel.md) beschrijft mogelijke prijzen en uitbreidingen. Dit is nog geen gepubliceerd of automatisch gefactureerd aanbod.
+
+## Uitbreiding aanvragen en beoordelen
+
+Als bedrijfseigenaar open je **Apps & uitbreidingen** en kies je **Uitbreiding aanvragen** bij Cashflow of Frostwork. Je aanvraag is vrijblijvend en wordt eenmaal per bedrijf/product vastgelegd. Medewerkers en bedrijfsbeheerders kunnen de status bekijken; alleen de eigenaar kan aanvragen.
+
+Je ziet **In behandeling**, **Goedgekeurd** of **Afgewezen**, met de laatste toelichting en het beoordelingstijdstip. Goedkeuring betekent dat de inrichting verder kan worden afgesproken. Koppeling en producttoegang blijven afzonderlijke stappen. Bij afwijzing of vragen neem je contact op met de platformbeheerder; een tweede klik maakt geen dubbele aanvraag.
+
+Als platform-superadmin vind je onderaan dezelfde pagina **Uitbreidingsaanvragen · platformbeheer**. Vul een toelichting van 5–500 tekens in en kies Goedkeuren of Afwijzen. De toelichting is zichtbaar voor het bedrijf: zet hier geen interne of vertrouwelijke aantekeningen in. Een beoordeling kan met een nieuwe toelichting worden herzien; eerdere beoordelingen blijven in het logboek. Bij gelijktijdige wijzigingen wordt een verouderde beoordeling geweigerd.
+
+Activering blijft verlopen via de bestaande suite-koppeling en toegang met einddatum. Goedkeuren wijzigt geen gebruikersrol, betaalafspraak of productrecht. Er worden door deze aanvraagflow geen e-mails verzonden of kosten afgeschreven.
