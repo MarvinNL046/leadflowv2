@@ -103,3 +103,7 @@ Bij het contact toont de Cashflow-kaart naast de aantallen de meest recente offe
 ## Actuele opvolging P-001 — LG-076
 
 Agendaonderzoek op klantnaam leverde historische afspraken op, geen aangetroffen septemberafspraak. Status blijft te bevestigen. Op 13 september is één echte interne taak opgeslagen voor Marvin Smit, uiterlijk 14 september: Afspraakstatus bevestigen en verplaatsingsaanvraag beoordelen. Controleer afspraak/werkbon, huidig adres, werkzaamheden en relatie met de oude offerte; leg daarna uitkomst en vervolg vast. De taak is geen ingeplande klantafspraak en verstuurt geen bericht.
+
+## Frostwork-match herkennen — LG-077
+
+LeadFlow zoekt eerst met contact-ID. Bij geen match probeert de bestaande koppeling het exacte e-mailadres binnen de ingestelde Frostwork-organisatie. Gevonden via e-mailadres betekent dat onderhoud/installatiegegevens gevonden zijn, maar de contact-ID nog niet gekoppeld is. Maak daarom niet automatisch een nieuwe klant aan. Geen klantmatch gevonden is een zoekresultaat, geen bewijs dat de klant nergens bestaat. Niet beschikbaar betekent dat de gegevens niet betrouwbaar konden worden opgehaald.
