@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { type QueryCtx, query } from "../_generated/server";
 import { requireMarketplaceAccess } from "./access";
@@ -424,5 +425,31 @@ export const getLeadBuyers = query({
 			companyName: (await ctx.db.get(purchase.buyerOrgId))?.name || "Onbekend bedrijf",
 			mode: purchase.mode,
 		})));
+	},
+});
+
+/** Paginate before filtering so history reads remain bounded, even for narrow preferences. */
+export const getSoldLeads = query({
+	args: { paginationOpts: paginationOptsValidator },
+	returns: v.object({
+		page: v.array(v.object({
+			id: v.id("marketplaceLeads"), nicheLabel: v.string(), city: v.union(v.string(), v.null()),
+			buyers: v.array(v.object({companyName: v.string(), mode: v.union(v.literal("exclusive"), v.literal("shared"))})),
+		})),
+		isDone: v.boolean(), continueCursor: v.string(),
+	}),
+	handler: async (ctx, { paginationOpts }) => {
+		const { orgId } = await requireMarketplaceAccess(ctx);
+		const prefs = await ctx.db.query("marketplaceBuyerPreferences").withIndex("by_org", q => q.eq("orgId", orgId)).unique();
+		const batch = await ctx.db.query("marketplaceLeads").order("desc").paginate({...paginationOpts, numItems: Math.min(30, Math.max(1, paginationOpts.numItems))});
+		const page = [];
+		for (const lead of batch.page) {
+			if (!["sold_exclusive", "sold_shared", "expired"].includes(lead.status) || !matchesBuyer(lead, prefs)) continue;
+			const purchases = await ctx.db.query("marketplacePurchases").withIndex("by_lead", q => q.eq("leadId", lead._id)).take(10);
+			if (!purchases.length) continue;
+			const buyers = await Promise.all(purchases.map(async purchase => ({companyName: (await ctx.db.get(purchase.buyerOrgId))?.name || "Onbekend bedrijf", mode: purchase.mode})));
+			page.push({id: lead._id, nicheLabel: NICHE_LABELS[lead.niche as Niche], city: lead.city ?? null, buyers});
+		}
+		return {page, isDone: batch.isDone, continueCursor: batch.continueCursor};
 	},
 });

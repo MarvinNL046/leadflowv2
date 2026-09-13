@@ -264,11 +264,18 @@ test.each(['shared', 'exclusive'] as const)('buyer names disclose only company a
   });
   const observer = t.withIdentity({subject:'observer'});
   expect(await observer.query(api.marketplace.feed.getLeadBuyers,{leadId})).toEqual([{companyName:'Audit only',mode}]);
+  const historyArgs = {paginationOpts:{numItems:30,cursor:null}};
+  const history = await observer.query(api.marketplace.feed.getSoldLeads,historyArgs);
+  expect(history.page).toEqual([{id:leadId,nicheLabel:'Airco',city:'Maastricht',buyers:[{companyName:'Audit only',mode}]}]);
+  expect(history.isDone).toBe(true);
+  await expect(t.query(api.marketplace.feed.getSoldLeads,historyArgs)).rejects.toThrow();
   expect(await observer.query(api.marketplace.purchase.getMyPurchasedContact,{leadId})).toBeNull();
   await expect(t.query(api.marketplace.feed.getLeadBuyers,{leadId})).rejects.toThrow();
   await t.run(ctx => ctx.db.patch(prefsB,{provinces:['Groningen']}));
+  expect((await observer.query(api.marketplace.feed.getSoldLeads,historyArgs)).page).toEqual([]);
   expect(await observer.query(api.marketplace.feed.getLeadBuyers,{leadId})).toEqual([]);
   await t.run(ctx => ctx.db.patch(prefsB,{provinces:['Limburg'],niches:['loodgieter']}));
+  expect((await observer.query(api.marketplace.feed.getSoldLeads,historyArgs)).page).toEqual([]);
   expect(await observer.query(api.marketplace.feed.getLeadBuyers,{leadId})).toEqual([]);
 });
 
