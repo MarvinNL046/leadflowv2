@@ -51,12 +51,13 @@ De browsercontrole liep van 15:22:23 tot 15:24:49 UTC (17:22:23–17:24:49 CEST)
 
 Het meetbestand markeert bedrijfscontext en CRM-opvolging als Bezig; overige praktijkstappen blijven open. Kosten en menselijke supportminuten blijven onbekend. Eerste concrete vervolg: afspraakstatus controleren en de verplaatsingsvraag opvolgen, met eigenaar, datum en werkelijke uitkomst. Daarna de passende Cashflow-offerte en Frostwork-route controleren. Productverbeterpunt voor een volgende taak: vanuit een CRM-contact rechtstreeks de relevante offerte en open opvolgtaak kunnen openen.
 
-## Opvolgtaken op een contact (in ontwikkeling, LG-065)
+## Opvolgtaken op een contact (LG-065, live sinds LG-066)
 
-Open een contact en ga naar Opvolging. Lees eerst de bestaande taken en controleer de afspraakstatus. Vul voor een nieuwe taak de handeling in, vermeld de verantwoordelijke in de toelichting en kies zo nodig een uiterste datum. Taak opslaan maakt een interne taak; er wordt geen klantbericht gestuurd. Afronden sluit uitsluitend die taak, Heropenen maakt hem weer open. Een verkoopfase of afspraak verandert hierdoor niet. De lijst toont maximaal 50 recentste taken. Verantwoordelijke is voorlopig tekst, geen formele toewijzing of notificatie aan een teamlid. Deze interface is nog niet live gepubliceerd.
+Open een contact en ga naar Opvolging. Lees eerst de bestaande taken en controleer de afspraakstatus. Vul voor een nieuwe taak de handeling in, vermeld de verantwoordelijke in de toelichting en kies zo nodig een uiterste datum. Taak opslaan maakt een interne taak; er wordt geen klantbericht gestuurd. Afronden sluit uitsluitend die taak, Heropenen maakt hem weer open. Een verkoopfase of afspraak verandert hierdoor niet. De lijst toont maximaal 50 recentste taken. Verantwoordelijke is voorlopig tekst, geen formele toewijzing of notificatie aan een teamlid. Deze interface is op 13 september 2026 live gepubliceerd en als normaal bedrijfsaccount getest.
 
 ## Publicatie en leads kopen — LG-066
 
 Het opvolgblok is op 13 september 2026 gepubliceerd en in Chrome getest met een normaal testbedrijf: opslaan, herladen, afronden en heropenen werken. Eén synthetische testtaak is als afgerond bewaard.
 
-Voor bedrijven zonder marketplace is een startscherm toegevoegd (publicatie nog te bevestigen): open Leads kopen in de sidebar. De eigenaar of beheerder kan de marketplace voor het eigen bedrijf activeren. Dit koopt geen lead. De bestaande standaardinstelling schakelt nieuwe-leadmeldingen per e-mail in; controleer daarna Werkgebied en meldingen, diensten en voorkeuren. Medewerkers vragen de eigenaar/beheerder om activering. Leadgenbeheer blijft alleen voor de platform-superadmin.
+Voor bedrijven zonder marketplace is een startscherm toegevoegd (live sinds 13 september 2026, PR #66): open Leads kopen in de sidebar. De eigenaar of beheerder kan de marketplace voor het eigen bedrijf activeren. Dit koopt geen lead. De bestaande standaardinstelling schakelt nieuwe-leadmeldingen per e-mail in; controleer daarna Werkgebied en meldingen, diensten en voorkeuren. Medewerkers vragen de eigenaar/beheerder om activering. Leadgenbeheer blijft alleen voor de platform-superadmin.
+
