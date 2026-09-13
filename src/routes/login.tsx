@@ -50,7 +50,7 @@ function LoginPage() {
           <p className="text-sm text-zinc-600">Ingelogd — profiel laden…</p>
         </div>
       ) : (
-        <SignIn routing="hash" />
+        <SignIn routing="hash" signUpUrl="/registreren" />
       )}
 
       {error && (

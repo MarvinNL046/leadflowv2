@@ -75,6 +75,9 @@ export default function AppConvexProvider({
     <ClerkProvider
       publishableKey={CLERK_PUBLISHABLE_KEY}
       afterSignOutUrl="/login"
+      signUpUrl="/registreren"
+      signInUrl="/login"
+      signUpForceRedirectUrl="/aan-de-slag"
     >
       <ConvexProviderWithClerk
         client={convexQueryClient.convexClient}

@@ -14,6 +14,7 @@ import { Route as AanDeSlagRouteImport } from './routes/aan-de-slag'
 import { Route as CrmRouteImport } from './routes/crm'
 import { Route as FeedRouteImport } from './routes/feed'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as RegistrerenRouteImport } from './routes/registreren'
 import { Route as CrmIndexRouteImport } from './routes/crm.index'
 import { Route as CrmCampaignsRouteImport } from './routes/crm.campaigns'
 import { Route as CrmContactsRouteImport } from './routes/crm.contacts'
@@ -70,6 +71,11 @@ const FeedRoute = FeedRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegistrerenRoute = RegistrerenRouteImport.update({
+  id: '/registreren',
+  path: '/registreren',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CrmIndexRoute = CrmIndexRouteImport.update({
@@ -240,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/crm': typeof CrmRouteWithChildren
   '/feed': typeof FeedRouteWithChildren
   '/login': typeof LoginRoute
+  '/registreren': typeof RegistrerenRoute
   '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
   '/crm/leadgen': typeof CrmLeadgenRoute
@@ -277,6 +284,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/aan-de-slag': typeof AanDeSlagRoute
   '/login': typeof LoginRoute
+  '/registreren': typeof RegistrerenRoute
   '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
   '/crm/leadgen': typeof CrmLeadgenRoute
@@ -317,6 +325,7 @@ export interface FileRoutesById {
   '/crm': typeof CrmRouteWithChildren
   '/feed': typeof FeedRouteWithChildren
   '/login': typeof LoginRoute
+  '/registreren': typeof RegistrerenRoute
   '/crm/campaigns': typeof CrmCampaignsRoute
   '/crm/contacts': typeof CrmContactsRoute
   '/crm/leadgen': typeof CrmLeadgenRoute
@@ -358,6 +367,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/feed'
     | '/login'
+    | '/registreren'
     | '/crm/campaigns'
     | '/crm/contacts'
     | '/crm/leadgen'
@@ -395,6 +405,7 @@ export interface FileRouteTypes {
     | '/'
     | '/aan-de-slag'
     | '/login'
+    | '/registreren'
     | '/crm/campaigns'
     | '/crm/contacts'
     | '/crm/leadgen'
@@ -434,6 +445,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/feed'
     | '/login'
+    | '/registreren'
     | '/crm/campaigns'
     | '/crm/contacts'
     | '/crm/leadgen'
@@ -474,6 +486,7 @@ export interface RootRouteChildren {
   CrmRoute: typeof CrmRouteWithChildren
   FeedRoute: typeof FeedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  RegistrerenRoute: typeof RegistrerenRoute
   FeedOnboardingRoute: typeof FeedOnboardingRoute
 }
 
@@ -512,6 +525,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/registreren': {
+      id: '/registreren'
+      path: '/registreren'
+      fullPath: '/registreren'
+      preLoaderRoute: typeof RegistrerenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/crm/': {
@@ -825,6 +845,7 @@ const rootRouteChildren: RootRouteChildren = {
   CrmRoute: CrmRouteWithChildren,
   FeedRoute: FeedRouteWithChildren,
   LoginRoute: LoginRoute,
+  RegistrerenRoute: RegistrerenRoute,
   FeedOnboardingRoute: FeedOnboardingRoute,
 }
 export const routeTree = rootRouteImport
