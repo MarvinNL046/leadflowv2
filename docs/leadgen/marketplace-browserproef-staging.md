@@ -67,3 +67,7 @@ Bestaande Stripe-testmodus van StaycoolAirco.nl bevat een actieve webhook naar d
 ## Aparte sandbox aangemaakt — LG-086
 
 Sandbox LeadFlow Marketplace E2E: acct_1UFIDcEGHXq0MPJu. Webhook we_1UFIEoEGHXq0MPJubwCjxaMa wijst uitsluitend naar steady-orca-351, luistert naar completed en async_payment_succeeded. Staging mode=test en modusbeveiliging gedeployd. Nog in te stellen: STRIPE_SECRET_KEY uit deze nieuwe sandbox (niet gedeelde Testmodus) en STRIPE_MARKETPLACE_WEBHOOK_SECRET van deze nieuwe webhook. Geen betaling uitgevoerd. Productie bevat momenteel een testsleutel; de nieuwe live-default is daar nog niet gepubliceerd.
+
+## Betalingsbewijs — LG-087
+
+Beide sandboxsecrets ingesteld na expliciet akkoord. EUR 50 Checkout betaald met synthetische kaart/contactgegevens. Event evt_1UFIJvEGHXq0MPJuW7FoJEP2, paid/complete, event en session livemode=false. Eerste webhook 200 OK om 18:40:07 UTC, handmatige herlevering 200 OK om 18:40:52 UTC. Lokale wallet na herladen EUR 50 en precies één opwaardering. Geen echte betaling. Aankoop/CRM-taak/bedrijf B nog uit te voeren; productie-instellingen ongewijzigd.
