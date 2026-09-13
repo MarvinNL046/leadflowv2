@@ -84,3 +84,7 @@ Geslaagd in localhost:5186 met steady-orca-351 en Test A:
 - Wallet EUR 31,85: EUR 50 opwaardering minus één aankoop EUR 18,15.
 
 Read-only backend bevestigt aankoop en taak in workspace vd77743j3p5zb2nta93q9vc4sx8ea0dy van Test A. Alleen synthetische data, geen klantcommunicatie. Tweede-bedrijfcontrole in browser nog open; bestaande integratietests vervangen die stap niet. Productie-Stripewijziging nog niet gepubliceerd. Eerstvolgende stap: testbedrijf B aanmelden in dezelfde geïsoleerde Development-omgeving en toegang tot dit contact/deze taak controleren.
+
+## Tweede bedrijf — LG-091
+
+13 september 2026: B (m_smit1988@hotmail.com) geverifieerd en via reguliere registratie aangemaakt als LeadFlow Marketplace Test B. Leeg CRM bevestigd. Directe A-contactlink geweigerd door backend met Not a member of this workspace, zonder contactinhoud. Mijn taken en Alle open taken beide 0; A-taak niet zichtbaar. Gerichte schrijfproef via B-browser niet uitgevoerd. Technische foutpagina bij geweigerde contacttoegang verdient gebruiksvriendelijke afhandeling. Geen productieactie.
