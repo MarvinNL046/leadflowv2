@@ -59,7 +59,25 @@ import type { Doc, Id } from '../../convex/_generated/dataModel'
 
 export const Route = createFileRoute('/crm/contacts_/$id')({
   component: ContactDetailPage,
+  errorComponent: ContactUnavailable,
 })
+
+function ContactUnavailable() {
+  return (
+    <main className="mx-auto max-w-xl p-6" aria-labelledby="contact-unavailable-title">
+      <Card>
+        <CardHeader>
+          <CardTitle id="contact-unavailable-title">Contact niet beschikbaar</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p>Je hebt mogelijk geen toegang tot dit contact, of het kan op dit moment niet worden geladen.</p>
+          <p className="text-sm text-muted-foreground">Open het contact vanuit je eigen contactenoverzicht. Blijft het probleem bestaan, neem dan contact op met je bedrijfsbeheerder.</p>
+          <Link to="/crm/contacts" className="text-primary underline">Terug naar mijn contacten</Link>
+        </CardContent>
+      </Card>
+    </main>
+  )
+}
 
 function ContactDetailPage() {
   const { id } = Route.useParams()
