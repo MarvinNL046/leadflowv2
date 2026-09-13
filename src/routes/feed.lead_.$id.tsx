@@ -66,6 +66,7 @@ function LeadDetailPage() {
 
   const lead = useQuery(api.marketplace.feed.getMaskedLeadDetail, { leadId })
   const purchased = useQuery(api.marketplace.purchase.getMyPurchasedContact, { leadId })
+  const buyers = useQuery(api.marketplace.feed.getLeadBuyers, { leadId })
   const trackView = useMutation(api.marketplace.leadViews.trackLeadView)
 
   // Purchase flow state. `revealed` holds the unmasked contact after a
@@ -84,7 +85,9 @@ function LeadDetailPage() {
     void trackView({ leadId }).catch(() => {})
   }, [lead, leadId, trackView])
 
-  if (purchased || revealed) return <div className="space-y-4"><BackLink /><UnlockedCard contact={purchased ?? revealed!} /></div>
+  const buyerInfo = buyers && buyers.length > 0 ? <Card><CardHeader><CardTitle>Gekocht door</CardTitle></CardHeader><CardContent><ul className="space-y-2 text-sm">{buyers.map((buyer, index) => <li key={index}><span className="font-medium">{buyer.companyName}</span> · {buyer.mode === 'exclusive' ? 'Exclusief' : 'Gedeeld'}</li>)}</ul><p className="mt-3 text-sm text-zinc-500">Contactgegevens van de aanvrager zijn alleen beschikbaar voor kopers.</p></CardContent></Card> : null
+
+  if (purchased || revealed) return <div className="space-y-4"><BackLink /><UnlockedCard contact={purchased ?? revealed!} />{buyerInfo}</div>
 
   if (lead === undefined || purchased === undefined) {
     return (
@@ -114,6 +117,7 @@ function LeadDetailPage() {
             Deze aanvraag is niet (meer) beschikbaar.
           </CardContent>
         </Card>
+        {buyerInfo}
       </div>
     )
   }
@@ -121,6 +125,8 @@ function LeadDetailPage() {
   return (
     <div className="space-y-4">
       <BackLink />
+
+      {buyerInfo}
 
       <Card>
         <CardHeader className="gap-3">

@@ -135,6 +135,7 @@ export function PurchaseModal({
           <p className="mt-1 text-xs text-zinc-500">
             Dit bedrag wordt van je tegoed afgeschreven. De volledige
             contactgegevens worden direct zichtbaar en in je CRM gezet.
+            {' '}Andere marketplacebedrijven die deze aanvraag mogen bekijken, zien je bedrijfsnaam en of je exclusief of gedeeld hebt gekocht.
           </p>
         </div>
 

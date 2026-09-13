@@ -406,3 +406,23 @@ export const getMaskedLeadDetail = query({
 		);
 	},
 });
+
+/** Company names only: no buyer IDs, CRM links or applicant details. */
+export const getLeadBuyers = query({
+	args: { leadId: v.id("marketplaceLeads") },
+	returns: v.array(v.object({ companyName: v.string(), mode: v.union(v.literal("exclusive"), v.literal("shared")) })),
+	handler: async (ctx, { leadId }) => {
+		const { orgId } = await requireMarketplaceAccess(ctx);
+		const lead = await ctx.db.get(leadId);
+		if (!lead || !["published", "sold_shared", "sold_exclusive", "expired"].includes(lead.status)) return [];
+		const prefs = await ctx.db.query("marketplaceBuyerPreferences").withIndex("by_org", q => q.eq("orgId", orgId)).unique();
+		const ownPurchase = await ctx.db.query("marketplacePurchases").withIndex("by_lead_org", q => q.eq("leadId", leadId).eq("buyerOrgId", orgId)).first();
+		if (!ownPurchase && !matchesBuyer(lead, prefs)) return [];
+		// Historic leads allowed four buyers; bound this read independently of stored limits.
+		const purchases = await ctx.db.query("marketplacePurchases").withIndex("by_lead", q => q.eq("leadId", leadId)).take(10);
+		return await Promise.all(purchases.map(async purchase => ({
+			companyName: (await ctx.db.get(purchase.buyerOrgId))?.name || "Onbekend bedrijf",
+			mode: purchase.mode,
+		})));
+	},
+});

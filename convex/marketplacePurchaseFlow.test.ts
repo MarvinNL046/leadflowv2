@@ -252,6 +252,26 @@ test.each(['live','test'])('rejects opposite signed payment mode in %s deploymen
   expect((await buyer.query(api.marketplace.wallet.getWallet,{})).wallet.balanceCents).toBe(0);
 });
 
+test.each(['shared', 'exclusive'] as const)('buyer names disclose only company and mode for %s sales', async mode => {
+  const {t,buyer,leadId} = await setup();
+  await buyer.mutation(api.marketplace.purchase.purchaseLead,{leadId,mode});
+  const prefsB = await t.run(async ctx => {
+    const userId = await ctx.db.insert('users',{clerkUserId:'observer'});
+    const orgId = await ctx.db.insert('orgs',{name:'Observer',slug:'observer',ownerId:userId,marketplaceEnabled:true});
+    const workspaceId = await ctx.db.insert('workspaces',{orgId,name:'Observer',isDefault:true});
+    await ctx.db.insert('memberships',{orgId,userId,workspaceId,role:'owner'});
+    return await ctx.db.insert('marketplaceBuyerPreferences',{orgId,niches:['airco'],provinces:['Limburg'],serviceTypes:['install'],preferredMode:'both',notifyOnNewLead:false,notifyChannel:'email',updatedAt:Date.now()});
+  });
+  const observer = t.withIdentity({subject:'observer'});
+  expect(await observer.query(api.marketplace.feed.getLeadBuyers,{leadId})).toEqual([{companyName:'Audit only',mode}]);
+  expect(await observer.query(api.marketplace.purchase.getMyPurchasedContact,{leadId})).toBeNull();
+  await expect(t.query(api.marketplace.feed.getLeadBuyers,{leadId})).rejects.toThrow();
+  await t.run(ctx => ctx.db.patch(prefsB,{provinces:['Groningen']}));
+  expect(await observer.query(api.marketplace.feed.getLeadBuyers,{leadId})).toEqual([]);
+  await t.run(ctx => ctx.db.patch(prefsB,{provinces:['Limburg'],niches:['loodgieter']}));
+  expect(await observer.query(api.marketplace.feed.getLeadBuyers,{leadId})).toEqual([]);
+});
+
 test('live payment accepted only with live configuration, duplicate still idempotent', async () => {
   const {t,buyer,orgId} = await setup(0);
   vi.stubEnv('STRIPE_MARKETPLACE_MODE','live');
