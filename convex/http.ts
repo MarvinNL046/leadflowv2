@@ -1,4 +1,5 @@
 import { httpRouter } from "convex/server";
+import {bridge as suiteBridge} from './suiteHttp';
 import Stripe from "stripe";
 import { httpAction } from "./_generated/server";
 import { mcpEndpoint } from "./mcpWhatsapp";
@@ -23,6 +24,7 @@ import {
 } from "./marketplace/wizard";
 
 const http = httpRouter();
+http.route({path:'/suite/access',method:'POST',handler:suiteBridge});
 
 // ════════════════════════════════════════════════════════════════════
 // META OAUTH CALLBACK

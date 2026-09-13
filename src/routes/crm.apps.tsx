@@ -1,4 +1,5 @@
 import { useState } from "react";
+import {SuiteAccess} from '#/components/crm/suite-access';
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, usePaginatedQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -71,9 +72,9 @@ function Page() {
 							<CardContent className="space-y-4 p-5">
 								<h2 className="text-lg font-semibold">{p.name}</h2>
 								<p className="text-sm text-muted-foreground">{p.description}</p>
-								{access.existingSuite ? (
+								{access.existingSuite || access.active.includes(p.key) ? (
 									<>
-										<Badge>Bestaande bedrijfskoppeling</Badge>
+										<Badge>{access.existingSuite?'Bestaande bedrijfskoppeling':'Suite-toegang toegekend'}</Badge>
 										<p className="text-sm">
 											Je rechten in {p.name} bepalen welke gegevens je daar kunt
 											openen.
@@ -121,6 +122,7 @@ function Page() {
 					))}
 				</div>
 			)}
+			{workspaceId && <SuiteAccess workspaceId={workspaceId} admin={profile?.isSuperAdmin===true}/>}
 			{profile?.isSuperAdmin && <Requests />}
 		</div>
 	);
