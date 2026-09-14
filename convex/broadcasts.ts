@@ -21,6 +21,7 @@ import { buildListUnsubHeaders } from "./broadcastsLogic";
 import { renderEmailShell } from "./emailShell";
 import { dedupeByEmail, isMailable } from "./segmentsLogic";
 import { MAX_BATCH_BYTES } from './broadcastDelivery';
+import { contactStillMatches } from './segments';
 
 const RESEND_BATCH_URL = "https://api.resend.com/emails/batch";
 const BATCH_SIZE = 20;
@@ -711,13 +712,15 @@ export const pendingForPreparation = internalMutation({
   handler: async (ctx, args) => {
     const b = await ctx.db.get(args.broadcastId);
     if (!b || b.status !== 'sending') return [];
+    const segment = await ctx.db.get(b.segmentId);
+    if (!segment || segment.workspaceId !== b.workspaceId) throw new Error('Doelgroep ontbreekt. Controleer de campagne.');
     const rows = await ctx.db.query('broadcastRecipients').withIndex('by_broadcast_status', q => q.eq('broadcastId', args.broadcastId).eq('status', 'pending')).take(BATCH_SIZE);
     const eligible = [];
     let failed = 0;
     for (const r of rows) {
       const c = await ctx.db.get(r.contactId);
-      if (!c || c.workspaceId !== b.workspaceId || c.deletedAt || !isMailable(c) || c.email?.trim().toLowerCase() !== r.email.trim().toLowerCase()) {
-        await ctx.db.patch(r._id, { status: 'failed', errorMessage: 'Overgeslagen: afgemeld, ongeldig, verwijderd of e-mailadres gewijzigd.' });
+      if (!c || c.workspaceId !== b.workspaceId || c.deletedAt || !isMailable(c) || c.email?.trim().toLowerCase() !== r.email.trim().toLowerCase() || !(await contactStillMatches(ctx, c, segment.rules))) {
+        await ctx.db.patch(r._id, { status: 'failed', errorMessage: 'Overgeslagen: niet meer mailbaar of niet meer in deze doelgroep.' });
         failed++;
       } else eligible.push(r);
     }

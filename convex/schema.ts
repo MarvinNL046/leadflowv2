@@ -452,6 +452,7 @@ export default defineSchema({
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
   }).index("by_workspace_status", ["workspaceId", "status"])
+    .index("by_segment_status", ["segmentId", "status"])
     .index("by_status", ["status"]),
 
   broadcastRecipients: defineTable({

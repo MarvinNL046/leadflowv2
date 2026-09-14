@@ -4,9 +4,11 @@ import {
   query,
   mutation,
   internalQuery,
+  internalMutation,
   type QueryCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { internal } from './_generated/api';
 import {
   contactMatchesRules,
   isMailable,
@@ -91,6 +93,11 @@ async function toMatchable(
   };
 }
 
+/** Reuse the exact resolver predicates immediately before a recipient is sent. */
+export async function contactStillMatches(ctx: QueryCtx, contact: Doc<'contacts'>, rules: SegmentRules): Promise<boolean> {
+  return contactMatchesRules(await toMatchable(ctx, contact, neededJoins(rules)), rules);
+}
+
 export const list = query({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
@@ -136,6 +143,7 @@ export const update = mutation({
       ...(args.description !== undefined ? { description: args.description } : {}),
       ...(args.rules !== undefined ? { rules: args.rules } : {}),
     });
+    if (args.rules !== undefined) await ctx.scheduler.runAfter(0, internal.segments.refreshCampaignCounts, { segmentId: seg._id, cursor: null });
   },
 });
 
@@ -145,7 +153,27 @@ export const remove = mutation({
     const seg = await ctx.db.get(args.segmentId);
     if (!seg) throw new Error("Segment not found");
     await requireWorkspace(ctx, seg.workspaceId, 'manage');
+    for (const status of ['draft', 'scheduled', 'sending', 'failed'] as const) {
+      const campaign = await ctx.db.query('broadcasts').withIndex('by_segment_status', q => q.eq('segmentId', seg._id).eq('status', status)).first();
+      if (campaign) throw new Error('Deze doelgroep wordt nog gebruikt door een campagne. Kies daar eerst een andere doelgroep of annuleer de campagne.');
+    }
     await ctx.db.delete(args.segmentId);
+  },
+});
+
+/** Invalidate and refresh future campaigns in bounded pages after rule changes. */
+export const refreshCampaignCounts = internalMutation({
+  args: { segmentId: v.id('segments'), cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const page = await ctx.db.query('broadcasts').withIndex('by_segment_status', q => q.eq('segmentId', args.segmentId)).paginate({ cursor: args.cursor, numItems: 100 });
+    for (const [index, b] of page.page.entries()) {
+      if (b.status !== 'draft' && b.status !== 'scheduled') continue;
+      await ctx.db.patch(b._id, { audienceCount: undefined, audienceCountedAt: undefined, audienceRules: undefined });
+      await ctx.scheduler.runAfter(index * 250, internal.broadcastAudience.refresh, { broadcastId: b._id });
+    }
+    if (!page.isDone) await ctx.scheduler.runAfter(1000, internal.segments.refreshCampaignCounts, { segmentId: args.segmentId, cursor: page.continueCursor });
+    return null;
   },
 });
 
