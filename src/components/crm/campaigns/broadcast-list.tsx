@@ -75,7 +75,7 @@ export function BroadcastList({
               </div>
               <div className="flex items-center gap-3 text-xs text-zinc-500">
                 <span>{b.status === 'draft' || b.status === 'scheduled'
-                  ? b.audienceCount === undefined ? 'Ontvangers nog niet geteld' : `${b.audienceCount.toLocaleString('nl-NL')} ontvangers (laatste telling)`
+                  ? b.audienceError ? 'Doelgroep controleren' : b.audienceCount === undefined ? 'Ontvangers nog niet geteld' : `${b.audienceCount.toLocaleString('nl-NL')} ontvangers (laatste telling)`
                   : `${b.stats.sent}/${b.stats.total} verzonden`}</span>
                 <Badge>{b.status}</Badge>
               </div>

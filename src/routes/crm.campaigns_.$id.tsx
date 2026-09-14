@@ -171,6 +171,7 @@ function BroadcastDetail() {
           <CardHeader><CardTitle className="text-sm">Verzendlijst vooraf</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <p className="text-lg font-semibold">{b.audienceCount === undefined ? 'Aantal nog niet berekend' : `${b.audienceCount.toLocaleString('nl-NL')} unieke ontvangers`}</p>
+            {b.audienceError && <p role="alert" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">{b.audienceError}</p>}
             {b.audienceCountedAt !== undefined && <p className="text-xs text-zinc-600">Berekend op {formatMoment(b.audienceCountedAt)}</p>}
             <p className="text-sm text-zinc-600">Afmeldingen, ongeldige adressen en dubbele e-mailadressen worden uitgesloten. Bij verzending wordt de actuele doelgroep opnieuw gecontroleerd.</p>
             <Button variant="outline" disabled={counting} onClick={() => void refreshAudience()}>{counting ? 'Volledige lijst tellen…' : 'Aantal ontvangers berekenen'}</Button>

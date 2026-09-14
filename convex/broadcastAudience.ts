@@ -10,7 +10,7 @@ export const config = internalQuery({
     const b = await ctx.db.get(broadcastId);
     if (!b) throw new Error('Campagne niet gevonden.');
     const segment = await ctx.db.get(b.segmentId);
-    if (!segment || segment.workspaceId !== b.workspaceId) throw new Error('Doelgroep niet gevonden.');
+    if (!segment || segment.workspaceId !== b.workspaceId) throw new Error('De doelgroep van deze campagne bestaat niet meer. Kies bij Mail bewerken een geldige doelgroep.');
     return { workspaceId: b.workspaceId, segmentId: b.segmentId, rules: segment.rules };
   },
 });
@@ -23,8 +23,20 @@ export const saveCount = internalMutation({
     const segment = await ctx.db.get(args.segmentId);
     if (!b || b.segmentId !== args.segmentId || !segment || segment.workspaceId !== b.workspaceId || JSON.stringify(segment.rules) !== args.rules) return false;
     if ((b.audienceCountedAt ?? 0) > args.countedAt) return false;
-    await ctx.db.patch(b._id, { audienceCount: args.count, audienceCountedAt: args.countedAt, audienceRules: args.rules });
+    await ctx.db.patch(b._id, { audienceCount: args.count, audienceCountedAt: args.countedAt, audienceRules: args.rules, audienceError: undefined });
     return true;
+  },
+});
+
+export const recordError = internalMutation({
+  args: { broadcastId: v.id('broadcasts'), startedAt: v.number(), error: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const b = await ctx.db.get(args.broadcastId);
+    if (b && (b.status === 'draft' || b.status === 'scheduled') && (b.audienceCountedAt ?? 0) <= args.startedAt) {
+      await ctx.db.patch(b._id, { audienceError: args.error.slice(0, 400), audienceCount: undefined, audienceCountedAt: undefined });
+    }
+    return null;
   },
 });
 
@@ -34,7 +46,12 @@ export const count = action({
   returns: v.object({ count: v.number(), countedAt: v.number() }),
   handler: async (ctx, args): Promise<{ count: number; countedAt: number }> => {
     await ctx.runQuery(internal.broadcasts.assertBroadcastAccess, args);
-    return calculate(ctx, args.broadcastId);
+    const startedAt = Date.now();
+    try { return await calculate(ctx, args.broadcastId); }
+    catch (err) {
+      await ctx.runMutation(internal.broadcastAudience.recordError, { ...args, startedAt, error: err instanceof Error ? err.message : 'Ontvangers tellen mislukt.' });
+      throw err;
+    }
   },
 });
 
@@ -42,7 +59,9 @@ export const refresh = internalAction({
   args: { broadcastId: v.id('broadcasts') },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
-    await calculate(ctx, args.broadcastId);
+    const startedAt = Date.now();
+    try { await calculate(ctx, args.broadcastId); }
+    catch (err) { await ctx.runMutation(internal.broadcastAudience.recordError, { ...args, startedAt, error: err instanceof Error ? err.message : 'Ontvangers tellen mislukt.' }); }
     return null;
   },
 });
