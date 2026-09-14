@@ -16,7 +16,7 @@ async function setup(){
       const workspaceId=await ctx.db.insert('workspaces',{orgId,name,isDefault:true});
       const membershipId=await ctx.db.insert('memberships',{orgId,userId,role:'owner'});
       const memberId=await ctx.db.insert('users',{clerkUserId:name+'-member'});await ctx.db.insert('memberships',{orgId,userId:memberId,role:'member'});
-      const contactId=await ctx.db.insert('contacts',{workspaceId,email:'recipient@example.invalid',callCount:0});
+      const contactId=await ctx.db.insert('contacts',{workspaceId,email:'recipient@real.nl',callCount:0});
       return {orgId,workspaceId,contactId,membershipId};
     }return {a:await company('a'),b:await company('b')};
   });
@@ -89,7 +89,7 @@ test('campaign batch stamps its connection and delivery updates only its campaig
   const broadcastId=await t.run(async ctx=>{
     const segmentId=await ctx.db.insert('segments',{workspaceId:a.workspaceId,name:'Test',rules:{match:'all',conditions:[]}});
     const id=await ctx.db.insert('broadcasts',{workspaceId:a.workspaceId,segmentId,name:'Test',subject:'Test',body:'Test',status:'sending',stats:{total:1,sent:0,delivered:0,bounced:0,unsubscribed:0,failed:0}});
-    await ctx.db.insert('broadcastRecipients',{workspaceId:a.workspaceId,broadcastId:id,contactId:a.contactId,email:'recipient@example.invalid',status:'pending'});return id;
+    await ctx.db.insert('broadcastRecipients',{workspaceId:a.workspaceId,broadcastId:id,contactId:a.contactId,email:'recipient@real.nl',status:'pending'});return id;
   });
   vi.useFakeTimers();try{
     await t.action(internal.broadcasts.runBatch,{broadcastId});

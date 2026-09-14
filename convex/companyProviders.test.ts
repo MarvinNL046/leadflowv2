@@ -35,7 +35,8 @@ test.each(['email','sms','whatsapp'] as const)('company B cannot use A %s, inclu
 test('campaigns and WhatsApp setup cannot use another company provider account',async()=>{
   const {t,b}=await setup();const caller=t.withIdentity({subject:'b'});const fetchMock=vi.fn();vi.stubGlobal('fetch',fetchMock);
   await expect(caller.action(api.broadcasts.sendTest,{broadcastId:b.broadcastId,toEmail:'test@example.invalid'})).rejects.toThrow('niet ingesteld');
-  await expect(t.action(internal.broadcasts.runBatch,{broadcastId:b.broadcastId})).rejects.toThrow('niet ingesteld');
+  await t.action(internal.broadcasts.runBatch,{broadcastId:b.broadcastId});
+  expect((await t.run(ctx=>ctx.db.get(b.broadcastId)))?.status).not.toBe('sent');
   for(const f of [api.integrations.linkWhatsapp,api.integrations.checkWhatsappStatus])await expect(caller.action(f,{workspaceId:b.workspaceId})).rejects.toThrow('niet ingesteld');
   expect(fetchMock).not.toHaveBeenCalled();
 });

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQuery, useMutation, usePaginatedQuery } from 'convex/react'
+import { useQuery, useMutation, usePaginatedQuery, useAction } from 'convex/react'
 import { ArrowLeft } from "@/components/icons"
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card.tsx'
 import { Button } from '#/components/ui/button.tsx'
@@ -27,13 +27,15 @@ function formatMoment(ms: number): string {
  *  Resend-webhook wint van de verzendstatus). */
 function deliveryLabel(r: {
   status: string
-  delivery: 'delivered' | 'bounced' | 'read' | null
+  delivery: 'delivered' | 'bounced' | 'read' | 'failed' | null
 }): { label: string; tone: 'ok' | 'warn' | 'muted' } {
+  if (r.delivery === 'failed') return { label: 'Niet afgeleverd', tone: 'warn' }
   if (r.delivery === 'bounced') return { label: 'Gebounced', tone: 'warn' }
   if (r.delivery === 'read') return { label: 'Geopend', tone: 'ok' }
   if (r.delivery === 'delivered') return { label: 'Afgeleverd', tone: 'ok' }
   if (r.status === 'failed') return { label: 'Mislukt', tone: 'warn' }
   if (r.status === 'sent') return { label: 'Verzonden', tone: 'muted' }
+  if (r.status === 'sending') return { label: 'Verzendbevestiging afwachten', tone: 'warn' }
   return { label: 'In wachtrij', tone: 'muted' }
 }
 
@@ -44,6 +46,11 @@ function BroadcastDetail() {
   const cancel = useMutation(api.broadcasts.cancel)
   const schedule = useMutation(api.broadcasts.schedule)
   const restore = useMutation(api.broadcasts.restoreDraft)
+  const countAudience = useAction(api.broadcastAudience.count)
+  const health = useQuery(api.broadcastRecovery.health, b && b.startedAt !== undefined ? { broadcastId: b._id } : 'skip')
+  const resumePending = useMutation(api.broadcastRecovery.resumePending)
+  const [counting, setCounting] = useState(false)
+  const [countError, setCountError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [scheduleAt, setScheduleAt] = useState('')
@@ -100,6 +107,14 @@ function BroadcastDetail() {
     } finally { setBusy(false) }
   }
 
+  async function refreshAudience() {
+    setCounting(true)
+    setCountError(null)
+    try { await countAudience({ broadcastId: id as Id<'broadcasts'> }) }
+    catch (err) { setCountError(humanizeConvexError(err, 'Ontvangers tellen mislukt.')) }
+    finally { setCounting(false) }
+  }
+
   return (
     <div className="space-y-6 p-4">
       <Link to="/crm/campaigns" className="inline-flex items-center gap-1 text-sm text-zinc-500">
@@ -130,6 +145,39 @@ function BroadcastDetail() {
       </div>
 
       {scheduleError && <p role="alert" className="text-sm text-red-600">{scheduleError}</p>}
+      {b.lastError && <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{b.lastError}</p>}
+      {health && (b.status === 'sending' || b.status === 'failed') && (
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Verzendvoortgang</CardTitle></CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {b.lastActivityAt !== undefined && <p>Laatste activiteit: {formatMoment(b.lastActivityAt)}</p>}
+            {health.hasUnconfirmed && <p>Er zijn mails waarvan de verzendbevestiging nog ontbreekt. Deze worden niet als nieuwe mails opnieuw verstuurd.</p>}
+            {health.batches.map(batch => <div key={batch.id} className="rounded border border-zinc-300 p-3">
+              <p>{batch.recipients} ontvangers · {batch.status === 'needs_review' ? 'Controle nodig' : batch.status === 'processing' ? 'Bevestiging afwachten' : 'Nieuwe poging gepland'} · {batch.attempts} pogingen</p>
+              {batch.status === 'pending' && <p>Volgende poging: {formatMoment(batch.nextAttemptAt)}</p>}
+              {batch.error && <p className="text-amber-900">{batch.error}</p>}
+            </div>)}
+            {health.hasPending && b.status === 'failed' && <Button disabled={busy} onClick={async () => {
+              setBusy(true)
+              try { await resumePending({ broadcastId: b._id }) }
+              catch (err) { setScheduleError(humanizeConvexError(err, 'Hervatten mislukt.')) }
+              finally { setBusy(false) }
+            }}>Verder met wachtende ontvangers</Button>}
+          </CardContent>
+        </Card>
+      )}
+      {(b.status === 'draft' || b.status === 'scheduled') && (
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Verzendlijst vooraf</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-lg font-semibold">{b.audienceCount === undefined ? 'Aantal nog niet berekend' : `${b.audienceCount.toLocaleString('nl-NL')} unieke ontvangers`}</p>
+            {b.audienceCountedAt !== undefined && <p className="text-xs text-zinc-600">Berekend op {formatMoment(b.audienceCountedAt)}</p>}
+            <p className="text-sm text-zinc-600">Afmeldingen, ongeldige adressen en dubbele e-mailadressen worden uitgesloten. Bij verzending wordt de actuele doelgroep opnieuw gecontroleerd.</p>
+            <Button variant="outline" disabled={counting} onClick={() => void refreshAudience()}>{counting ? 'Volledige lijst tellen…' : 'Aantal ontvangers berekenen'}</Button>
+            {countError && <p role="alert" className="text-sm text-red-600">{countError}</p>}
+          </CardContent>
+        </Card>
+      )}
       {(b.status === 'draft' || b.status === 'scheduled') && (
         <Card>
           <CardHeader><CardTitle className="text-sm">{b.status === 'scheduled' ? 'Verzendmoment aanpassen' : 'Inplannen'}</CardTitle>
@@ -175,18 +223,20 @@ function BroadcastDetail() {
         </CardContent>
       </Card>
 
-      <Card>
+      {b.startedAt !== undefined && <Card>
         <CardHeader><CardTitle className="text-sm">Statistieken (live)</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-3 gap-3 md:grid-cols-7">
-          {stat('Totaal', b.stats.total)}
+        <CardContent className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {stat('Totaal ontvangers', b.stats.total)}
           {stat('Verzonden', b.stats.sent)}
           {stat('Afgeleverd', b.stats.delivered)}
           {stat('Geopend', b.stats.opened ?? 0)}
+          {stat('Geklikt', b.stats.clicked ?? 0)}
           {stat('Gebounced', b.stats.bounced)}
           {stat('Afgemeld', b.stats.unsubscribed)}
           {stat('Mislukt', b.stats.failed)}
+          <p className="col-span-2 text-xs text-zinc-600 md:col-span-4">Openingen en klikken tonen ontvangen meetgegevens. Hiervoor moeten tracking en de bijbehorende meldingen in Resend aanstaan. Een nul betekent daarom niet altijd dat niemand de mail heeft geopend of aangeklikt.</p>
         </CardContent>
-      </Card>
+      </Card>}
 
       {b.stats.total > 0 && (
         <Card>

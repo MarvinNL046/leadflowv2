@@ -21,8 +21,19 @@ export function isMailable(c: {
   emailMarketingStatus?: string;
   email?: string;
 }): boolean {
-  if (!c.email) return false;
+  if (!isValidMarketingEmail(c.email)) return false;
   return c.emailMarketingStatus !== "unsubscribed" && c.emailMarketingStatus !== "cleaned";
+}
+
+/** Plain recipient address; reserved example/test domains must never reach a batch. */
+export function isValidMarketingEmail(email?: string): boolean {
+  if (!email) return false;
+  const normalized = email.trim();
+  if (normalized.length > 254 || !/^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$/.test(normalized)) return false;
+  const [local, domain] = normalized.toLowerCase().split('@');
+  if (local.length > 64 || local.startsWith('.') || local.endsWith('.') || local.includes('..')) return false;
+  if (domain.split('.').some(part => !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(part))) return false;
+  return !/(^|\.)(example\.(com|net|org)|invalid|localhost|test)$/.test(domain);
 }
 
 function fieldValue(c: MatchableContact, field: string): unknown {
@@ -84,10 +95,11 @@ export function dedupeByEmail<T extends { email?: string }>(rows: T[]): T[] {
   const out: T[] = [];
   for (const r of rows) {
     if (!r.email) continue;
-    const key = r.email.toLowerCase();
+    const key = r.email.trim().toLowerCase();
+    if (!key) continue;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(r);
+    out.push({ ...r, email: r.email.trim() });
   }
   return out;
 }

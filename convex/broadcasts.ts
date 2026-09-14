@@ -19,11 +19,11 @@ import { renderTemplate, htmlToPlainText, leadTemplateVars } from "./templateRen
 import { signUnsubToken } from "./unsubscribeToken";
 import { buildListUnsubHeaders } from "./broadcastsLogic";
 import { renderEmailShell } from "./emailShell";
-import { dedupeByEmail } from "./segmentsLogic";
+import { dedupeByEmail, isMailable } from "./segmentsLogic";
+import { MAX_BATCH_BYTES } from './broadcastDelivery';
 
 const RESEND_BATCH_URL = "https://api.resend.com/emails/batch";
-const BATCH_SIZE = 100;
-const BATCH_DELAY_MS = 10_000;
+const BATCH_SIZE = 20;
 
 async function requireWorkspace(ctx: QueryCtx, workspaceId: Id<"workspaces">, permission: CompanyPermission = 'crm') {
   return (await requireWorkspacePermission(ctx, workspaceId, permission)).userId;
@@ -104,7 +104,7 @@ export const recipientsPage = query({
       });
     const rows = await Promise.all(
       page.page.map(async (r) => {
-        let delivery: "delivered" | "bounced" | "read" | null = null;
+        let delivery: "delivered" | "bounced" | "read" | "failed" | null = null;
         let bounceReason: string | undefined;
         if (r.externalMessageId !== undefined) {
           const message = await ctx.db
@@ -113,7 +113,7 @@ export const recipientsPage = query({
               q.eq("externalMessageId", r.externalMessageId as string),
             )
             .first();
-          if (message?.status === "delivered" || message?.status === "bounced" || message?.status === "read") {
+          if (message?.status === "delivered" || message?.status === "bounced" || message?.status === "read" || message?.status === "failed") {
             delivery = message.status;
           }
           if (message?.status === "bounced") {
@@ -147,9 +147,10 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     await requireWorkspace(ctx, args.workspaceId, 'manage');
+    if (!args.name.trim() || !args.subject.trim() || !args.body.trim()) throw new Error('Vul naam, onderwerp en inhoud in.');
     const segment = await ctx.db.get(args.segmentId);
     if (!segment || segment.workspaceId !== args.workspaceId) throw new Error('Ongeldig segment');
-    return await ctx.db.insert("broadcasts", {
+    const id = await ctx.db.insert("broadcasts", {
       workspaceId: args.workspaceId,
       name: args.name,
       subject: args.subject,
@@ -159,6 +160,8 @@ export const create = mutation({
       status: "draft",
       stats: ZERO_STATS,
     });
+    await ctx.scheduler.runAfter(0, internal.broadcastAudience.refresh, { broadcastId: id });
+    return id;
   },
 });
 
@@ -189,7 +192,8 @@ export const update = mutation({
     const segment = await ctx.db.get(fields.segmentId);
     if (!segment || segment.workspaceId !== b.workspaceId) throw new Error("Ongeldig segment.");
     if (!fields.name.trim() || !fields.subject.trim() || !fields.body.trim()) throw new Error("Vul naam, onderwerp en inhoud in.");
-    await ctx.db.patch(broadcastId, fields);
+    await ctx.db.patch(broadcastId, { ...fields, audienceCount: undefined, audienceCountedAt: undefined, audienceRules: undefined });
+    await ctx.scheduler.runAfter(0, internal.broadcastAudience.refresh, { broadcastId });
     return null;
   },
 });
@@ -271,7 +275,7 @@ async function runSendPipeline(
       workspaceId: b.workspaceId,
       rules: seg.rules,
       cursor,
-      numItems: 500,
+      numItems: 200,
     });
     allRecipients.push(...result.recipients);
     cursor = result.continueCursor;
@@ -280,6 +284,7 @@ async function runSendPipeline(
 
   // Stap 2: dedupe op lowercased email
   const deduped = dedupeByEmail(allRecipients);
+  if (!deduped.length) throw new Error("Deze doelgroep bevat geen mailbare ontvangers.");
 
   // Stap 3: schrijf broadcastRecipients-rijen in chunks van ≤ 500
   const CHUNK = 500;
@@ -296,7 +301,6 @@ async function runSendPipeline(
     broadcastId,
     total: deduped.length,
   });
-  await ctx.scheduler.runAfter(0, internal.broadcasts.runBatch, { broadcastId });
   return { total: deduped.length };
 }
 
@@ -315,7 +319,7 @@ export const sendNow = action({
     try {
       return await runSendPipeline(ctx, args.broadcastId);
     } catch (err) {
-      // Reset naar "draft" zodat de gebruiker de broadcast opnieuw kan proberen.
+      // A partially prepared audience must not be restarted as a fresh campaign.
       await ctx.runMutation(internal.broadcasts.resetToDraft, { broadcastId: args.broadcastId });
       throw err;
     }
@@ -341,6 +345,7 @@ export const schedule = mutation({
       throw new Error("Kies een moment in de toekomst.");
     }
     if (b.scheduledJobId) await ctx.scheduler.cancel(b.scheduledJobId);
+    await ctx.scheduler.runAfter(0, internal.broadcastAudience.refresh, { broadcastId: b._id });
     const scheduledJobId = await ctx.scheduler.runAt(args.scheduledAt, internal.broadcasts.runScheduled, {
       broadcastId: args.broadcastId,
       scheduledAt: args.scheduledAt,
@@ -360,7 +365,7 @@ export const beginScheduledSend = internalMutation({
     // Legacy jobs have no timestamp: they must still respect the current slot.
     if (b.scheduledAt === undefined || b.scheduledAt > Date.now()) return { started: false as const };
     if (args.scheduledAt !== undefined && args.scheduledAt !== b.scheduledAt) return { started: false as const };
-    await ctx.db.patch(args.broadcastId, { status: "sending", startedAt: Date.now() });
+    await ctx.db.patch(args.broadcastId, { status: "sending", startedAt: Date.now(), recipientsReady: false });
     return { started: true as const };
   },
 });
@@ -379,7 +384,7 @@ export const runScheduled = internalAction({
       await runSendPipeline(ctx, args.broadcastId);
     } catch (err) {
       console.error(`[runScheduled] broadcast ${args.broadcastId}:`, err);
-      await ctx.runMutation(internal.broadcasts.markFailed, { broadcastId: args.broadcastId });
+      await ctx.runMutation(internal.broadcasts.preparationFailed, { broadcastId: args.broadcastId, error: err instanceof Error ? err.message : 'Voorbereiden van de verzendlijst mislukt.' });
     }
   },
 });
@@ -444,7 +449,7 @@ export const resetToDraft = internalMutation({
   handler: async (ctx, args) => {
     const b = await ctx.db.get(args.broadcastId);
     if (b && b.status === "sending") {
-      await ctx.db.patch(args.broadcastId, { status: "draft", startedAt: undefined });
+      await ctx.db.patch(args.broadcastId, { status: "failed", lastError: 'Voorbereiden van de verzendlijst is afgebroken. Controleer de ontvangers voordat u hervat.' });
     }
   },
 });
@@ -458,7 +463,7 @@ export const beginSend = internalMutation({
     const b = await ctx.db.get(args.broadcastId);
     if (!b) return { started: false as const };
     if (b.status !== "draft") return { started: false as const };
-    await ctx.db.patch(args.broadcastId, { status: "sending", startedAt: Date.now() });
+    await ctx.db.patch(args.broadcastId, { status: "sending", startedAt: Date.now(), recipientsReady: false });
     return { started: true as const };
   },
 });
@@ -470,7 +475,8 @@ export const setTotal = internalMutation({
   handler: async (ctx, args) => {
     const b = await ctx.db.get(args.broadcastId);
     if (!b) return;
-    await ctx.db.patch(args.broadcastId, { stats: { ...b.stats, total: args.total } });
+    await ctx.db.patch(args.broadcastId, { stats: { ...b.stats, total: args.total }, recipientsReady: true, lastActivityAt: Date.now() });
+    if (b.status === 'sending') await ctx.scheduler.runAfter(0, internal.broadcasts.runBatch, { broadcastId: b._id });
   },
 });
 
@@ -487,7 +493,11 @@ export const addRecipients = internalMutation({
     })),
   },
   handler: async (ctx, args) => {
+    const broadcast = await ctx.db.get(args.broadcastId);
+    if (!broadcast || broadcast.status !== 'sending' || broadcast.workspaceId !== args.workspaceId) throw new Error('Campagne is niet actief.');
     for (const r of args.rows) {
+      const existing = await ctx.db.query('broadcastRecipients').withIndex('by_broadcast_contact', q => q.eq('broadcastId', args.broadcastId).eq('contactId', r.contactId)).first();
+      if (existing) continue;
       await ctx.db.insert("broadcastRecipients", {
         broadcastId: args.broadcastId,
         workspaceId: args.workspaceId,
@@ -552,6 +562,8 @@ export const recordSends = internalMutation({
     let sent = 0;
     let failed = 0;
     for (const s of args.sends) {
+      const recipient = await ctx.db.get(s.recipientId);
+      if (!recipient || recipient.broadcastId !== args.broadcastId || recipient.workspaceId !== args.workspaceId || recipient.status !== 'sending') continue;
       // Patch de broadcastRecipients-rij (sending → sent/failed)
       await ctx.db.patch(s.recipientId, {
         status: s.failed ? "failed" : "sent",
@@ -592,6 +604,7 @@ export const finishSending = internalMutation({
   handler: async (ctx, args) => {
     const b = await ctx.db.get(args.broadcastId);
     if (!b || b.status !== "sending") return;
+    if (b.recipientsReady === false) return;
     // Guard: finaliseer de broadcast pas als er GEEN "pending" én GEEN "sending"
     // ontvangers meer zijn. In-flight "sending"-rijen (batch crashte na claimBatch
     // maar vóór recordSends) voorkomen premature afsluiting.
@@ -608,7 +621,7 @@ export const finishSending = internalMutation({
       )
       .first();
     if (stillPending || stillSending) return; // niet finaliseren zolang er werk in-flight is
-    await ctx.db.patch(args.broadcastId, { status: "sent", completedAt: Date.now() });
+    await ctx.db.patch(args.broadcastId, { status: "sent", completedAt: Date.now(), lastActivityAt: Date.now(), lastError: undefined });
   },
 });
 
@@ -643,98 +656,74 @@ export const bumpStatFromExternalId = internalMutation({
   },
 });
 
+/** Prepare first, then atomically persist the request, claim rows and schedule delivery. */
 export const runBatch = internalAction({
   args: { broadcastId: v.id("broadcasts") },
-  handler: async (ctx, args): Promise<void> => {
-    const b = await ctx.runQuery(internal.broadcasts.loadForSend, { broadcastId: args.broadcastId });
-    if (!b || b.status === "cancelled") return;
-
-    // Fix 2c: gebruik claimBatch i.p.v. nextPendingRecipients — atomisch claim
-    // flipt pending→sending zodat gelijktijdige runBatch-aanroepen dezelfde
-    // batch nooit dubbel verwerken.
-    const claimed = await ctx.runMutation(internal.broadcasts.claimBatch, {
-      broadcastId: args.broadcastId,
-      limit: BATCH_SIZE,
-    });
-
-    if (claimed.length === 0) {
-      await ctx.runMutation(internal.broadcasts.finishSending, { broadcastId: args.broadcastId });
-      return;
-    }
-
-    const siteUrl = process.env.CONVEX_SITE_URL ?? "";
-
-    const emails = await Promise.all(
-      claimed.map(async (r) => {
-        const token = await signUnsubToken(String(r.contactId));
-        const unsubUrl = `${siteUrl}/unsubscribe?token=${token}`;
-        const vars = leadTemplateVars(
-          { firstName: r.firstName ?? "", lastName: r.lastName ?? "" },
-          b.companyName,
-        );
-        const html = renderEmailShell(renderTemplate(b.body ?? "", vars), {
-          companyName: b.companyName,
-          unsubUrl,
-          previewText: renderTemplate(b.subject, vars),
-        });
-        return {
-          from: b.from,
-          to: r.email,
-          subject: renderTemplate(b.subject, vars),
-          html,
-          text: htmlToPlainText(html),
-          headers: buildListUnsubHeaders(unsubUrl),
-          _recipientId: r._id,
-          _contactId: r.contactId,
-        };
-      }),
-    );
-
-    // Fix 3: onderscheid echte Resend-fout van JSON-parse-fout.
-    // fetch-throws of !res.ok → batchFailed=true.
-    // res.ok maar res.json() gooit → partial results, ontvangers toch "sent"
-    // (externalMessageId=undefined). Crash hier NIET de hele batch.
-    let results: Array<{ id?: string }> = [];
-    let batchFailed = false;
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
     try {
-      results = await postBatch(emails.map(({ _recipientId: _r, _contactId: _c, ...e }) => e), b.emailApiKey);
-    } catch {
-      batchFailed = true;
+      const b = await ctx.runQuery(internal.broadcasts.loadForSend, args);
+      if (!b || b.status !== 'sending') return null;
+      const pending = await ctx.runMutation(internal.broadcasts.pendingForPreparation, args);
+      if (!pending.length) {
+        await ctx.runMutation(internal.broadcasts.finishSending, args);
+        return null;
+      }
+      const siteUrl = process.env.CONVEX_SITE_URL;
+      if (!siteUrl) throw new Error('Afmeldadres ontbreekt.');
+      const payload = [];
+      const recipientIds = [];
+      for (const r of pending) {
+        const token = await signUnsubToken(String(r.contactId));
+        const unsubUrl = siteUrl + '/unsubscribe?token=' + token;
+        const vars = leadTemplateVars({ firstName: r.firstName ?? '', lastName: r.lastName ?? '' }, b.companyName);
+        const subject = renderTemplate(b.subject, vars);
+        const html = renderEmailShell(renderTemplate(b.body ?? '', vars), { companyName: b.companyName, unsubUrl, previewText: subject });
+        const email = { from: b.from, to: r.email.trim(), subject, html, text: htmlToPlainText(html), headers: buildListUnsubHeaders(unsubUrl) };
+        if (new TextEncoder().encode(JSON.stringify([...payload, email])).length > MAX_BATCH_BYTES) {
+          if (!payload.length) throw new Error('De mail is te groot. Verklein de inhoud of afbeeldingen.');
+          break;
+        }
+        payload.push(email);
+        recipientIds.push(r._id);
+      }
+      await ctx.runMutation(internal.broadcastDelivery.enqueue, { broadcastId: b._id, recipientIds, payload: JSON.stringify(payload), emailConnectionId: b.emailConnectionId });
+    } catch (err) {
+      await ctx.runMutation(internal.broadcasts.preparationFailed, { broadcastId: args.broadcastId, error: err instanceof Error ? err.message : 'Mail voorbereiden mislukt.' });
     }
+    return null;
+  },
+});
 
-    // Fix 4: waarschuw bij lengte-mismatch zonder te crashen.
-    if (!batchFailed && results.length !== emails.length) {
-      console.warn(
-        `[runBatch] Resend-response bevat ${results.length} items maar we stuurden ${emails.length} e-mails. Ontbrekende ids worden als undefined opgeslagen.`,
-      );
+export const preparationFailed = internalMutation({
+  args: { broadcastId: v.id('broadcasts'), error: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const b = await ctx.db.get(args.broadcastId);
+    if (b?.status === 'sending') await ctx.db.patch(b._id, { status: 'failed', lastError: args.error.slice(0, 400), lastActivityAt: Date.now() });
+    return null;
+  },
+});
+
+export const pendingForPreparation = internalMutation({
+  args: { broadcastId: v.id('broadcasts') },
+  returns: v.array(v.object({ _id: v.id('broadcastRecipients'), contactId: v.id('contacts'), email: v.string(), firstName: v.optional(v.string()), lastName: v.optional(v.string()) })),
+  handler: async (ctx, args) => {
+    const b = await ctx.db.get(args.broadcastId);
+    if (!b || b.status !== 'sending') return [];
+    const rows = await ctx.db.query('broadcastRecipients').withIndex('by_broadcast_status', q => q.eq('broadcastId', args.broadcastId).eq('status', 'pending')).take(BATCH_SIZE);
+    const eligible = [];
+    let failed = 0;
+    for (const r of rows) {
+      const c = await ctx.db.get(r.contactId);
+      if (!c || c.workspaceId !== b.workspaceId || c.deletedAt || !isMailable(c) || c.email?.trim().toLowerCase() !== r.email.trim().toLowerCase()) {
+        await ctx.db.patch(r._id, { status: 'failed', errorMessage: 'Overgeslagen: afgemeld, ongeldig, verwijderd of e-mailadres gewijzigd.' });
+        failed++;
+      } else eligible.push(r);
     }
-
-    await ctx.runMutation(internal.broadcasts.recordSends, {
-      broadcastId: args.broadcastId,
-      workspaceId: b.workspaceId,
-      emailConnectionId:b.emailConnectionId,
-      subject: b.subject,
-      sends: emails.map((e, i) => ({
-        recipientId: e._recipientId,
-        contactId: e._contactId,
-        to: e.to,
-        externalMessageId: batchFailed ? undefined : results[i]?.id,
-        failed: batchFailed,
-        errorMessage: batchFailed ? "Resend batch-call mislukt" : undefined,
-      })),
-    });
-
-    // Bij een mislukte batch-call: markeer de broadcast als failed en STOP
-    // (geen reschedule). De failed-rows tellen niet als 'verzonden', dus een
-    // latere handmatige hervatting pakt deze contacten alsnog op.
-    if (batchFailed) {
-      await ctx.runMutation(internal.broadcasts.markFailed, { broadcastId: args.broadcastId });
-      return;
-    }
-    // Volgende batch inplannen (getemporiseerd) zolang er nog pending-rijen zijn.
-    await ctx.scheduler.runAfter(BATCH_DELAY_MS, internal.broadcasts.runBatch, {
-      broadcastId: args.broadcastId,
-    });
+    if (failed) await ctx.db.patch(b._id, { stats: { ...b.stats, failed: b.stats.failed + failed } });
+    if (!eligible.length && rows.length) await ctx.scheduler.runAfter(10_000, internal.broadcasts.runBatch, args);
+    return eligible.map(r => ({ _id: r._id, contactId: r.contactId, email: r.email, firstName: r.firstName, lastName: r.lastName }));
   },
 });
 
@@ -775,50 +764,25 @@ export const backfillOpenedStat = internalMutation({
  *  de veilige richting voor e-mail. We loggen ze alleen. */
 export const sweepStalledBroadcasts = internalMutation({
   args: {},
+  returns: v.null(),
   handler: async (ctx) => {
-    const sending = await ctx.db
-      .query("broadcasts")
-      .filter((q) => q.eq(q.field("status"), "sending"))
-      .collect();
+    const sending = await ctx.db.query('broadcasts').withIndex('by_status', q => q.eq('status', 'sending')).take(100);
     for (const b of sending) {
-      // Startvertraging: addRecipients kan even duren; niets doen in de
-      // eerste 2 minuten na de start.
-      if (b.startedAt !== undefined && Date.now() - b.startedAt < 2 * 60_000) continue;
-      const pending = await ctx.db
-        .query("broadcastRecipients")
-        .withIndex("by_broadcast_status", (q) =>
-          q.eq("broadcastId", b._id).eq("status", "pending"),
-        )
-        .first();
-      if (!pending) continue;
-      const inflight = await ctx.db.system
-        .query("_scheduled_functions")
-        .filter((q) =>
-          q.or(
-            q.eq(q.field("state.kind"), "pending"),
-            q.eq(q.field("state.kind"), "inProgress"),
-          ),
-        )
-        .collect();
-      const hasRunBatch = inflight.some(
-        (j) =>
-          j.name === "broadcasts.js:runBatch" &&
-          (j.args[0] as { broadcastId?: string } | undefined)?.broadcastId === (b._id as string),
-      );
-      if (hasRunBatch) continue;
-      const stuck = await ctx.db
-        .query("broadcastRecipients")
-        .withIndex("by_broadcast_status", (q) =>
-          q.eq("broadcastId", b._id).eq("status", "sending"),
-        )
-        .collect();
-      console.warn(
-        `[sweepStalledBroadcasts] Broadcast ${b._id} ("${b.name}") stilgevallen: keten her-aangetrapt. ${stuck.length} rijen staan op "sending" (handmatig checken tegen Resend).`,
-      );
-      await ctx.scheduler.runAfter(0, internal.broadcasts.runBatch, {
-        broadcastId: b._id,
-      });
+      if (Date.now() - (b.lastActivityAt ?? b.startedAt ?? Date.now()) < 12 * 60_000) continue;
+      // Never send a partially materialized audience from an interrupted preparation.
+      if (b.recipientsReady === false || (b.recipientsReady === undefined && b.stats.total === 0)) {
+        await ctx.db.patch(b._id, { status: 'failed', lastError: 'Verzendlijst niet volledig voorbereid. Controle nodig.' });
+        continue;
+      }
+      const pending = await ctx.db.query('broadcastRecipients').withIndex('by_broadcast_status', q => q.eq('broadcastId', b._id).eq('status', 'pending')).first();
+      if (pending) await ctx.scheduler.runAfter(0, internal.broadcasts.runBatch, { broadcastId: b._id });
+      else {
+        const stuck = await ctx.db.query('broadcastRecipients').withIndex('by_broadcast_status', q => q.eq('broadcastId', b._id).eq('status', 'sending')).first();
+        if (stuck) await ctx.db.patch(b._id, { lastError: 'Er zijn ontvangers zonder verzendbevestiging. Controleer de batches; oude verzendingen worden niet automatisch herhaald.' });
+        else await ctx.scheduler.runAfter(0, internal.broadcasts.finishSending, { broadcastId: b._id });
+      }
     }
+    return null;
   },
 });
 
@@ -844,14 +808,11 @@ async function postBatch(
     const text = await res.text();
     throw new Error(`Resend batch ${res.status}: ${text.slice(0, 200)}`);
   }
-  // Fix 3: JSON-parse-fout is geen netwerk/Resend-fout; vang apart op zodat
-  // de batch niet als "failed" wordt gemarkeerd terwijl de e-mails wél
-  // verstuurd zijn. Geef lege array terug — caller slaat ids op als undefined.
   try {
     const data = (await res.json()) as { data?: Array<{ id?: string }> };
-    return data.data ?? [];
+    if (!Array.isArray(data.data) || data.data.length !== emails.length || data.data.some(item => !item.id)) throw new Error('Incomplete confirmation');
+    return data.data;
   } catch {
-    console.warn("[postBatch] res.ok maar JSON-parse mislukt; ids worden niet opgeslagen.");
-    return [];
+    throw new Error('Resend heeft de testmail mogelijk verzonden, maar de bevestiging ontbreekt. Controleer Resend voordat u opnieuw test.');
   }
 }

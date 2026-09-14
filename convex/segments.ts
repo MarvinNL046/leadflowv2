@@ -168,12 +168,16 @@ export const preview = query({
       .withIndex("by_workspace_created", (q) => q.eq("workspaceId", args.workspaceId))
       .paginate({ cursor: null, numItems: scanCap });
     let count = 0;
+    const seen = new Set<string>();
     const sample: Array<{ email: string; name: string }> = [];
     for (const c of page.page) {
       if (c.deletedAt) continue;
       if (!isMailable({ emailMarketingStatus: c.emailMarketingStatus, email: c.email })) continue;
       const m = await toMatchable(ctx, c, joins);
       if (!contactMatchesRules(m, args.rules)) continue;
+      const address = c.email!.trim().toLowerCase();
+      if (seen.has(address)) continue;
+      seen.add(address);
       count++;
       if (sample.length < 10) {
         sample.push({
