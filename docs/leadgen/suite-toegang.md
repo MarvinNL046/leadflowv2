@@ -105,3 +105,14 @@ Je ziet **In behandeling**, **Goedgekeurd** of **Afgewezen**, met de laatste toe
 Als platform-superadmin vind je onderaan dezelfde pagina **Uitbreidingsaanvragen · platformbeheer**. Vul een toelichting van 5–500 tekens in en kies Goedkeuren of Afwijzen. De toelichting is zichtbaar voor het bedrijf: zet hier geen interne of vertrouwelijke aantekeningen in. Een beoordeling kan met een nieuwe toelichting worden herzien; eerdere beoordelingen blijven in het logboek. Bij gelijktijdige wijzigingen wordt een verouderde beoordeling geweigerd.
 
 Activering blijft verlopen via de bestaande suite-koppeling en toegang met einddatum. Goedkeuren wijzigt geen gebruikersrol, betaalafspraak of productrecht. Er worden door deze aanvraagflow geen e-mails verzonden of kosten afgeschreven.
+
+## Status lezen en verdergaan
+
+Op Apps & uitbreidingen staan per product drie stappen: **Aanvraag**, **Bedrijfsaccount** en **Producttoegang via LeadFlow**. Een goedgekeurde aanvraag is akkoord om de inrichting te bespreken. Alleen een actieve producttoekenning geeft suite-toegang. Een bestaand zelfstandig abonnement wordt in de doelapp gecontroleerd.
+
+- **Goedgekeurd, nog niet gekoppeld:** de eigenaar koppelt het bestaande bedrijfsaccount via de link op de kaart. Maak geen tweede bedrijf aan.
+- **Gekoppeld, toegang niet actief of verlopen:** vraag de platformbeheerder om toekenning of verlenging. Opnieuw koppelen helpt niet.
+- **Toegang actief, app toont nog een blokkade:** open de toegangscontrole in Cashflow en klik op Toegang vernieuwen. Lees daarna de getoonde actuele status. Een geslaagde controle betekent op zichzelf niet dat toegang is toegekend.
+- **Bestaande inrichting:** controleer in de doelapp welke administratie en zelfstandige toegang actief zijn. LeadFlow presenteert dit niet als nieuwe suite-toekenning.
+
+Beheerders zien verlopen toekenningen ook als verlopen wanneer de oude aan/uit-vlag nog aanstaat. De einddatum en alle backendbevoegdheden blijven ongewijzigd.

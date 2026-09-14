@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { suiteStatus } from "#/lib/suite-status";
+import { useStatusTime } from "#/lib/use-status-time";
 import type { Id } from "../../convex/_generated/dataModel";
 import { SuiteAccess } from "#/components/crm/suite-access";
 import { createFileRoute } from "@tanstack/react-router";
@@ -33,6 +35,11 @@ function Page() {
 		api.appRequests.status,
 		workspaceId ? { workspaceId } : "skip",
 	);
+	const suite = useQuery(
+		api.suiteAccess.company,
+		workspaceId ? { workspaceId } : "skip",
+	);
+	const now = useStatusTime();
 	const profile = useQuery(api.userProfiles.me);
 	const request = useMutation(api.appRequests.request);
 	const [busy, setBusy] = useState(false),
@@ -65,97 +72,153 @@ function Page() {
 				</p>
 			)}
 			{!access ? (
-				<p role="status">Bedrijfstoegang laden…</p>
+				<output className="block">Bedrijfstoegang laden…</output>
 			) : (
 				<div className="grid gap-4 sm:grid-cols-2">
-					{products.map((p) => (
-						<Card key={p.key}>
-							<CardContent className="space-y-4 p-5">
-								<h2 className="text-lg font-semibold">{p.name}</h2>
-								<p className="text-sm text-muted-foreground">{p.description}</p>
-								{access.existingSuite || access.active.includes(p.key) ? (
-									<>
-										<Badge>
-											{access.existingSuite
-												? "Bestaande bedrijfskoppeling"
-												: "Suite-toegang toegekend"}
-										</Badge>
-										<p className="text-sm">
-											Je rechten in {p.name} bepalen welke gegevens je daar kunt
-											openen.
+					{products.map((p) => {
+						const binding = suite?.bindings.find((b) => b.product === p.key);
+						const entitlement = suiteStatus(binding, now);
+						const application = access.requests.find(
+							(r) => r.product === p.key,
+						);
+						const legacy = access.existingSuite && !binding;
+						const active = entitlement.state === "active";
+						const next = !suite
+							? "Koppelstatus laden…"
+							: legacy
+								? `Er is een bestaande inrichting. Controleer in ${p.name} met welk bedrijf je werkt en welke toegang daar geldt.`
+								: active
+									? `Je kunt ${p.name} openen. Zie je daar nog een blokkade? Vernieuw de toegangsstatus in die app.`
+									: binding
+										? "Je bedrijfsaccount is gekoppeld. Vraag de platformbeheerder om producttoegang toe te kennen of te verlengen. Is dat al gedaan? Vernieuw de status in de app."
+										: application?.status === "approved"
+											? suite.canPair
+												? "Je aanvraag is goedgekeurd. Koppel hieronder eerst je bestaande bedrijfsaccount; daarna kent de platformbeheerder producttoegang toe."
+												: "Vraag je bedrijfseigenaar het bestaande bedrijfsaccount te koppelen. Daarna kent de platformbeheerder producttoegang toe."
+											: application?.status === "pending"
+												? "De platformbeheerder beoordeelt je aanvraag. Goedkeuring activeert de app nog niet."
+												: application?.status === "rejected"
+													? "Bekijk de toelichting. Neem bij vragen contact op met de platformbeheerder."
+													: access.canRequest
+														? "Vraag deze uitbreiding aan om de mogelijkheden en inrichting te bespreken."
+														: "Vraag je bedrijfseigenaar om deze uitbreiding aan te vragen.";
+						return (
+							<Card key={p.key}>
+								<CardContent className="space-y-4 p-5">
+									<h2 className="text-lg font-semibold">{p.name}</h2>
+									<p className="text-sm text-muted-foreground">
+										{p.description}
+									</p>
+									<dl className="space-y-2 text-sm">
+										<div>
+											<dt className="font-medium">1. Aanvraag</dt>
+											<dd>
+												{application
+													? requestLabels[application.status]
+													: legacy
+														? "Bestaande inrichting"
+														: "Geen aanvraag"}
+											</dd>
+										</div>
+										<div>
+											<dt className="font-medium">2. Bedrijfsaccount</dt>
+											<dd>
+												{!suite
+													? "Laden…"
+													: binding
+														? "Gekoppeld"
+														: legacy
+															? "Bestaande inrichting; controleer in de app"
+															: "Nog niet gekoppeld"}
+											</dd>
+										</div>
+										<div>
+											<dt className="font-medium">
+												3. Producttoegang via LeadFlow
+											</dt>
+											<dd>
+												{!suite
+													? "Laden…"
+													: legacy
+														? "Toegang wordt in de app bepaald"
+														: binding
+															? entitlement.label
+															: "Nog niet toegekend"}
+												{binding &&
+													active &&
+													` tot en met ${new Date(binding.validUntil).toLocaleDateString("nl-NL")}`}
+											</dd>
+										</div>
+									</dl>
+									<p className="text-sm">
+										<strong>Volgende stap: </strong>
+										{next}
+									</p>
+									{application?.reviewNote && (
+										<p className="whitespace-pre-wrap text-sm">
+											Toelichting: {application.reviewNote}
 										</p>
+									)}
+									{suite && (active || legacy) && (
 										<Button asChild>
 											<a href={p.url} target="_blank" rel="noreferrer">
 												Open {p.name}
 											</a>
 										</Button>
-									</>
-								) : access.requested.includes(p.key) ? (
-									<>
-										<Badge>
-											{
-												requestLabels[
-													access.requests.find((r) => r.product === p.key)
-														?.status ?? "pending"
-												]
-											}
-										</Badge>
-										<p role="status" className="text-sm">
-											{access.requests.find((r) => r.product === p.key)
-												?.status === "approved"
-												? "Je aanvraag is goedgekeurd voor verdere inrichting. Producttoegang wordt apart geactiveerd."
-												: access.requests.find((r) => r.product === p.key)
-															?.status === "rejected"
-													? "Je aanvraag is afgewezen. Bekijk de toelichting; neem bij vragen contact op met de platformbeheerder."
-													: "Je aanvraag is in behandeling bij de platformbeheerder."}
+									)}
+									{suite && binding && (
+										<p>
+											<a
+												className="text-sm underline"
+												href={`https://${p.key}.wetry.app/leadflow-koppelen`}
+												target="_blank"
+												rel="noreferrer"
+											>
+												Toegangsstatus in {p.name} controleren
+											</a>
 										</p>
-										{access.requests.find((r) => r.product === p.key)
-											?.reviewNote && (
-											<p className="whitespace-pre-wrap text-sm">
-												Toelichting:{" "}
-												{
-													access.requests.find((r) => r.product === p.key)
-														?.reviewNote
-												}
-											</p>
+									)}
+									{suite &&
+										!binding &&
+										!legacy &&
+										application?.status === "approved" &&
+										suite.canPair && (
+											<a
+												className="block text-sm underline"
+												href="#bedrijfsaccounts"
+											>
+												Bedrijfsaccount koppelen
+											</a>
 										)}
-										{access.requests.find((r) => r.product === p.key)
-											?.reviewedAt && (
-											<p className="text-xs text-muted-foreground">
-												Beoordeeld op{" "}
-												{new Date(
-													access.requests.find((r) => r.product === p.key)!
-														.reviewedAt!,
-												).toLocaleString("nl-NL")}
-											</p>
+									{suite &&
+										!binding &&
+										!legacy &&
+										!application &&
+										access.canRequest && (
+											<Button
+												disabled={busy}
+												onClick={async () => {
+													if (!workspaceId) return;
+													setBusy(true);
+													setError("");
+													try {
+														await request({ workspaceId, product: p.key });
+													} catch {
+														setError(
+															"Aanvragen is niet gelukt. Probeer opnieuw.",
+														);
+													} finally {
+														setBusy(false);
+													}
+												}}
+											>
+												Uitbreiding aanvragen
+											</Button>
 										)}
-									</>
-								) : access.canRequest ? (
-									<Button
-										disabled={busy}
-										onClick={async () => {
-											if (!workspaceId) return;
-											setBusy(true);
-											setError("");
-											try {
-												await request({ workspaceId, product: p.key });
-											} catch {
-												setError("Aanvragen is niet gelukt. Probeer opnieuw.");
-											} finally {
-												setBusy(false);
-											}
-										}}
-									>
-										Uitbreiding aanvragen
-									</Button>
-								) : (
-									<p className="text-sm">
-										Vraag je bedrijfseigenaar om deze uitbreiding aan te vragen.
-									</p>
-								)}
-							</CardContent>
-						</Card>
-					))}
+								</CardContent>
+							</Card>
+						);
+					})}
 				</div>
 			)}
 			{workspaceId && (
@@ -291,7 +354,7 @@ function RequestReview({
 						Afwijzen
 					</Button>
 				</div>
-				{message && <p role="status">{message}</p>}
+				{message && <output className="block">{message}</output>}
 			</CardContent>
 		</Card>
 	);
