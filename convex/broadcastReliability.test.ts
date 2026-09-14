@@ -212,3 +212,40 @@ test('out-of-order opens, delivery and repeated clicks increment each metric onc
   for (const newStatus of ['read', 'delivered', 'delivered', 'clicked', 'clicked'] as const) await t.mutation(internal.messaging.updateStatusByExternalId, { externalMessageId: 'a', channel: 'email', newStatus, deliveredAt: Date.now() });
   expect((await t.run(ctx => ctx.db.get(broadcastId)))!.stats).toMatchObject({ opened: 1, delivered: 1, clicked: 1 });
 });
+
+test('conversion after preparation excludes the contact before the first provider request', async () => {
+  const { t, broadcastId, segmentId, recipientIds, payload } = await setup();
+  await t.run(async ctx => {
+    await ctx.db.patch(segmentId, { rules: { match: 'all', conditions: [{ field: 'tags', op: 'contains', value: 'needs-maintenance' }] } });
+    for (const id of recipientIds) { const r = (await ctx.db.get(id))!; await ctx.db.patch(r.contactId, { tags: ['needs-maintenance'] }); }
+  });
+  const batchId = (await t.mutation(internal.broadcastDelivery.enqueue, { broadcastId, recipientIds, payload }))!;
+  await t.run(async ctx => { const r = (await ctx.db.get(recipientIds[0]))!; await ctx.db.patch(r.contactId, { tags: [] }); });
+  const fetchMock = vi.fn().mockResolvedValue(Response.json({ data: [{ id: 'remaining' }] }));
+  vi.stubGlobal('fetch', fetchMock);
+  await t.action(internal.broadcastDelivery.deliver, { batchId });
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body).map((email: { to: string }) => email.to)).toEqual(['second@real.nl']);
+  expect((await t.run(ctx => ctx.db.get(broadcastId)))!.stats).toMatchObject({ sent: 1, failed: 1 });
+});
+
+test('a converted contact is excluded when a pending batch is prepared', async () => {
+  const { t, broadcastId, segmentId } = await setup();
+  await t.run(ctx => ctx.db.patch(segmentId, { rules: { match: 'all', conditions: [{ field: 'tags', op: 'contains', value: 'needs-maintenance' }] } }));
+  expect(await t.mutation(internal.broadcasts.pendingForPreparation, { broadcastId })).toEqual([]);
+});
+
+test('segments used by a scheduled campaign cannot be deleted', async () => {
+  const { t, auth, broadcastId, segmentId } = await setup();
+  await t.run(ctx => ctx.db.patch(broadcastId, { status: 'scheduled' }));
+  await expect(auth.mutation(api.segments.remove, { segmentId })).rejects.toThrow('nog gebruikt');
+  expect(await t.run(ctx => ctx.db.get(segmentId))).not.toBeNull();
+});
+
+test('changed segment rules invalidate cached audiences and reject stale calculation results', async () => {
+  const { t, auth, broadcastId, segmentId } = await setup();
+  await t.run(ctx => ctx.db.patch(broadcastId, { status: 'scheduled', audienceCount: 2, audienceCountedAt: Date.now(), audienceRules: JSON.stringify({ match: 'all', conditions: [] }) }));
+  await auth.mutation(api.segments.update, { segmentId, rules: { match: 'all', conditions: [{ field: 'tags', op: 'contains', value: 'new-audience' }] } });
+  await t.mutation(internal.segments.refreshCampaignCounts, { segmentId, cursor: null });
+  expect((await t.run(ctx => ctx.db.get(broadcastId)))!.audienceCount).toBeUndefined();
+  expect(await t.mutation(internal.broadcastAudience.saveCount, { broadcastId, segmentId, rules: JSON.stringify({ match: 'all', conditions: [] }), count: 2, countedAt: Date.now() + 1000 })).toBe(false);
+});

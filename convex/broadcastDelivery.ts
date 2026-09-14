@@ -3,6 +3,7 @@ import { internalAction, internalMutation, internalQuery } from './_generated/se
 import { internal } from './_generated/api';
 import type { Doc } from './_generated/dataModel';
 import { isMailable } from './segmentsLogic';
+import { contactStillMatches } from './segments';
 
 // Requests are deliberately small enough to persist under Convex's document limit.
 export const MAX_BATCH_BYTES = 700_000;
@@ -44,6 +45,13 @@ export const begin = internalMutation({
     // Before the first request only, honor opt-outs that happened after preparation.
     // Once attempted, the immutable body must remain unchanged for safe retries.
     if (job.firstAttemptAt === undefined) {
+      const segment = await ctx.db.get(b.segmentId);
+      if (!segment || segment.workspaceId !== b.workspaceId) {
+        const lastError = 'Doelgroep ontbreekt. Controleer de campagne.';
+        await ctx.db.patch(job._id, { status: 'needs_review', lastError });
+        await ctx.db.patch(b._id, { lastError });
+        return null;
+      }
       const emails = JSON.parse(job.payload) as MailPayload[];
       const ids = [];
       const allowed = [];
@@ -52,8 +60,8 @@ export const begin = internalMutation({
         const r = await ctx.db.get(id);
         const c = r ? await ctx.db.get(r.contactId) : null;
         if (!r || r.status !== 'sending' || r.broadcastId !== b._id) throw new Error('Ontvangerstatus gewijzigd.');
-        if (!c || c.workspaceId !== b.workspaceId || c.deletedAt || !isMailable(c) || c.email?.trim().toLowerCase() !== r.email.trim().toLowerCase()) {
-          await ctx.db.patch(r._id, { status: 'failed', errorMessage: 'Overgeslagen: ontvanger is niet meer mailbaar.' });
+        if (!c || c.workspaceId !== b.workspaceId || c.deletedAt || !isMailable(c) || c.email?.trim().toLowerCase() !== r.email.trim().toLowerCase() || !(await contactStillMatches(ctx, c, segment.rules))) {
+          await ctx.db.patch(r._id, { status: 'failed', errorMessage: 'Overgeslagen: niet meer mailbaar of niet meer in deze doelgroep.' });
           skipped++;
         } else { ids.push(id); allowed.push(emails[i]); }
       }

@@ -5,7 +5,7 @@ Campaigns prepare and deduplicate their entire audience before starting delivery
 ## Delivery invariants
 
 - Render first, then persist a batch and claim its recipients in one transaction. Persisted requests contain at most 20 recipients and 700,000 UTF-8 bytes.
-- Check mailability again immediately before the first provider attempt. After an attempt, never change that request's body.
+- Check mailability and the current segment rules again immediately before the first provider attempt, so a conversion that removes a campaign tag also stops pending outreach. After an attempt, never change that request's body.
 - Every retry uses the persisted body and `broadcast-batch-<batch ID>` idempotency key. Retry network failures, 408, 429 and 5xx, honoring Retry-After. Stop before 23 hours, below Resend's 24-hour idempotency lifetime, or after six attempts. Ambiguous outcomes require review.
 - Split a request only after an explicit 422 recipient validation rejection, which accepted no recipients. A timeout must never be split or requeued under a new key.
 - Commit complete provider IDs, recipient statuses, messages and counters together. Duplicate completions are no-ops. Never label an incomplete success response as sent.
@@ -29,3 +29,5 @@ Deploy the backward-compatible Convex schema/functions before the frontend that 
 The campaign regression suite covers competing claims, duplicate completions, lost responses, incomplete responses, validation splitting, opt-outs between preparation and delivery, retry timing/expiry, cancellation, multi-page audience counts, access checks, out-of-order tracking and guarded legacy recovery. The full repository test suite, TypeScript check, Vite build and Convex production schema dry-run are release checks. Provider calls in tests are mocked.
 
 The requested seventh maintenance variant is created only by `campaignDrip7:createDraft`, reusing the first sent campaign's segment. It is not scheduled or sent by the migration.
+
+Changing segment rules invalidates and refreshes audience counts for future campaigns in bounded pages. Segments referenced by draft, scheduled, sending or failed campaigns cannot be deleted until those campaigns are moved or cancelled. Regression tests cover these guards and conversion during batch preparation.
