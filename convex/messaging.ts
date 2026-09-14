@@ -471,6 +471,7 @@ export const updateStatusByExternalId = internalMutation({
       v.literal("failed"),
       v.literal("bounced"),
       v.literal("read"),
+      v.literal("clicked"),
     ),
     deliveredAt: v.optional(v.number()),
     errorMessage: v.optional(v.string()),
@@ -479,19 +480,22 @@ export const updateStatusByExternalId = internalMutation({
     const msg = args.smsConnectionId ? (args.channel==='sms'?await findCompanySmsReceipt(ctx,args.externalMessageId,args.smsConnectionId):null) : args.whatsappConnectionId ? (args.channel==='whatsapp'?await findCompanyWhatsappReceipt(ctx,args.externalMessageId,args.whatsappConnectionId):null) : args.emailConnectionId ? (args.channel==='email' ? await findCompanyEmailReceipt(ctx,args.externalMessageId,args.emailConnectionId):null) : await findLegacyReceipt(ctx,args.externalMessageId,args.channel,args.workspaceId);
     if (!msg) {await recordSignal(ctx,args.channel,'unmatched_receipt',args.externalMessageId);return { matched: false, firstRead: false };}
 
-    const patch: Record<string, unknown> = { status: args.newStatus };
+    const patch: Record<string, unknown> = args.newStatus === 'clicked' ? {} : { status: args.newStatus };
     // Webhook-events kunnen door elkaar binnenkomen: een (herhaald)
     // delivered-event mag een al-geopende mail niet terugzetten naar
     // "delivered" — dan verdwijnt het "Geopend"-label weer uit de UI.
     if (msg.status === "read" && args.newStatus === "delivered") {
       delete patch.status;
     }
-    if (args.deliveredAt !== undefined && Number.isFinite(args.deliveredAt)) patch.deliveredAt = args.deliveredAt;
+    if (msg.status === 'bounced' && (args.newStatus === 'read' || args.newStatus === 'delivered')) delete patch.status;
+    if (args.newStatus === 'delivered' && args.deliveredAt !== undefined && Number.isFinite(args.deliveredAt)) patch.deliveredAt = args.deliveredAt;
     if (args.errorMessage !== undefined) patch.errorMessage = args.errorMessage;
     // firstRead: alleen de EERSTE open telt (herhaalde opens van dezelfde
     // ontvanger bumpen de broadcast-teller niet nog eens).
     const firstRead = args.newStatus === "read" && msg.readAt === undefined;
     if (firstRead) patch.readAt = Date.now();
+    const firstClick = args.newStatus === 'clicked' && msg.clickedAt === undefined;
+    if (firstClick) patch.clickedAt = Date.now();
 
     const firstDelivery=args.newStatus==='delivered' && msg.deliveryReceiptAt===undefined && msg.deliveredAt===undefined;
     const firstBounce=args.newStatus==='bounced' && msg.bounceReceiptAt===undefined && msg.status!=='bounced';
@@ -508,6 +512,7 @@ export const updateStatusByExternalId = internalMutation({
         if(broadcast?.workspaceId===msg.workspaceId){
           const stats={...broadcast.stats};
           if(firstRead)stats.opened=(stats.opened??0)+1;
+          if(firstClick)stats.clicked=(stats.clicked??0)+1;
           if(firstDelivery)stats.delivered+=1;
           if(firstBounce)stats.bounced+=1;
           await ctx.db.patch(broadcast._id,{stats});

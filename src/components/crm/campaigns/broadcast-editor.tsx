@@ -46,13 +46,14 @@ export function BroadcastEditor({
   const update = useMutation(api.broadcasts.update)
   const sendTest = useAction(api.broadcasts.sendTest)
   const sendNow = useAction(api.broadcasts.sendNow)
+  const countAudience = useAction(api.broadcastAudience.count)
 
   const companyName = crmSettings?.companyName ?? 'StayCool Airco'
 
   const preview = useQuery(
     api.segments.preview,
-    segmentId
-      ? { workspaceId, rules: segments?.find((s) => s._id === segmentId)?.rules ?? { match: 'all', conditions: [] } }
+    segmentId && segments?.find((s) => s._id === segmentId)
+      ? { workspaceId, rules: segments.find((s) => s._id === segmentId)!.rules }
       : 'skip',
   )
 
@@ -144,7 +145,8 @@ export function BroadcastEditor({
     setBusy(true)
     try {
       const id = await saveDraft()
-      const n = preview?.count ?? 0
+      const { count: n } = await countAudience({ broadcastId: id })
+      if (n === 0) throw new Error('Deze doelgroep bevat geen mailbare ontvangers.')
       if (!window.confirm(`Je staat op het punt ${n} mensen te mailen. Doorgaan?`)) return
       const res = await sendNow({ broadcastId: id })
       toast.success(`Verzending gestart naar ${res.total} contacten`)

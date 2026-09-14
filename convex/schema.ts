@@ -431,6 +431,12 @@ export default defineSchema({
     ),
     scheduledAt: v.optional(v.number()),
     scheduledJobId: v.optional(v.id("_scheduled_functions")),
+    audienceCount: v.optional(v.number()),
+    audienceCountedAt: v.optional(v.number()),
+    audienceRules: v.optional(v.string()),
+    recipientsReady: v.optional(v.boolean()),
+    lastError: v.optional(v.string()),
+    lastActivityAt: v.optional(v.number()),
     stats: v.object({
       total: v.number(),
       sent: v.number(),
@@ -441,10 +447,12 @@ export default defineSchema({
       // Unieke opens (max 1 per ontvanger); optioneel — oudere broadcasts
       // hebben dit veld niet.
       opened: v.optional(v.number()),
+      clicked: v.optional(v.number()),
     }),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
-  }).index("by_workspace_status", ["workspaceId", "status"]),
+  }).index("by_workspace_status", ["workspaceId", "status"])
+    .index("by_status", ["status"]),
 
   broadcastRecipients: defineTable({
     broadcastId: v.id("broadcasts"),
@@ -456,7 +464,23 @@ export default defineSchema({
     status: v.union(v.literal("pending"), v.literal("sending"), v.literal("sent"), v.literal("failed")),
     externalMessageId: v.optional(v.string()),
     errorMessage: v.optional(v.string()),
-  }).index("by_broadcast_status", ["broadcastId", "status"]),
+  }).index("by_broadcast_status", ["broadcastId", "status"])
+    .index("by_broadcast_contact", ["broadcastId", "contactId"]),
+
+  // A bounded, immutable request makes retries safe with Resend's idempotency key.
+  broadcastBatches: defineTable({
+    broadcastId: v.id("broadcasts"),
+    recipientIds: v.array(v.id("broadcastRecipients")),
+    payload: v.string(),
+    emailConnectionId: v.optional(v.id("companyEmailConnections")),
+    status: v.union(v.literal("pending"), v.literal("processing"), v.literal("sent"), v.literal("failed"), v.literal("needs_review")),
+    attempts: v.number(),
+    firstAttemptAt: v.optional(v.number()),
+    lastAttemptAt: v.optional(v.number()),
+    nextAttemptAt: v.number(),
+    lastError: v.optional(v.string()),
+  }).index("by_status_nextAttemptAt", ["status", "nextAttemptAt"])
+    .index("by_broadcastId_status", ["broadcastId", "status"]),
 
   // ════════════════════════════════════════════════════════════════════
   // AI LEAD-RESPONSE AGENT
@@ -542,6 +566,7 @@ export default defineSchema({
     sentAt: v.optional(v.number()),
     deliveredAt: v.optional(v.number()),
     readAt: v.optional(v.number()),
+    clickedAt: v.optional(v.number()),
     deliveryReceiptAt: v.optional(v.number()),
     bounceReceiptAt: v.optional(v.number()),
     // Migration breadcrumb: idempotency-key voor Neon→Convex ETL.
@@ -1210,4 +1235,3 @@ export default defineSchema({
   //    ETL moet email-based matching doen tijdens migratie (alle gebruikers
   //    krijgen welcome-back email met magic-link voor nieuwe auth provider).
 });
-

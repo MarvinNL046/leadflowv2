@@ -539,14 +539,14 @@ http.route({
     // Map Resend event-type naar messages.status enum
     const statusMap: Record<
       string,
-      "delivered" | "failed" | "bounced" | "read" | null
+      "delivered" | "failed" | "bounced" | "read" | "clicked" | null
     > = {
       "email.delivered": "delivered",
       "email.bounced": "bounced",
       "email.complained": "bounced",
       "email.delivery_delayed": null,  // negeer
       "email.opened": "read",
-      "email.clicked": null,
+      "email.clicked": "clicked",
       "email.sent": null,
     };
     const newStatus = statusMap[payload.type];
@@ -554,7 +554,7 @@ http.route({
       return jsonResponse({ received: true, ignored: payload.type }, 200);
     }
 
-    await ctx.runMutation(internal.messaging.updateStatusByExternalId, {
+    const receipt = await ctx.runMutation(internal.messaging.updateStatusByExternalId, {
       externalMessageId: externalId,
       channel: 'email',
       complaint: payload.type === 'email.complained',
@@ -568,6 +568,7 @@ http.route({
           : undefined,
     });
 
+    if (!receipt.matched) return jsonResponse({ error: "Message receipt not stored yet" }, 503);
     return jsonResponse({ received: true, type: payload.type }, 200);
   }),
 });
@@ -615,14 +616,14 @@ http.route({
     // Map Resend event-type naar messages.status enum
     const statusMap: Record<
       string,
-      "delivered" | "failed" | "bounced" | "read" | null
+      "delivered" | "failed" | "bounced" | "read" | "clicked" | null
     > = {
       "email.delivered": "delivered",
       "email.bounced": "bounced",
       "email.complained": "bounced",
       "email.delivery_delayed": null,  // negeer
       "email.opened": "read",
-      "email.clicked": null,
+      "email.clicked": "clicked",
       "email.sent": null,
     };
     const newStatus = statusMap[payload.type];
@@ -630,7 +631,7 @@ http.route({
       return jsonResponse({ received: true, ignored: payload.type }, 200);
     }
 
-    await ctx.runMutation(internal.messaging.updateStatusByExternalId, {
+    const receipt = await ctx.runMutation(internal.messaging.updateStatusByExternalId, {
       externalMessageId: externalId,
       channel: 'email',
       emailConnectionId:rawId as Id<'companyEmailConnections'>,
@@ -645,6 +646,7 @@ http.route({
           : undefined,
     });
 
+    if (!receipt.matched) return jsonResponse({ error: "Message receipt not stored yet" }, 503);
     return jsonResponse({ received: true, type: payload.type }, 200);
   }),
 });
