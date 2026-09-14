@@ -145,7 +145,7 @@ function BroadcastDetail() {
       </div>
 
       {scheduleError && <p role="alert" className="text-sm text-red-600">{scheduleError}</p>}
-      {b.lastError && <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{b.lastError}</p>}
+      {b.lastError && <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{humanizeConvexError(new Error(b.lastError), 'De verzending heeft aandacht nodig.')}</p>}
       {health && (b.status === 'sending' || b.status === 'failed') && (
         <Card>
           <CardHeader><CardTitle className="text-sm">Verzendvoortgang</CardTitle></CardHeader>
@@ -155,7 +155,7 @@ function BroadcastDetail() {
             {health.batches.map(batch => <div key={batch.id} className="rounded border border-zinc-300 p-3">
               <p>{batch.recipients} ontvangers · {batch.status === 'needs_review' ? 'Controle nodig' : batch.status === 'processing' ? 'Bevestiging afwachten' : 'Nieuwe poging gepland'} · {batch.attempts} pogingen</p>
               {batch.status === 'pending' && <p>Volgende poging: {formatMoment(batch.nextAttemptAt)}</p>}
-              {batch.error && <p className="text-amber-900">{batch.error}</p>}
+              {batch.error && <p className="text-amber-900">{humanizeConvexError(new Error(batch.error), 'Deze verzendpoging heeft aandacht nodig.')}</p>}
             </div>)}
             {health.hasPending && b.status === 'failed' && <Button disabled={busy} onClick={async () => {
               setBusy(true)
@@ -171,7 +171,7 @@ function BroadcastDetail() {
           <CardHeader><CardTitle className="text-sm">Verzendlijst vooraf</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <p className="text-lg font-semibold">{b.audienceCount === undefined ? 'Aantal nog niet berekend' : `${b.audienceCount.toLocaleString('nl-NL')} unieke ontvangers`}</p>
-            {b.audienceError && <p role="alert" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">{b.audienceError}</p>}
+            {b.audienceError && <p role="alert" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">{humanizeConvexError(new Error(b.audienceError), 'Controleer de doelgroep.')}</p>}
             {b.audienceCountedAt !== undefined && <p className="text-xs text-zinc-600">Berekend op {formatMoment(b.audienceCountedAt)}</p>}
             <p className="text-sm text-zinc-600">Afmeldingen, ongeldige adressen en dubbele e-mailadressen worden uitgesloten. Bij verzending wordt de actuele doelgroep opnieuw gecontroleerd.</p>
             <Button variant="outline" disabled={counting} onClick={() => void refreshAudience()}>{counting ? 'Volledige lijst tellen…' : 'Aantal ontvangers berekenen'}</Button>
