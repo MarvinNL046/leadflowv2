@@ -80,7 +80,9 @@ export function AnsweredDialog({
       })
       toast.success(
         outcome === 'appointment'
-          ? 'Afspraak ingepland — in agenda + lead naar Voorstel-stage'
+          ? extras.followUpAt
+            ? 'Afspraak ingepland — in agenda + lead naar Voorstel-stage'
+            : 'Handmatig ingepland — lead naar Voorstel'
           : outcome === 'callback'
             ? 'Terugbel-datum gezet'
             : 'Lead gemarkeerd als niet geïnteresseerd',
@@ -123,6 +125,16 @@ export function AnsweredDialog({
               desc="Lead naar Voorstel-stage, datum kiezen"
               color="violet"
               onClick={() => setView('appointment')}
+            />
+            <OutcomeButton
+              icon={CalendarClock}
+              label="Handmatig ingepland"
+              desc="Al elders gepland — naar Voorstel, geen nieuw agenda-item"
+              color="violet"
+              onClick={() => handleOutcome('appointment', {
+                note: 'Handmatig ingepland — afspraak staat al elders in de planning. Geen nieuw agenda-item aangemaakt.',
+              })}
+              disabled={submitting}
             />
             <OutcomeButton
               icon={PhoneOutgoing}
