@@ -226,6 +226,17 @@ export function LeadDialog({
           <AnsweredOptionsView
             processing={processing}
             onScheduleNow={() => setView('appointment_date')}
+            onManuallyScheduled={() =>
+              runAction(
+                'manually_scheduled',
+                () => recordCallAnswered({
+                  contactId: lead._id as Id<'contacts'>,
+                  outcome: 'appointment',
+                  note: 'Handmatig ingepland — afspraak staat al elders in de planning. Geen nieuw agenda-item aangemaakt.',
+                }),
+                'Handmatig ingepland — lead naar Voorstel',
+              )
+            }
             onCallbackLater={() => setView('callback_options')}
             onCustomerWillCallback={() =>
               runAction(

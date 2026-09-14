@@ -4,6 +4,7 @@ import { ActionButton } from '../parts/action-button'
 interface Props {
   processing: string | null
   onScheduleNow: () => void
+  onManuallyScheduled: () => void
   onCallbackLater: () => void
   onCustomerWillCallback: () => void
   onNotInterested: () => void
@@ -12,6 +13,7 @@ interface Props {
 export function AnsweredOptionsView({
   processing,
   onScheduleNow,
+  onManuallyScheduled,
   onCallbackLater,
   onCustomerWillCallback,
   onNotInterested,
@@ -30,6 +32,15 @@ export function AnsweredOptionsView({
         primary
         disabled={processing !== null}
         onClick={onScheduleNow}
+      />
+
+      <ActionButton
+        icon={CalendarPlus}
+        title="Handmatig ingepland"
+        subtitle="Al elders gepland → naar Voorstel, geen nieuw agenda-item"
+        color="violet"
+        disabled={processing !== null}
+        onClick={onManuallyScheduled}
       />
 
       <ActionButton
