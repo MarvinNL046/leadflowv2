@@ -249,3 +249,43 @@ test('changed segment rules invalidate cached audiences and reject stale calcula
   expect((await t.run(ctx => ctx.db.get(broadcastId)))!.audienceCount).toBeUndefined();
   expect(await t.mutation(internal.broadcastAudience.saveCount, { broadcastId, segmentId, rules: JSON.stringify({ match: 'all', conditions: [] }), count: 2, countedAt: Date.now() + 1000 })).toBe(false);
 });
+
+test('a missing audience cannot be scheduled or started and the draft stays editable', async () => {
+  const { t, auth, broadcastId, segmentId } = await setup();
+  await t.run(async ctx => { await ctx.db.patch(broadcastId, { status: 'draft' }); await ctx.db.delete(segmentId); });
+  await expect(auth.mutation(api.broadcasts.schedule, { broadcastId, scheduledAt: Date.now() + 60_000 })).rejects.toThrow('doelgroep');
+  await expect(t.mutation(internal.broadcasts.beginSend, { broadcastId })).rejects.toThrow('doelgroep');
+  expect((await t.run(ctx => ctx.db.get(broadcastId)))!.status).toBe('draft');
+});
+
+test('a legacy scheduled campaign with a missing segment stops with an actionable error', async () => {
+  const { t, broadcastId, segmentId } = await setup();
+  await t.run(async ctx => { await ctx.db.patch(broadcastId, { status: 'scheduled', scheduledAt: Date.now() - 1000 }); await ctx.db.delete(segmentId); });
+  expect(await t.mutation(internal.broadcasts.beginScheduledSend, { broadcastId })).toEqual({ started: false });
+  expect(await t.run(ctx => ctx.db.get(broadcastId))).toMatchObject({ status: 'failed', lastError: expect.stringContaining('doelgroep') });
+});
+
+test('background count failures are visible without falsely reporting zero recipients', async () => {
+  const { t, broadcastId, segmentId } = await setup();
+  await t.run(async ctx => { await ctx.db.patch(broadcastId, { status: 'draft', audienceCount: 2 }); await ctx.db.delete(segmentId); });
+  await t.action(internal.broadcastAudience.refresh, { broadcastId });
+  const b = (await t.run(ctx => ctx.db.get(broadcastId)))!;
+  expect(b.audienceCount).toBeUndefined();
+  expect(b.audienceError).toContain('doelgroep');
+});
+
+test('recipient pagination stays stable while recipients change delivery status', async () => {
+  const { t, auth, broadcastId } = await setup();
+  const first = await auth.query(api.broadcasts.recipientsPage, { broadcastId, paginationOpts: { cursor: null, numItems: 1 } });
+  await t.run(ctx => ctx.db.patch(first.page[0]._id, { status: 'sent' }));
+  const seen = [first.page[0]._id];
+  let cursor = first.continueCursor;
+  for (let i = 0; i < 4; i++) {
+    const next = await auth.query(api.broadcasts.recipientsPage, { broadcastId, paginationOpts: { cursor, numItems: 1 } });
+    seen.push(...next.page.map(r => r._id));
+    if (next.isDone) break;
+    cursor = next.continueCursor;
+  }
+  expect(seen).toHaveLength(2);
+  expect(new Set(seen).size).toBe(2);
+});

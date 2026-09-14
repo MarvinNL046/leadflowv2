@@ -14,7 +14,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { renderTemplate, htmlToPlainText, leadTemplateVars } from "./templateRender";
 import { signUnsubToken } from "./unsubscribeToken";
 import { buildListUnsubHeaders } from "./broadcastsLogic";
@@ -31,6 +31,13 @@ async function requireWorkspace(ctx: QueryCtx, workspaceId: Id<"workspaces">, pe
 }
 
 const ZERO_STATS = { total: 0, sent: 0, delivered: 0, bounced: 0, unsubscribed: 0, failed: 0 };
+
+async function validateForStart(ctx: QueryCtx, b: Doc<'broadcasts'>): Promise<string | null> {
+  if (!b.name.trim() || !b.subject.trim() || !b.body?.trim()) return 'Vul naam, onderwerp en mailinhoud in voordat u de campagne start.';
+  const segment = await ctx.db.get(b.segmentId);
+  if (!segment || segment.workspaceId !== b.workspaceId) return 'De doelgroep bestaat niet meer. Kies bij Mail bewerken een geldige doelgroep.';
+  return null;
+}
 
 // ── Queries ──────────────────────────────────────────────────────────
 export const list = query({
@@ -98,7 +105,7 @@ export const recipientsPage = query({
     await requireWorkspace(ctx, b.workspaceId);
     const page = await ctx.db
       .query("broadcastRecipients")
-      .withIndex("by_broadcast_status", (q) => q.eq("broadcastId", args.broadcastId))
+      .withIndex("by_broadcast_contact", (q) => q.eq("broadcastId", args.broadcastId))
       .paginate({
         ...args.paginationOpts,
         numItems: Math.min(args.paginationOpts.numItems, 100),
@@ -193,7 +200,7 @@ export const update = mutation({
     const segment = await ctx.db.get(fields.segmentId);
     if (!segment || segment.workspaceId !== b.workspaceId) throw new Error("Ongeldig segment.");
     if (!fields.name.trim() || !fields.subject.trim() || !fields.body.trim()) throw new Error("Vul naam, onderwerp en inhoud in.");
-    await ctx.db.patch(broadcastId, { ...fields, audienceCount: undefined, audienceCountedAt: undefined, audienceRules: undefined });
+    await ctx.db.patch(broadcastId, { ...fields, audienceCount: undefined, audienceCountedAt: undefined, audienceRules: undefined, audienceError: undefined });
     await ctx.scheduler.runAfter(0, internal.broadcastAudience.refresh, { broadcastId });
     return null;
   },
@@ -342,6 +349,8 @@ export const schedule = mutation({
     if (b.status !== "draft" && b.status !== "scheduled") {
       throw new Error("Alleen een concept of ingeplande campagne kan worden ingepland.");
     }
+    const validationError = await validateForStart(ctx, b);
+    if (validationError) throw new Error(validationError);
     if (!Number.isFinite(args.scheduledAt) || args.scheduledAt <= Date.now()) {
       throw new Error("Kies een moment in de toekomst.");
     }
@@ -366,6 +375,11 @@ export const beginScheduledSend = internalMutation({
     // Legacy jobs have no timestamp: they must still respect the current slot.
     if (b.scheduledAt === undefined || b.scheduledAt > Date.now()) return { started: false as const };
     if (args.scheduledAt !== undefined && args.scheduledAt !== b.scheduledAt) return { started: false as const };
+    const validationError = await validateForStart(ctx, b);
+    if (validationError) {
+      await ctx.db.patch(b._id, { status: 'failed', lastError: validationError });
+      return { started: false as const };
+    }
     await ctx.db.patch(args.broadcastId, { status: "sending", startedAt: Date.now(), recipientsReady: false });
     return { started: true as const };
   },
@@ -464,6 +478,8 @@ export const beginSend = internalMutation({
     const b = await ctx.db.get(args.broadcastId);
     if (!b) return { started: false as const };
     if (b.status !== "draft") return { started: false as const };
+    const validationError = await validateForStart(ctx, b);
+    if (validationError) throw new Error(validationError);
     await ctx.db.patch(args.broadcastId, { status: "sending", startedAt: Date.now(), recipientsReady: false });
     return { started: true as const };
   },

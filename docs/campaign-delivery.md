@@ -31,3 +31,5 @@ The campaign regression suite covers competing claims, duplicate completions, lo
 The requested seventh maintenance variant is created only by `campaignDrip7:createDraft`, reusing the first sent campaign's segment. It is not scheduled or sent by the migration.
 
 Changing segment rules invalidates and refreshes audience counts for future campaigns in bounded pages. Segments referenced by draft, scheduled, sending or failed campaigns cannot be deleted until those campaigns are moved or cancelled. Regression tests cover these guards and conversion during batch preparation.
+
+Preflight checks reject incomplete emails and missing/cross-workspace segments before scheduling or leaving draft status. Legacy scheduled campaigns with missing segments stop with a visible error. Background audience-count failures are persisted separately from delivery errors and are never shown as zero recipients. Recipient pagination uses the stable broadcast/contact index rather than a changing delivery status.

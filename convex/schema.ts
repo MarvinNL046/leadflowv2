@@ -434,6 +434,7 @@ export default defineSchema({
     audienceCount: v.optional(v.number()),
     audienceCountedAt: v.optional(v.number()),
     audienceRules: v.optional(v.string()),
+    audienceError: v.optional(v.string()),
     recipientsReady: v.optional(v.boolean()),
     lastError: v.optional(v.string()),
     lastActivityAt: v.optional(v.number()),
